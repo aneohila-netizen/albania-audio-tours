@@ -18,9 +18,11 @@ function requireAdmin(req: any, res: any, next: any) {
   next();
 }
 
-// ─── Audio upload config ──────────────────────────────────────────────────────
+// ─── Upload dirs ─────────────────────────────────────────────────────────────
 const AUDIO_DIR = path.join(process.cwd(), "data", "audio");
+const IMAGE_DIR = path.join(process.cwd(), "data", "images");
 if (!fs.existsSync(AUDIO_DIR)) fs.mkdirSync(AUDIO_DIR, { recursive: true });
+if (!fs.existsSync(IMAGE_DIR)) fs.mkdirSync(IMAGE_DIR, { recursive: true });
 
 const audioStorage = multer.diskStorage({
   destination: (_req, _file, cb) => {
@@ -33,14 +35,37 @@ const audioStorage = multer.diskStorage({
   },
 });
 
+const imageStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    if (!fs.existsSync(IMAGE_DIR)) fs.mkdirSync(IMAGE_DIR, { recursive: true });
+    cb(null, IMAGE_DIR);
+  },
+  filename: (_req, file, cb) => {
+    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
+    cb(null, `${Date.now()}_${safe}`);
+  },
+});
+
 const upload = multer({
   storage: audioStorage,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB
+  limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith("audio/") || file.mimetype === "application/octet-stream") {
       cb(null, true);
     } else {
       cb(new Error("Only audio files are allowed"));
+    }
+  },
+});
+
+const imageUpload = multer({
+  storage: imageStorage,
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed"));
     }
   },
 });
@@ -83,6 +108,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } else {
       next();
     }
+  });
+
+  // Serve uploaded image files
+  app.use("/api/images", (req, res, next) => {
+    const filePath = path.join(IMAGE_DIR, req.path.replace(/^\//, ""));
+    if (fs.existsSync(filePath)) {
+      res.sendFile(filePath);
+    } else {
+      next();
+    }
+  });
+
+  // Health check
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok", backend: "railway", db: process.env.DATABASE_URL ? "postgres" : "memory" });
   });
 
   // ── Admin: Auth ─────────────────────────────────────────────────────────────
@@ -153,6 +193,33 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!updated) return res.status(404).json({ error: "Site not found" });
     res.json({ success: true, site: updated });
   });
+
+  // ── Admin: Image Upload ─────────────────────────────────────────────────────────────
+  app.post(
+    "/api/admin/sites/:id/image",
+    requireAdmin,
+    imageUpload.single("image"),
+    async (req: any, res) => {
+      const id = parseInt(req.params.id);
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      const imageUrl = `/api/images/${req.file.filename}`;
+      const updated = await storage.updateSite(id, { imageUrl } as any);
+      if (!updated) return res.status(404).json({ error: "Site not found" });
+      res.json({ url: imageUrl, site: updated });
+    }
+  );
+
+  // POST /api/admin/upload-image — generic image upload (returns URL, caller updates site separately)
+  app.post(
+    "/api/admin/upload-image",
+    requireAdmin,
+    imageUpload.single("image"),
+    async (req: any, res) => {
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      const imageUrl = `/api/images/${req.file.filename}`;
+      res.json({ url: imageUrl });
+    }
+  );
 
   return httpServer;
 }

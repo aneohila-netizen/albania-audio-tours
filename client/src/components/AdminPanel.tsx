@@ -100,16 +100,63 @@ type View =
   | { screen: "attr-editor"; attractionId: number | null; destinationSlug: string; destinationName: string };
 
 // ─── Admin fetch helper ────────────────────────────────────────────────────────
+const RAILWAY_API = "https://albania-audio-tours-production.up.railway.app";
+
 function adminFetch(url: string, options?: RequestInit) {
   const token = getAdminToken() || "";
-  return fetch(url, {
+  // Always use absolute Railway URL so calls work from any hosting
+  const fullUrl = url.startsWith("http") ? url : `${RAILWAY_API}${url}`;
+  return fetch(fullUrl, {
     ...options,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       "x-admin-token": token,
       ...(options?.headers || {}),
     },
   });
+}
+
+// For multipart/file uploads (no Content-Type header — browser sets boundary)
+function adminUpload(url: string, formData: FormData) {
+  const token = getAdminToken() || "";
+  const fullUrl = url.startsWith("http") ? url : `${RAILWAY_API}${url}`;
+  return fetch(fullUrl, {
+    method: "POST",
+    credentials: "include",
+    headers: { "x-admin-token": token },
+    body: formData,
+  });
+}
+
+// ─── BACKEND STATUS BANNER ───────────────────────────────────────────────────
+function BackendStatusBanner() {
+  const [status, setStatus] = useState<"checking" | "connected" | "offline">("checking");
+  const [dbType, setDbType] = useState("");
+
+  useEffect(() => {
+    fetch(`${RAILWAY_API}/api/health`, { credentials: "include" })
+      .then(r => r.json())
+      .then(d => { setStatus("connected"); setDbType(d.db || ""); })
+      .catch(() => setStatus("offline"));
+  }, []);
+
+  if (status === "checking") return (
+    <div className="rounded-lg bg-muted/50 border border-border/40 px-4 py-3 text-xs text-muted-foreground flex items-center gap-2">
+      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Connecting to backend...
+    </div>
+  );
+  if (status === "connected") return (
+    <div className="rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/40 px-4 py-3 text-xs text-green-800 dark:text-green-300 flex items-center gap-2">
+      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+      <span><strong>Connected to Railway backend</strong> — all changes save permanently to {dbType === "postgres" ? "PostgreSQL database" : "server storage"}. Edits sync across all devices instantly.</span>
+    </div>
+  );
+  return (
+    <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 px-4 py-3 text-xs text-amber-800 dark:text-amber-300">
+      <strong>Backend offline</strong> — changes saved locally this session only.
+    </div>
+  );
 }
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
@@ -316,11 +363,8 @@ function SitesView({
           ))}
         </div>
 
-        {/* Info banner — soft, not alarming */}
-        <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40 px-4 py-3 text-xs text-blue-800 dark:text-blue-300">
-          <strong>Content mode</strong> — changes are saved locally in your browser. To sync across devices or team members, connect a backend server.
-          Image uploads and edits are preserved in your current browser session.
-        </div>
+        {/* Backend status banner */}
+        <BackendStatusBanner />
 
         {/* Destinations list */}
         <div className="flex items-center justify-between">
@@ -632,14 +676,13 @@ function AudioCard({
     const formData = new FormData();
     formData.append("audio", file);
     try {
-      const token = getAdminToken() || "";
-      const res = await fetch(`/api/admin/sites/${siteId}/audio/${lang}`, {
-        method: "POST",
-        headers: { "x-admin-token": token },
-        body: formData,
-      });
+      const res = await adminUpload(`/api/admin/sites/${siteId}/audio/${lang}`, formData);
       const data = await res.json();
-      if (res.ok) { onUpdate(data.url); }
+      if (res.ok) {
+        // Make URL absolute for cross-origin playback
+        const absUrl = data.url.startsWith("http") ? data.url : `${RAILWAY_API}${data.url}`;
+        onUpdate(absUrl);
+      }
       else { setError(data.error || "Upload failed"); }
     } catch {
       setError("Network error during upload");
@@ -731,20 +774,29 @@ function ImageUploadCard({ imageUrl, onUpdate }: { imageUrl: string; onUpdate: (
     onUpdate(val);
   }
 
-  function processFile(file: File) {
+  async function processFile(file: File) {
     setError("");
     if (!file.type.startsWith("image/")) { setError("Please select an image file."); return; }
-    if (file.size > 8 * 1024 * 1024) { setError("Image must be under 8 MB"); return; }
+    if (file.size > 20 * 1024 * 1024) { setError("Image must be under 20 MB"); return; }
     setProcessing(true);
     setUploadedName(file.name);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      onUpdate(dataUrl);
-      setProcessing(false);
-    };
-    reader.onerror = () => { setError("Failed to read file"); setProcessing(false); };
-    reader.readAsDataURL(file);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await adminUpload("/api/admin/upload-image", fd);
+      if (res.ok) {
+        const { url } = await res.json();
+        // Convert relative URL to absolute Railway URL
+        const absUrl = url.startsWith("http") ? url : `${RAILWAY_API}${url}`;
+        onUpdate(absUrl);
+        setUploadedName(file.name);
+      } else {
+        setError("Upload failed. Please use a URL instead.");
+      }
+    } catch {
+      setError("Upload failed. Please use a URL instead.");
+    }
+    setProcessing(false);
   }
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -846,7 +898,7 @@ function ImageUploadCard({ imageUrl, onUpdate }: { imageUrl: string; onUpdate: (
               </button>
               <div className="absolute bottom-2 left-2">
                 <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-black/50 text-white">
-                  {isDataUrl ? "📁 Local file" : "🔗 URL"}
+                  {isDataUrl ? "📁 Local file" : imageUrl.includes("railway.app") ? "✅ Uploaded" : "🔗 URL"}
                 </span>
               </div>
             </div>
