@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -19,6 +20,17 @@ app.use(
     },
   }),
 );
+
+app.use(cors({
+  origin: [
+    "https://www.perplexity.ai",
+    "https://albania-audio-tours-production.up.railway.app",
+    "https://albanianaudiotours.com",
+    "https://audiotours.albanianeagletours.com",
+    /\.perplexity\.ai$/,
+  ],
+  credentials: true,
+}));
 
 app.use(express.urlencoded({ extended: false }));
 
