@@ -752,6 +752,135 @@ function AudioCard({
   );
 }
 
+// ─── PREVIEW CARDS ───────────────────────────────────────────────────────────
+function DestinationPreviewCard({ form }: { form: any }) {
+  const RAILWAY_BASE = "https://albania-audio-tours-production.up.railway.app";
+  const frontendUrl = `${RAILWAY_BASE}/#/sites/${form.slug}`;
+  const catColor = CATEGORY_COLORS[form.category] || "bg-gray-100 text-gray-800";
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">Live preview of how this destination appears to visitors.</p>
+        <a href={frontendUrl} target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+          <Eye className="w-3.5 h-3.5" /> Open in App
+        </a>
+      </div>
+      <div className="rounded-2xl border border-border/60 overflow-hidden shadow-sm max-w-sm">
+        {form.imageUrl ? (
+          <div className="relative h-44 bg-muted">
+            <img src={form.imageUrl} alt={form.nameEn} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display="none"; }} />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent" />
+            <div className="absolute bottom-3 left-3 right-3">
+              <h3 className="text-white font-semibold text-base leading-tight">{form.nameEn || "Destination Name"}</h3>
+              {form.region && <p className="text-white/70 text-xs mt-0.5">{form.region}</p>}
+            </div>
+          </div>
+        ) : (
+          <div className="h-44 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+            <div className="text-center">
+              <MapPin className="w-8 h-8 text-primary/40 mx-auto mb-2" />
+              <p className="text-sm font-medium text-foreground/60">{form.nameEn || "Destination Name"}</p>
+            </div>
+          </div>
+        )}
+        <div className="p-4 space-y-3 bg-card">
+          <div className="flex items-center gap-2 flex-wrap">
+            {form.category && <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${catColor}`}>{form.category}</span>}
+            {form.difficulty && <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{form.difficulty}</span>}
+            {form.points && <span className="text-xs font-medium text-amber-600">★ {form.points} XP</span>}
+          </div>
+          {form.descEn && <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">{form.descEn}</p>}
+          {form.funFactEn && (
+            <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200/60 px-3 py-2">
+              <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-0.5">💡 Fun fact</p>
+              <p className="text-xs text-amber-700/80 dark:text-amber-400/80 line-clamp-2">{form.funFactEn}</p>
+            </div>
+          )}
+          <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1 border-t border-border/40">
+            {form.lat && form.lng && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{parseFloat(form.lat).toFixed(4)}, {parseFloat(form.lng).toFixed(4)}</span>}
+            {form.visitDuration && <span>⏱ {form.visitDuration} min</span>}
+          </div>
+        </div>
+      </div>
+      <div className="rounded-lg border border-border/60 p-4 space-y-2">
+        <p className="text-xs font-medium text-foreground">Translation coverage</p>
+        {(["En", "Al", "Gr"] as const).map(lang => (
+          <div key={lang} className="flex items-center gap-2 text-xs">
+            <span className="w-16 text-muted-foreground">{lang === "En" ? "🇬🇧 EN" : lang === "Al" ? "🇦🇱 SQ" : "🇬🇷 GR"}</span>
+            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+              <div className="h-full rounded-full bg-primary transition-all" style={{ width: (form as any)[`name${lang}`] && (form as any)[`desc${lang}`] ? "100%" : (form as any)[`name${lang}`] ? "40%" : "0%" }} />
+            </div>
+            <span className="text-muted-foreground">{(form as any)[`name${lang}`] && (form as any)[`desc${lang}`] ? "✅ Complete" : (form as any)[`name${lang}`] ? "⚠️ Partial" : "❌ Missing"}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AttractionPreviewCard({ form, destinationName }: { form: any; destinationName: string }) {
+  const RAILWAY_BASE = "https://albania-audio-tours-production.up.railway.app";
+  const frontendUrl = `${RAILWAY_BASE}/#/attraction/${form.slug}`;
+  const catColor = CATEGORY_COLORS[form.category] || "bg-gray-100 text-gray-800";
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">Preview of this attraction inside {destinationName || "the destination"}.</p>
+        <a href={frontendUrl} target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+          <Eye className="w-3.5 h-3.5" /> Open in App
+        </a>
+      </div>
+      <div className="rounded-2xl border border-border/60 overflow-hidden shadow-sm max-w-sm">
+        {form.imageUrl ? (
+          <div className="relative h-36 bg-muted">
+            <img src={form.imageUrl} alt={form.nameEn} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display="none"; }} />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent" />
+            <div className="absolute bottom-2 left-3">
+              <h3 className="text-white font-semibold text-sm">{form.nameEn || "Attraction Name"}</h3>
+            </div>
+          </div>
+        ) : (
+          <div className="h-36 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+            <div className="text-center">
+              <Star className="w-7 h-7 text-primary/40 mx-auto mb-1" />
+              <p className="text-sm font-medium text-foreground/60">{form.nameEn || "Attraction Name"}</p>
+            </div>
+          </div>
+        )}
+        <div className="p-4 space-y-3 bg-card">
+          {form.category && <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${catColor}`}>{form.category}</span>}
+          {form.descEn && <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">{form.descEn}</p>}
+          {form.funFactEn && (
+            <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200/60 px-3 py-2">
+              <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-0.5">💡 Fun fact</p>
+              <p className="text-xs text-amber-700/80 line-clamp-2">{form.funFactEn}</p>
+            </div>
+          )}
+          <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1 border-t border-border/40">
+            {form.points && <span className="font-medium text-amber-600">★ {form.points} XP</span>}
+            {form.visitDuration && <span>⏱ {form.visitDuration} min</span>}
+            {form.lat && form.lng && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{parseFloat(form.lat).toFixed(3)}, {parseFloat(form.lng).toFixed(3)}</span>}
+          </div>
+        </div>
+      </div>
+      <div className="rounded-lg border border-border/60 p-4 space-y-2">
+        <p className="text-xs font-medium text-foreground">Translation coverage</p>
+        {(["En", "Al", "Gr"] as const).map(lang => (
+          <div key={lang} className="flex items-center gap-2 text-xs">
+            <span className="w-16 text-muted-foreground">{lang === "En" ? "🇬🇧 EN" : lang === "Al" ? "🇦🇱 SQ" : "🇬🇷 GR"}</span>
+            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+              <div className="h-full rounded-full bg-primary transition-all" style={{ width: (form as any)[`name${lang}`] && (form as any)[`desc${lang}`] ? "100%" : (form as any)[`name${lang}`] ? "40%" : "0%" }} />
+            </div>
+            <span className="text-muted-foreground">{(form as any)[`name${lang}`] && (form as any)[`desc${lang}`] ? "✅ Complete" : (form as any)[`name${lang}`] ? "⚠️ Partial" : "❌ Missing"}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── IMAGE UPLOAD CARD ────────────────────────────────────────────────────────
 function ImageUploadCard({ imageUrl, onUpdate }: { imageUrl: string; onUpdate: (url: string) => void }) {
   const [mode, setMode] = useState<"url" | "upload">("url");
@@ -1112,6 +1241,7 @@ function EditorView({
               {isNew && <span className="text-muted-foreground/60 ml-1">(save first)</span>}
             </TabsTrigger>
             <TabsTrigger value="media" className="gap-1.5 text-xs"><Image className="w-3.5 h-3.5" /> Media</TabsTrigger>
+            <TabsTrigger value="preview" className="gap-1.5 text-xs"><Eye className="w-3.5 h-3.5" /> Preview</TabsTrigger>
           </TabsList>
 
           {/* Details */}
@@ -1249,6 +1379,11 @@ function EditorView({
           {/* Media */}
           <TabsContent value="media" className="space-y-5">
             <ImageUploadCard imageUrl={form.imageUrl} onUpdate={url => set("imageUrl", url)} />
+          </TabsContent>
+
+          {/* Preview */}
+          <TabsContent value="preview" className="space-y-5">
+            <DestinationPreviewCard form={form} />
           </TabsContent>
         </Tabs>
 
@@ -1404,6 +1539,7 @@ function AttrEditorView({
             <TabsTrigger value="location" className="gap-1.5 text-xs"><MapPin className="w-3.5 h-3.5" /> Location</TabsTrigger>
             <TabsTrigger value="translations" className="gap-1.5 text-xs"><Globe className="w-3.5 h-3.5" /> Translations</TabsTrigger>
             <TabsTrigger value="media" className="gap-1.5 text-xs"><Image className="w-3.5 h-3.5" /> Media</TabsTrigger>
+            <TabsTrigger value="preview" className="gap-1.5 text-xs"><Eye className="w-3.5 h-3.5" /> Preview</TabsTrigger>
           </TabsList>
 
           {/* Details */}
@@ -1509,6 +1645,11 @@ function AttrEditorView({
           {/* Media */}
           <TabsContent value="media" className="space-y-5">
             <ImageUploadCard imageUrl={form.imageUrl} onUpdate={url => set("imageUrl", url)} />
+          </TabsContent>
+
+          {/* Preview */}
+          <TabsContent value="preview" className="space-y-5">
+            <AttractionPreviewCard form={form} destinationName={destinationName} />
           </TabsContent>
         </Tabs>
 
