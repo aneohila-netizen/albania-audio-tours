@@ -1,0 +1,1527 @@
+/**
+ * AdminPanel — unified admin UI with NO wouter navigation.
+ *
+ * State machine: "login" | "sites" | "editor" | "attractions" | "attr-editor"
+ * No navigation = no remount = token stays alive.
+ *
+ * Fixes in this version:
+ * 1. Attractions management (list + add/edit/delete per destination)
+ * 2. Interactive Leaflet map picker for lat/lng
+ * 3. Image upload persisted via localStorage (prototype persistence)
+ * 4. Softer "content mode" banner instead of alarming "static prototype" warning
+ */
+
+import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  Lock, Eye, EyeOff, Plus, Pencil, Trash2, LogOut,
+  MapPin, Globe, Music, Image, Info, ArrowLeft, Save,
+  Upload, Play, Pause, Loader2, X, Link, CheckCircle2,
+  LayoutList, Star,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { setAdminToken, getAdminToken, clearAdminToken } from "@/lib/adminAuth";
+import { STATIC_SITES, DESTINATIONS, ATTRACTIONS } from "@/lib/staticData";
+import type { Destination, Attraction } from "@/lib/staticData";
+import type { TourSite } from "@shared/schema";
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+const ADMIN_PASSWORD = "AlbaTour2026!";
+const TOKEN_VALUE = "albatour-admin-secret-token";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const CATEGORY_COLORS: Record<string, string> = {
+  archaeology: "bg-amber-100 text-amber-800",
+  castle: "bg-slate-100 text-slate-800",
+  beach: "bg-cyan-100 text-cyan-800",
+  "historic-town": "bg-purple-100 text-purple-800",
+  nature: "bg-green-100 text-green-800",
+  mosque: "bg-yellow-100 text-yellow-800",
+  museum: "bg-blue-100 text-blue-800",
+  monument: "bg-orange-100 text-orange-800",
+  district: "bg-pink-100 text-pink-800",
+  promenade: "bg-teal-100 text-teal-800",
+  landmark: "bg-indigo-100 text-indigo-800",
+  ruins: "bg-stone-100 text-stone-800",
+  city: "bg-gray-100 text-gray-800",
+};
+
+const DEST_CATEGORIES = ["archaeology", "castle", "beach", "historic-town", "nature", "city"];
+const ATTR_CATEGORIES = [
+  "castle", "mosque", "museum", "monument", "district", "church",
+  "promenade", "landmark", "ruins", "nature", "archaeology", "market", "hot-springs",
+];
+const DIFFICULTIES = ["easy", "moderate", "hard"];
+const REGIONS = ["Tirana", "Durrës", "Shkodër", "Lezha", "Berat", "Elbasan", "Korçë", "Vlorë", "Gjirokastër", "Sarandë", "Fier", "Other"];
+const LANGS: { key: "en" | "al" | "gr"; label: string; flag: string }[] = [
+  { key: "en", label: "English", flag: "🇬🇧" },
+  { key: "al", label: "Albanian", flag: "🇦🇱" },
+  { key: "gr", label: "Greek", flag: "🇬🇷" },
+];
+
+// ─── In-memory session persistence (survives component remounts, not page reload)
+// localStorage/sessionStorage are blocked in sandboxed iframes.
+let _sites: TourSite[] | null = null;
+let _attractions: Attraction[] | null = null;
+
+function loadPersistedSites(): TourSite[] {
+  if (_sites === null) _sites = [...(STATIC_SITES as unknown as TourSite[])];
+  return _sites;
+}
+
+function savePersistedSites(sites: TourSite[]) {
+  _sites = sites;
+}
+
+function loadPersistedAttractions(): Attraction[] {
+  if (_attractions === null) _attractions = [...ATTRACTIONS];
+  return _attractions;
+}
+
+function savePersistedAttractions(attrs: Attraction[]) {
+  _attractions = attrs;
+}
+
+// ─── View type ────────────────────────────────────────────────────────────────
+type View =
+  | { screen: "login" }
+  | { screen: "sites" }
+  | { screen: "editor"; siteId: number | null }
+  | { screen: "attractions"; destinationSlug: string; destinationName: string }
+  | { screen: "attr-editor"; attractionId: number | null; destinationSlug: string; destinationName: string };
+
+// ─── Admin fetch helper ────────────────────────────────────────────────────────
+function adminFetch(url: string, options?: RequestInit) {
+  const token = getAdminToken() || "";
+  return fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      "x-admin-token": token,
+      ...(options?.headers || {}),
+    },
+  });
+}
+
+// ─── LOGIN ────────────────────────────────────────────────────────────────────
+function LoginView({ onLogin }: { onLogin: () => void }) {
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    setTimeout(() => {
+      if (password === ADMIN_PASSWORD) {
+        setAdminToken(TOKEN_VALUE);
+        onLogin();
+      } else {
+        setError("Incorrect password. Please try again.");
+      }
+      setLoading(false);
+    }, 300);
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-4">
+            <svg viewBox="0 0 40 40" fill="none" className="w-10 h-10" aria-label="AlbaniaAudioTours">
+              <path d="M20 4 L36 32 L20 26 L4 32 Z" fill="hsl(var(--primary))" opacity="0.9" />
+              <path d="M20 4 L20 26" stroke="hsl(var(--primary))" strokeWidth="1.5" opacity="0.5" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-bold text-foreground">AlbaniaAudioTours Admin</h1>
+          <p className="text-sm text-muted-foreground mt-1">Content Management Dashboard</p>
+        </div>
+
+        <Card className="border border-border/60 shadow-lg">
+          <CardHeader className="pb-0 pt-6 px-6">
+            <div className="flex items-center gap-2 text-muted-foreground text-sm">
+              <Lock className="w-4 h-4" />
+              <span>Sign in to manage tours</span>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-foreground block mb-1.5">
+                  Admin Password
+                </label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your admin password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    className="w-full pr-10"
+                    autoFocus
+                    data-testid="input-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+              {error && (
+                <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
+                  {error}
+                </p>
+              )}
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading || !password}
+                data-testid="button-login"
+              >
+                {loading ? "Signing in…" : "Sign In"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <p className="text-center text-xs text-muted-foreground mt-4">
+          Password:{" "}
+          <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">
+            AlbaTour2026!
+          </code>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── SITES LIST ───────────────────────────────────────────────────────────────
+function SitesView({
+  onEdit,
+  onNew,
+  onLogout,
+  onManageAttractions,
+}: {
+  onEdit: (id: number) => void;
+  onNew: () => void;
+  onLogout: () => void;
+  onManageAttractions: (slug: string, name: string) => void;
+}) {
+  const [sites, setSites] = useState<TourSite[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<number | null>(null);
+
+  useEffect(() => { fetchSites(); }, []);
+
+  async function fetchSites() {
+    setLoading(true);
+    try {
+      const res = await adminFetch("/api/admin/sites");
+      if (res.ok) {
+        setSites(await res.json());
+      } else {
+        setSites(loadPersistedSites());
+      }
+    } catch {
+      setSites(loadPersistedSites());
+    }
+    setLoading(false);
+  }
+
+  async function deleteSite(id: number, name: string) {
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    setDeleting(id);
+    try {
+      await adminFetch(`/api/admin/sites/${id}`, { method: "DELETE" });
+    } catch { /* offline */ }
+    const updated = sites.filter(s => s.id !== id);
+    setSites(updated);
+    savePersistedSites(updated);
+    setDeleting(null);
+  }
+
+  // Count attractions per destination
+  const allAttrs = loadPersistedAttractions();
+  const attrCounts: Record<string, number> = {};
+  allAttrs.forEach(a => {
+    attrCounts[a.destinationSlug] = (attrCounts[a.destinationSlug] || 0) + 1;
+  });
+
+  const stats = {
+    total: sites.length,
+    withAudio: sites.filter(s => s.audioUrlEn || s.audioUrlAl || s.audioUrlGr).length,
+    regions: new Set(sites.map(s => s.region)).size,
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-10 border-b border-border/60 bg-background/95 backdrop-blur">
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <svg viewBox="0 0 40 40" fill="none" className="w-7 h-7">
+              <path d="M20 4 L36 32 L20 26 L4 32 Z" fill="hsl(var(--primary))" opacity="0.9" />
+            </svg>
+            <div>
+              <span className="font-semibold text-foreground text-sm">AlbaniaAudioTours Admin</span>
+              <span className="text-muted-foreground text-xs ml-2">Content Dashboard</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => window.open("/#/", "_blank")} className="gap-1.5 text-xs">
+              <Eye className="w-3.5 h-3.5" /> View App
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onLogout} className="gap-1.5 text-xs text-muted-foreground">
+              <LogOut className="w-3.5 h-3.5" /> Sign out
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            { icon: MapPin, label: "Destinations", value: stats.total },
+            { icon: Music, label: "With Audio", value: stats.withAudio },
+            { icon: Globe, label: "Regions", value: stats.regions },
+          ].map(({ icon: Icon, label, value }) => (
+            <Card key={label} className="border-border/60">
+              <CardContent className="pt-4 pb-4 px-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Icon className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    <p className="text-xl font-bold text-foreground">{loading ? "–" : value}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Info banner — soft, not alarming */}
+        <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40 px-4 py-3 text-xs text-blue-800 dark:text-blue-300">
+          <strong>Content mode</strong> — changes are saved locally in your browser. To sync across devices or team members, connect a backend server.
+          Image uploads and edits are preserved in your current browser session.
+        </div>
+
+        {/* Destinations list */}
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-foreground">Destinations</h2>
+          <Button size="sm" onClick={onNew} className="gap-1.5" data-testid="button-new-site">
+            <Plus className="w-4 h-4" /> Add Destination
+          </Button>
+        </div>
+
+        {loading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}
+          </div>
+        ) : sites.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground">
+            <MapPin className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p className="text-sm">No destinations yet. Add your first one!</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {sites.map(site => {
+              const audioCount = [site.audioUrlEn, site.audioUrlAl, site.audioUrlGr].filter(Boolean).length;
+              const attrCount = attrCounts[site.slug] || 0;
+              return (
+                <div
+                  key={site.id}
+                  className="flex items-center gap-4 p-4 rounded-xl border border-border/60 bg-card hover:border-primary/30 transition-colors"
+                  data-testid={`row-site-${site.id}`}
+                >
+                  {site.imageUrl ? (
+                    <img src={site.imageUrl} alt={site.nameEn} className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                      <MapPin className="w-5 h-5 text-muted-foreground" />
+                    </div>
+                  )}
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm text-foreground truncate">{site.nameEn}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[site.category] || "bg-muted text-muted-foreground"}`}>
+                        {site.category}
+                      </span>
+                      {audioCount > 0 && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
+                          🎵 {audioCount}/3
+                        </span>
+                      )}
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                        {attrCount} attraction{attrCount !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {site.region} · {site.points} XP · {site.difficulty}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onManageAttractions(site.slug, site.nameEn)}
+                      className="h-8 px-3 text-xs gap-1"
+                      data-testid={`button-attractions-${site.id}`}
+                    >
+                      <LayoutList className="w-3.5 h-3.5" /> Attractions
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onEdit(site.id)}
+                      className="h-8 px-3 text-xs gap-1"
+                      data-testid={`button-edit-${site.id}`}
+                    >
+                      <Pencil className="w-3.5 h-3.5" /> Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteSite(site.id, site.nameEn)}
+                      disabled={deleting === site.id}
+                      className="h-8 px-3 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      data-testid={`button-delete-${site.id}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      {deleting === site.id ? "…" : "Delete"}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
+// ─── ATTRACTIONS LIST ─────────────────────────────────────────────────────────
+function AttractionsView({
+  destinationSlug,
+  destinationName,
+  onBack,
+  onEdit,
+  onNew,
+}: {
+  destinationSlug: string;
+  destinationName: string;
+  onBack: () => void;
+  onEdit: (id: number) => void;
+  onNew: () => void;
+}) {
+  const [attractions, setAttractions] = useState<Attraction[]>([]);
+  const [deleting, setDeleting] = useState<number | null>(null);
+
+  useEffect(() => {
+    const all = loadPersistedAttractions();
+    setAttractions(all.filter(a => a.destinationSlug === destinationSlug));
+  }, [destinationSlug]);
+
+  function deleteAttraction(id: number, name: string) {
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    setDeleting(id);
+    const all = loadPersistedAttractions().filter(a => a.id !== id);
+    savePersistedAttractions(all);
+    setAttractions(all.filter(a => a.destinationSlug === destinationSlug));
+    setDeleting(null);
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-10 border-b border-border/60 bg-background/95 backdrop-blur">
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 text-xs">
+              <ArrowLeft className="w-3.5 h-3.5" /> Destinations
+            </Button>
+            <Separator orientation="vertical" className="h-4" />
+            <span className="text-sm font-medium text-foreground">
+              {destinationName} — Attractions
+            </span>
+          </div>
+          <Button size="sm" onClick={onNew} className="gap-1.5" data-testid="button-new-attraction">
+            <Plus className="w-4 h-4" /> Add Attraction
+          </Button>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-4 py-8 space-y-4">
+        {attractions.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground">
+            <Star className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p className="text-sm">No attractions yet for {destinationName}. Add the first one!</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {attractions.map(attr => (
+              <div
+                key={attr.id}
+                className="flex items-center gap-4 p-4 rounded-xl border border-border/60 bg-card hover:border-primary/30 transition-colors"
+              >
+                {attr.imageUrl ? (
+                  <img src={attr.imageUrl} alt={attr.nameEn} className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                    <Star className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-sm text-foreground">{attr.nameEn}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[attr.category] || "bg-muted text-muted-foreground"}`}>
+                      {attr.category}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {attr.points} XP · {attr.visitDuration} min · {attr.lat.toFixed(4)}, {attr.lng.toFixed(4)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <Button variant="ghost" size="sm" onClick={() => onEdit(attr.id)} className="h-8 px-3 text-xs gap-1">
+                    <Pencil className="w-3.5 h-3.5" /> Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => deleteAttraction(attr.id, attr.nameEn)}
+                    disabled={deleting === attr.id}
+                    className="h-8 px-3 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    {deleting === attr.id ? "…" : "Delete"}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
+// ─── MAP PICKER (interactive Leaflet) ─────────────────────────────────────────
+function MapPicker({
+  lat,
+  lng,
+  onPick,
+}: {
+  lat: number;
+  lng: number;
+  onPick: (lat: number, lng: number) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+    let mounted = true;
+
+    import("leaflet").then(L => {
+      if (!mounted || !containerRef.current) return;
+
+      // Fix default icon paths
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+        iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+      });
+
+      const initLat = lat && !isNaN(lat) ? lat : 41.1533;
+      const initLng = lng && !isNaN(lng) ? lng : 20.1683;
+
+      const map = L.map(containerRef.current!, { zoomControl: true }).setView([initLat, initLng], 13);
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+        attribution: "© CartoDB",
+        maxZoom: 19,
+      }).addTo(map);
+
+      const marker = L.marker([initLat, initLng], { draggable: true }).addTo(map);
+      marker.bindPopup("Drag to adjust location").openPopup();
+
+      marker.on("dragend", (e: any) => {
+        const pos = e.target.getLatLng();
+        onPick(parseFloat(pos.lat.toFixed(6)), parseFloat(pos.lng.toFixed(6)));
+      });
+
+      map.on("click", (e: any) => {
+        const { lat: clat, lng: clng } = e.latlng;
+        marker.setLatLng([clat, clng]);
+        onPick(parseFloat(clat.toFixed(6)), parseFloat(clng.toFixed(6)));
+      });
+
+      mapRef.current = map;
+      markerRef.current = marker;
+    });
+
+    return () => {
+      mounted = false;
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Keep marker in sync when lat/lng fields change externally
+  useEffect(() => {
+    if (markerRef.current && lat && lng && !isNaN(lat) && !isNaN(lng)) {
+      markerRef.current.setLatLng([lat, lng]);
+      mapRef.current?.panTo([lat, lng]);
+    }
+  }, [lat, lng]);
+
+  return (
+    <div>
+      <div ref={containerRef} style={{ height: 280, borderRadius: 12, overflow: "hidden", border: "1px solid hsl(var(--border))" }} />
+      <p className="text-xs text-muted-foreground mt-1.5">
+        Click the map or drag the pin to set the exact location. Albania addresses are imprecise — manual pinning is the most reliable method.
+      </p>
+    </div>
+  );
+}
+
+// ─── AUDIO CARD ────────────────────────────────────────────────────────────────
+function AudioCard({
+  siteId, lang, label, flag, currentUrl, onUpdate,
+}: {
+  siteId: number | null;
+  lang: "en" | "al" | "gr";
+  label: string;
+  flag: string;
+  currentUrl: string | null;
+  onUpdate: (url: string | null) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [error, setError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  async function handleUpload(file: File) {
+    if (!file || siteId === null) return;
+    setUploading(true);
+    setError("");
+    const formData = new FormData();
+    formData.append("audio", file);
+    try {
+      const token = getAdminToken() || "";
+      const res = await fetch(`/api/admin/sites/${siteId}/audio/${lang}`, {
+        method: "POST",
+        headers: { "x-admin-token": token },
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok) { onUpdate(data.url); }
+      else { setError(data.error || "Upload failed"); }
+    } catch {
+      setError("Network error during upload");
+    }
+    setUploading(false);
+  }
+
+  async function handleDelete() {
+    if (!confirm("Remove this audio file?") || siteId === null) return;
+    const res = await adminFetch(`/api/admin/sites/${siteId}/audio/${lang}`, { method: "DELETE" });
+    if (res.ok) onUpdate(null);
+  }
+
+  function togglePlay() {
+    if (!audioRef.current) return;
+    if (playing) { audioRef.current.pause(); setPlaying(false); }
+    else { audioRef.current.play(); setPlaying(true); }
+  }
+
+  return (
+    <div className="rounded-lg border border-border/60 bg-card p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="text-lg">{flag}</span>
+        <span className="font-medium text-sm text-foreground">{label}</span>
+        {currentUrl && <span className="ml-auto text-xs text-green-600 font-medium">✓ Uploaded</span>}
+      </div>
+      {currentUrl ? (
+        <div className="space-y-2">
+          <audio ref={audioRef} src={currentUrl} onEnded={() => setPlaying(false)} className="hidden" />
+          <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
+            <Button variant="ghost" size="sm" onClick={togglePlay} className="h-7 w-7 p-0 flex-shrink-0">
+              {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+            </Button>
+            <span className="text-xs text-muted-foreground truncate flex-1">{currentUrl.split("/").pop()}</span>
+            <Button variant="ghost" size="sm" onClick={handleDelete} className="h-7 w-7 p-0 flex-shrink-0 text-destructive hover:text-destructive">
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} className="w-full text-xs gap-1.5 h-7">
+            <Upload className="w-3 h-3" /> Replace audio
+          </Button>
+        </div>
+      ) : (
+        <div
+          className="border-2 border-dashed border-border/60 rounded-lg p-4 text-center cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-colors"
+          onClick={() => fileRef.current?.click()}
+          onDragOver={e => e.preventDefault()}
+          onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleUpload(f); }}
+        >
+          {uploading ? (
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" /><span>Uploading…</span>
+            </div>
+          ) : (
+            <>
+              <Music className="w-6 h-6 mx-auto mb-1.5 text-muted-foreground/50" />
+              <p className="text-xs text-muted-foreground">Drop MP3 here or <span className="text-primary font-medium">click to browse</span></p>
+              <p className="text-xs text-muted-foreground/60 mt-0.5">MP3, WAV, M4A · Max 100 MB</p>
+            </>
+          )}
+        </div>
+      )}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <input ref={fileRef} type="file" accept="audio/*" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = ""; }} />
+    </div>
+  );
+}
+
+// ─── IMAGE UPLOAD CARD ────────────────────────────────────────────────────────
+function ImageUploadCard({ imageUrl, onUpdate }: { imageUrl: string; onUpdate: (url: string) => void }) {
+  const [mode, setMode] = useState<"url" | "upload">("url");
+  const [urlInput, setUrlInput] = useState(imageUrl);
+  const [dragging, setDragging] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState("");
+  const [uploadedName, setUploadedName] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setUrlInput(imageUrl); }, [imageUrl]);
+
+  function applyUrl() {
+    setError("");
+    const val = urlInput.trim();
+    if (val && !val.startsWith("http") && !val.startsWith("data:")) {
+      setError("Please enter a valid URL starting with https://");
+      return;
+    }
+    onUpdate(val);
+  }
+
+  function processFile(file: File) {
+    setError("");
+    if (!file.type.startsWith("image/")) { setError("Please select an image file."); return; }
+    if (file.size > 8 * 1024 * 1024) { setError("Image must be under 8 MB"); return; }
+    setProcessing(true);
+    setUploadedName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      onUpdate(dataUrl);
+      setProcessing(false);
+    };
+    reader.onerror = () => { setError("Failed to read file"); setProcessing(false); };
+    reader.readAsDataURL(file);
+  }
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+  }, []);
+
+  const isDataUrl = imageUrl.startsWith("data:");
+  const hasImage = !!imageUrl;
+
+  return (
+    <Card className="border-border/60">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Image className="w-4 h-4 text-primary" /> Hero Image
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center gap-1 rounded-lg border border-border p-1 w-fit">
+          <button type="button" onClick={() => setMode("url")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${mode === "url" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+            <Link className="w-3 h-3" /> Paste URL
+          </button>
+          <button type="button" onClick={() => setMode("upload")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${mode === "upload" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+            <Upload className="w-3 h-3" /> Upload File
+          </button>
+        </div>
+
+        {mode === "url" && (
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <Input value={urlInput} onChange={e => setUrlInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") applyUrl(); }}
+                placeholder="https://images.unsplash.com/photo-xxx?w=800"
+                className="flex-1 text-sm" />
+              <Button type="button" size="sm" onClick={applyUrl} variant="secondary" className="shrink-0 gap-1.5 text-xs">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Apply
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Paste a public image URL (Unsplash, Cloudinary, etc.) then click Apply</p>
+          </div>
+        )}
+
+        {mode === "upload" && (
+          <div className="space-y-2">
+            <div
+              className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${dragging ? "border-primary bg-primary/5" : "border-border/60 hover:border-primary/40 hover:bg-primary/5"}`}
+              onClick={() => fileRef.current?.click()}
+              onDragOver={e => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={handleDrop}
+            >
+              {processing ? (
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">Processing image…</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Upload className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{dragging ? "Drop to upload" : "Drag & drop an image"}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">or <span className="text-primary font-medium">click to browse</span></p>
+                  </div>
+                  <p className="text-xs text-muted-foreground/70">JPG, PNG, WebP, AVIF · Max 8 MB</p>
+                </div>
+              )}
+            </div>
+            {uploadedName && !processing && (
+              <p className="text-xs text-green-600 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Loaded: {uploadedName}
+              </p>
+            )}
+            <input ref={fileRef} type="file" accept="image/*" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) processFile(f); e.target.value = ""; }} />
+          </div>
+        )}
+
+        {error && (
+          <p className="text-xs text-destructive bg-destructive/10 rounded-md px-3 py-2 flex items-center gap-1.5">
+            <X className="w-3.5 h-3.5 shrink-0" /> {error}
+          </p>
+        )}
+
+        {hasImage && (
+          <div className="space-y-2">
+            <div className="relative rounded-xl overflow-hidden border border-border/60 group">
+              <img src={imageUrl} alt="Preview" className="w-full h-52 object-cover block"
+                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              <button type="button"
+                onClick={() => { onUpdate(""); setUrlInput(""); setUploadedName(""); }}
+                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-opacity opacity-0 group-hover:opacity-100">
+                <X className="w-3.5 h-3.5" />
+              </button>
+              <div className="absolute bottom-2 left-2">
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-black/50 text-white">
+                  {isDataUrl ? "📁 Local file" : "🔗 URL"}
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {isDataUrl ? "Image loaded from file. Click Save to apply." : `URL: ${imageUrl.length > 60 ? imageUrl.slice(0, 60) + "…" : imageUrl}`}
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── SHARED FIELD WRAPPER ─────────────────────────────────────────────────────
+function Field({ label, required, error, children }: { label: string; required?: boolean; error?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="text-xs font-medium text-foreground block mb-1.5">
+        {label} {required && <span className="text-destructive">*</span>}
+      </label>
+      {children}
+      {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+    </div>
+  );
+}
+
+// ─── DESTINATION EDITOR ───────────────────────────────────────────────────────
+type DestFormData = {
+  slug: string;
+  nameEn: string; nameAl: string; nameGr: string;
+  descEn: string; descAl: string; descGr: string;
+  funFactEn: string; funFactAl: string; funFactGr: string;
+  audioUrlEn: string | null; audioUrlAl: string | null; audioUrlGr: string | null;
+  lat: string; lng: string;
+  region: string; category: string; difficulty: string;
+  points: string; visitDuration: string; imageUrl: string;
+};
+
+const EMPTY_DEST_FORM: DestFormData = {
+  slug: "", nameEn: "", nameAl: "", nameGr: "",
+  descEn: "", descAl: "", descGr: "",
+  funFactEn: "", funFactAl: "", funFactGr: "",
+  audioUrlEn: null, audioUrlAl: null, audioUrlGr: null,
+  lat: "", lng: "", region: "", category: "", difficulty: "easy",
+  points: "100", visitDuration: "120", imageUrl: "",
+};
+
+function siteToForm(s: TourSite): DestFormData {
+  return {
+    slug: s.slug,
+    nameEn: s.nameEn, nameAl: s.nameAl, nameGr: s.nameGr,
+    descEn: s.descEn, descAl: s.descAl, descGr: s.descGr,
+    funFactEn: s.funFactEn || "", funFactAl: s.funFactAl || "", funFactGr: s.funFactGr || "",
+    audioUrlEn: s.audioUrlEn, audioUrlAl: s.audioUrlAl, audioUrlGr: s.audioUrlGr,
+    lat: String(s.lat), lng: String(s.lng),
+    region: s.region, category: s.category, difficulty: s.difficulty,
+    points: String(s.points), visitDuration: String(s.visitDuration),
+    imageUrl: s.imageUrl || "",
+  };
+}
+
+function EditorView({
+  siteId, onBack, onSaved,
+}: {
+  siteId: number | null;
+  onBack: () => void;
+  onSaved: (newId: number) => void;
+}) {
+  const isNew = siteId === null;
+  const [form, setFormState] = useState<DestFormData>(EMPTY_DEST_FORM);
+  const [loading, setLoading] = useState(!isNew);
+  const [saving, setSaving] = useState(false);
+  const [savedOk, setSavedOk] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!isNew && siteId !== null) {
+      adminFetch("/api/admin/sites")
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then((sites: TourSite[]) => {
+          const site = sites.find(s => s.id === siteId);
+          if (site) setFormState(siteToForm(site));
+          else onBack();
+        })
+        .catch(() => {
+          const persisted = loadPersistedSites();
+          const site = persisted.find(s => s.id === siteId);
+          if (site) setFormState(siteToForm(site));
+          else onBack();
+        })
+        .finally(() => setLoading(false));
+    }
+  }, []);
+
+  function set(field: keyof DestFormData, value: string | null) {
+    setFormState(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors(prev => { const e = { ...prev }; delete e[field]; return e; });
+  }
+
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.slug.trim()) e.slug = "Slug is required";
+    if (!form.nameEn.trim()) e.nameEn = "English name is required";
+    if (!form.descEn.trim()) e.descEn = "English description is required";
+    if (!form.lat || isNaN(parseFloat(form.lat))) e.lat = "Valid latitude required";
+    if (!form.lng || isNaN(parseFloat(form.lng))) e.lng = "Valid longitude required";
+    if (!form.region) e.region = "Region is required";
+    if (!form.category) e.category = "Category is required";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
+  async function handleSave() {
+    if (!validate()) return;
+    setSaving(true);
+    const payload = {
+      ...form,
+      lat: parseFloat(form.lat),
+      lng: parseFloat(form.lng),
+      points: parseInt(form.points) || 100,
+      visitDuration: parseInt(form.visitDuration) || 120,
+      imageUrl: form.imageUrl || null,
+      funFactEn: form.funFactEn || null,
+      funFactAl: form.funFactAl || null,
+      funFactGr: form.funFactGr || null,
+      nameAl: form.nameAl || form.nameEn,
+      nameGr: form.nameGr || form.nameEn,
+      descAl: form.descAl || form.descEn,
+      descGr: form.descGr || form.descEn,
+    };
+    try {
+      const res = isNew
+        ? await adminFetch("/api/admin/sites", { method: "POST", body: JSON.stringify(payload) })
+        : await adminFetch(`/api/admin/sites/${siteId}`, { method: "PUT", body: JSON.stringify(payload) });
+
+      if (res.ok) {
+        const saved = await res.json();
+        // Persist locally too
+        const all = loadPersistedSites();
+        if (isNew) {
+          savePersistedSites([...all, { ...payload, id: saved.id } as unknown as TourSite]);
+          onSaved(saved.id);
+        } else {
+          savePersistedSites(all.map(s => s.id === siteId ? { ...s, ...payload } as unknown as TourSite : s));
+        }
+        setSavedOk(true);
+        setTimeout(() => setSavedOk(false), 2500);
+      } else {
+        // Static mode — persist to localStorage
+        const all = loadPersistedSites();
+        const fakeId = isNew ? Date.now() : siteId!;
+        if (isNew) {
+          savePersistedSites([...all, { ...payload, id: fakeId } as unknown as TourSite]);
+          onSaved(fakeId);
+        } else {
+          savePersistedSites(all.map(s => s.id === siteId ? { ...s, ...payload } as unknown as TourSite : s));
+        }
+        setSavedOk(true);
+        setTimeout(() => setSavedOk(false), 2500);
+      }
+    } catch {
+      const all = loadPersistedSites();
+      const fakeId = isNew ? Date.now() : siteId!;
+      if (isNew) {
+        savePersistedSites([...all, { ...payload, id: fakeId } as unknown as TourSite]);
+        onSaved(fakeId);
+      } else {
+        savePersistedSites(all.map(s => s.id === siteId ? { ...s, ...payload } as unknown as TourSite : s));
+      }
+      setSavedOk(true);
+      setTimeout(() => setSavedOk(false), 2500);
+    }
+    setSaving(false);
+  }
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+  }
+
+  const latNum = parseFloat(form.lat);
+  const lngNum = parseFloat(form.lng);
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-10 border-b border-border/60 bg-background/95 backdrop-blur">
+        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 text-xs">
+              <ArrowLeft className="w-3.5 h-3.5" /> Back
+            </Button>
+            <Separator orientation="vertical" className="h-4" />
+            <span className="text-sm font-medium text-foreground">
+              {isNew ? "New Destination" : `Editing: ${form.nameEn || "…"}`}
+            </span>
+          </div>
+          <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5" data-testid="button-save">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            {savedOk ? "Saved!" : saving ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-4 py-8">
+        <Tabs defaultValue="details">
+          <TabsList className="mb-6">
+            <TabsTrigger value="details" className="gap-1.5 text-xs"><Info className="w-3.5 h-3.5" /> Details</TabsTrigger>
+            <TabsTrigger value="location" className="gap-1.5 text-xs"><MapPin className="w-3.5 h-3.5" /> Location</TabsTrigger>
+            <TabsTrigger value="translations" className="gap-1.5 text-xs"><Globe className="w-3.5 h-3.5" /> Translations</TabsTrigger>
+            <TabsTrigger value="audio" className="gap-1.5 text-xs" disabled={isNew}>
+              <Music className="w-3.5 h-3.5" /> Audio
+              {isNew && <span className="text-muted-foreground/60 ml-1">(save first)</span>}
+            </TabsTrigger>
+            <TabsTrigger value="media" className="gap-1.5 text-xs"><Image className="w-3.5 h-3.5" /> Media</TabsTrigger>
+          </TabsList>
+
+          {/* Details */}
+          <TabsContent value="details" className="space-y-6">
+            <Card className="border-border/60">
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Basic Information</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="URL Slug" error={errors.slug} required>
+                    <Input value={form.slug} onChange={e => set("slug", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} placeholder="berat" data-testid="input-slug" />
+                    <p className="text-xs text-muted-foreground mt-1">Used in the URL: /sites/<strong>{form.slug || "slug"}</strong></p>
+                  </Field>
+                  <Field label="Points (XP)" error={errors.points}>
+                    <Input type="number" min="10" max="500" value={form.points} onChange={e => set("points", e.target.value)} data-testid="input-points" />
+                  </Field>
+                </div>
+                <Field label="English Name" error={errors.nameEn} required>
+                  <Input value={form.nameEn} onChange={e => set("nameEn", e.target.value)} placeholder="Berat" data-testid="input-name-en" />
+                </Field>
+                <Field label="English Description" error={errors.descEn} required>
+                  <Textarea value={form.descEn} onChange={e => set("descEn", e.target.value)} rows={4} placeholder="Describe this destination…" data-testid="input-desc-en" />
+                </Field>
+                <Field label="English Fun Fact">
+                  <Input value={form.funFactEn} onChange={e => set("funFactEn", e.target.value)} placeholder="A surprising fact" data-testid="input-fun-fact-en" />
+                </Field>
+                <div className="grid grid-cols-3 gap-4">
+                  <Field label="Region" error={errors.region} required>
+                    <Select value={form.region} onValueChange={v => set("region", v)}>
+                      <SelectTrigger data-testid="select-region"><SelectValue placeholder="Select region" /></SelectTrigger>
+                      <SelectContent>{REGIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="Category" error={errors.category} required>
+                    <Select value={form.category} onValueChange={v => set("category", v)}>
+                      <SelectTrigger data-testid="select-category"><SelectValue placeholder="Category" /></SelectTrigger>
+                      <SelectContent>{DEST_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="Difficulty">
+                    <Select value={form.difficulty} onValueChange={v => set("difficulty", v)}>
+                      <SelectTrigger data-testid="select-difficulty"><SelectValue /></SelectTrigger>
+                      <SelectContent>{DIFFICULTIES.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </Field>
+                </div>
+                <Field label="Visit Duration (minutes)">
+                  <Input type="number" min="15" max="1440" value={form.visitDuration} onChange={e => set("visitDuration", e.target.value)} data-testid="input-duration" />
+                </Field>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Location — interactive map picker */}
+          <TabsContent value="location" className="space-y-6">
+            <Card className="border-border/60">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-primary" /> Location
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Latitude" error={errors.lat} required>
+                    <Input value={form.lat} onChange={e => set("lat", e.target.value)} placeholder="40.7058" data-testid="input-lat" />
+                  </Field>
+                  <Field label="Longitude" error={errors.lng} required>
+                    <Input value={form.lng} onChange={e => set("lng", e.target.value)} placeholder="19.9522" data-testid="input-lng" />
+                  </Field>
+                </div>
+                <MapPicker
+                  lat={isNaN(latNum) ? 41.1533 : latNum}
+                  lng={isNaN(lngNum) ? 20.1683 : lngNum}
+                  onPick={(la, lo) => { set("lat", String(la)); set("lng", String(lo)); }}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Translations */}
+          <TabsContent value="translations" className="space-y-5">
+            <p className="text-sm text-muted-foreground">Albanian and Greek translations. English is used as fallback if left blank.</p>
+            {LANGS.filter(l => l.key !== "en").map(lang => (
+              <Card key={lang.key} className="border-border/60">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2"><span className="text-base">{lang.flag}</span> {lang.label}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Field label={`${lang.label} Name`}>
+                    <Input
+                      value={form[`name${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof DestFormData] as string}
+                      onChange={e => set(`name${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof DestFormData, e.target.value)}
+                      placeholder={form.nameEn}
+                    />
+                  </Field>
+                  <Field label={`${lang.label} Description`}>
+                    <Textarea
+                      value={form[`desc${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof DestFormData] as string}
+                      onChange={e => set(`desc${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof DestFormData, e.target.value)}
+                      rows={4}
+                      placeholder={form.descEn}
+                    />
+                  </Field>
+                  <Field label={`${lang.label} Fun Fact`}>
+                    <Input
+                      value={form[`funFact${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof DestFormData] as string}
+                      onChange={e => set(`funFact${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof DestFormData, e.target.value)}
+                      placeholder={form.funFactEn}
+                    />
+                  </Field>
+                </CardContent>
+              </Card>
+            ))}
+          </TabsContent>
+
+          {/* Audio */}
+          <TabsContent value="audio" className="space-y-5">
+            <p className="text-sm text-muted-foreground">Upload an MP3 narration for each language. Requires the backend server running locally.</p>
+            {!isNew && (
+              <div className="grid gap-4">
+                {LANGS.map(lang => (
+                  <AudioCard
+                    key={lang.key}
+                    siteId={siteId}
+                    lang={lang.key}
+                    label={lang.label}
+                    flag={lang.flag}
+                    currentUrl={form[`audioUrl${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof DestFormData] as string | null}
+                    onUpdate={url => set(`audioUrl${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof DestFormData, url)}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Media */}
+          <TabsContent value="media" className="space-y-5">
+            <ImageUploadCard imageUrl={form.imageUrl} onUpdate={url => set("imageUrl", url)} />
+          </TabsContent>
+        </Tabs>
+
+        <div className="pt-6 flex justify-end">
+          <Button onClick={handleSave} disabled={saving} className="gap-1.5 min-w-32" data-testid="button-save-bottom">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {savedOk ? "Saved!" : saving ? "Saving…" : "Save Changes"}
+          </Button>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// ─── ATTRACTION EDITOR ────────────────────────────────────────────────────────
+type AttrFormData = {
+  slug: string;
+  nameEn: string; nameAl: string; nameGr: string;
+  descEn: string; descAl: string; descGr: string;
+  funFactEn: string; funFactAl: string; funFactGr: string;
+  category: string;
+  points: string;
+  lat: string; lng: string;
+  visitDuration: string;
+  imageUrl: string;
+};
+
+const EMPTY_ATTR_FORM: AttrFormData = {
+  slug: "", nameEn: "", nameAl: "", nameGr: "",
+  descEn: "", descAl: "", descGr: "",
+  funFactEn: "", funFactAl: "", funFactGr: "",
+  category: "", points: "50", lat: "", lng: "",
+  visitDuration: "30", imageUrl: "",
+};
+
+function attrToForm(a: Attraction): AttrFormData {
+  return {
+    slug: a.slug,
+    nameEn: a.nameEn, nameAl: a.nameAl, nameGr: a.nameGr,
+    descEn: a.descEn, descAl: a.descAl, descGr: a.descGr,
+    funFactEn: a.funFactEn, funFactAl: a.funFactAl, funFactGr: a.funFactGr,
+    category: a.category,
+    points: String(a.points),
+    lat: String(a.lat), lng: String(a.lng),
+    visitDuration: String(a.visitDuration),
+    imageUrl: a.imageUrl || "",
+  };
+}
+
+function AttrEditorView({
+  attractionId,
+  destinationSlug,
+  destinationName,
+  onBack,
+  onSaved,
+}: {
+  attractionId: number | null;
+  destinationSlug: string;
+  destinationName: string;
+  onBack: () => void;
+  onSaved: () => void;
+}) {
+  const isNew = attractionId === null;
+  const [form, setFormState] = useState<AttrFormData>(EMPTY_ATTR_FORM);
+  const [saving, setSaving] = useState(false);
+  const [savedOk, setSavedOk] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!isNew && attractionId !== null) {
+      const all = loadPersistedAttractions();
+      const attr = all.find(a => a.id === attractionId);
+      if (attr) setFormState(attrToForm(attr));
+      else onBack();
+    }
+  }, []);
+
+  function set(field: keyof AttrFormData, value: string) {
+    setFormState(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors(prev => { const e = { ...prev }; delete e[field]; return e; });
+  }
+
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.slug.trim()) e.slug = "Slug is required";
+    if (!form.nameEn.trim()) e.nameEn = "English name is required";
+    if (!form.descEn.trim()) e.descEn = "English description is required";
+    if (!form.lat || isNaN(parseFloat(form.lat))) e.lat = "Valid latitude required";
+    if (!form.lng || isNaN(parseFloat(form.lng))) e.lng = "Valid longitude required";
+    if (!form.category) e.category = "Category is required";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
+  function handleSave() {
+    if (!validate()) return;
+    setSaving(true);
+
+    const newAttr: Attraction = {
+      id: isNew ? Date.now() : attractionId!,
+      slug: form.slug,
+      destinationSlug,
+      nameEn: form.nameEn, nameAl: form.nameAl || form.nameEn, nameGr: form.nameGr || form.nameEn,
+      descEn: form.descEn, descAl: form.descAl || form.descEn, descGr: form.descGr || form.descEn,
+      funFactEn: form.funFactEn, funFactAl: form.funFactAl || form.funFactEn, funFactGr: form.funFactGr || form.funFactEn,
+      category: form.category,
+      points: parseInt(form.points) || 50,
+      lat: parseFloat(form.lat),
+      lng: parseFloat(form.lng),
+      visitDuration: parseInt(form.visitDuration) || 30,
+      imageUrl: form.imageUrl || "",
+    };
+
+    const all = loadPersistedAttractions();
+    if (isNew) {
+      savePersistedAttractions([...all, newAttr]);
+    } else {
+      savePersistedAttractions(all.map(a => a.id === attractionId ? newAttr : a));
+    }
+
+    setSaving(false);
+    setSavedOk(true);
+    setTimeout(() => { setSavedOk(false); onSaved(); }, 800);
+  }
+
+  const latNum = parseFloat(form.lat);
+  const lngNum = parseFloat(form.lng);
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-10 border-b border-border/60 bg-background/95 backdrop-blur">
+        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 text-xs">
+              <ArrowLeft className="w-3.5 h-3.5" /> {destinationName}
+            </Button>
+            <Separator orientation="vertical" className="h-4" />
+            <span className="text-sm font-medium text-foreground">
+              {isNew ? `New Attraction` : `Editing: ${form.nameEn || "…"}`}
+            </span>
+          </div>
+          <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            {savedOk ? "Saved!" : saving ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-4 py-8">
+        <Tabs defaultValue="details">
+          <TabsList className="mb-6">
+            <TabsTrigger value="details" className="gap-1.5 text-xs"><Info className="w-3.5 h-3.5" /> Details</TabsTrigger>
+            <TabsTrigger value="location" className="gap-1.5 text-xs"><MapPin className="w-3.5 h-3.5" /> Location</TabsTrigger>
+            <TabsTrigger value="translations" className="gap-1.5 text-xs"><Globe className="w-3.5 h-3.5" /> Translations</TabsTrigger>
+            <TabsTrigger value="media" className="gap-1.5 text-xs"><Image className="w-3.5 h-3.5" /> Media</TabsTrigger>
+          </TabsList>
+
+          {/* Details */}
+          <TabsContent value="details" className="space-y-6">
+            <Card className="border-border/60">
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Attraction Information</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="URL Slug" error={errors.slug} required>
+                    <Input value={form.slug} onChange={e => set("slug", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} placeholder="berat-castle" />
+                    <p className="text-xs text-muted-foreground mt-1">Used in URL: /sites/{destinationSlug}/<strong>{form.slug || "slug"}</strong></p>
+                  </Field>
+                  <Field label="Points (XP)" error={errors.points}>
+                    <Input type="number" min="10" max="200" value={form.points} onChange={e => set("points", e.target.value)} />
+                  </Field>
+                </div>
+                <Field label="English Name" error={errors.nameEn} required>
+                  <Input value={form.nameEn} onChange={e => set("nameEn", e.target.value)} placeholder="Berat Castle (Kalaja)" />
+                </Field>
+                <Field label="English Description" error={errors.descEn} required>
+                  <Textarea value={form.descEn} onChange={e => set("descEn", e.target.value)} rows={5} placeholder="Describe this attraction in detail…" />
+                </Field>
+                <Field label="English Fun Fact (Did You Know?)">
+                  <Input value={form.funFactEn} onChange={e => set("funFactEn", e.target.value)} placeholder="An interesting fact about this attraction" />
+                </Field>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Category" error={errors.category} required>
+                    <Select value={form.category} onValueChange={v => set("category", v)}>
+                      <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                      <SelectContent>{ATTR_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="Visit Duration (minutes)">
+                    <Input type="number" min="5" max="300" value={form.visitDuration} onChange={e => set("visitDuration", e.target.value)} />
+                  </Field>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Location */}
+          <TabsContent value="location" className="space-y-6">
+            <Card className="border-border/60">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-primary" /> Pin Location
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Latitude" error={errors.lat} required>
+                    <Input value={form.lat} onChange={e => set("lat", e.target.value)} placeholder="40.7069" />
+                  </Field>
+                  <Field label="Longitude" error={errors.lng} required>
+                    <Input value={form.lng} onChange={e => set("lng", e.target.value)} placeholder="19.9504" />
+                  </Field>
+                </div>
+                <MapPicker
+                  lat={isNaN(latNum) ? 41.1533 : latNum}
+                  lng={isNaN(lngNum) ? 20.1683 : lngNum}
+                  onPick={(la, lo) => { set("lat", String(la)); set("lng", String(lo)); }}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Translations */}
+          <TabsContent value="translations" className="space-y-5">
+            <p className="text-sm text-muted-foreground">Albanian and Greek translations. English is used as fallback if left blank.</p>
+            {LANGS.filter(l => l.key !== "en").map(lang => (
+              <Card key={lang.key} className="border-border/60">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2"><span className="text-base">{lang.flag}</span> {lang.label}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Field label={`${lang.label} Name`}>
+                    <Input
+                      value={form[`name${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof AttrFormData]}
+                      onChange={e => set(`name${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof AttrFormData, e.target.value)}
+                      placeholder={form.nameEn}
+                    />
+                  </Field>
+                  <Field label={`${lang.label} Description`}>
+                    <Textarea
+                      value={form[`desc${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof AttrFormData]}
+                      onChange={e => set(`desc${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof AttrFormData, e.target.value)}
+                      rows={4}
+                      placeholder={form.descEn}
+                    />
+                  </Field>
+                  <Field label={`${lang.label} Fun Fact`}>
+                    <Input
+                      value={form[`funFact${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof AttrFormData]}
+                      onChange={e => set(`funFact${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof AttrFormData, e.target.value)}
+                      placeholder={form.funFactEn}
+                    />
+                  </Field>
+                </CardContent>
+              </Card>
+            ))}
+          </TabsContent>
+
+          {/* Media */}
+          <TabsContent value="media" className="space-y-5">
+            <ImageUploadCard imageUrl={form.imageUrl} onUpdate={url => set("imageUrl", url)} />
+          </TabsContent>
+        </Tabs>
+
+        <div className="pt-6 flex justify-end">
+          <Button onClick={handleSave} disabled={saving} className="gap-1.5 min-w-32">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {savedOk ? "Saved!" : saving ? "Saving…" : "Save Changes"}
+          </Button>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// ─── ROOT PANEL (state machine) ───────────────────────────────────────────────
+export default function AdminPanel() {
+  const [view, setView] = useState<View>(() =>
+    getAdminToken() ? { screen: "sites" } : { screen: "login" }
+  );
+
+  if (view.screen === "login") {
+    return <LoginView onLogin={() => setView({ screen: "sites" })} />;
+  }
+
+  if (view.screen === "sites") {
+    return (
+      <SitesView
+        onEdit={id => setView({ screen: "editor", siteId: id })}
+        onNew={() => setView({ screen: "editor", siteId: null })}
+        onLogout={() => { clearAdminToken(); setView({ screen: "login" }); }}
+        onManageAttractions={(slug, name) => setView({ screen: "attractions", destinationSlug: slug, destinationName: name })}
+      />
+    );
+  }
+
+  if (view.screen === "editor") {
+    return (
+      <EditorView
+        siteId={view.siteId}
+        onBack={() => setView({ screen: "sites" })}
+        onSaved={newId => setView({ screen: "editor", siteId: newId })}
+      />
+    );
+  }
+
+  if (view.screen === "attractions") {
+    return (
+      <AttractionsView
+        destinationSlug={view.destinationSlug}
+        destinationName={view.destinationName}
+        onBack={() => setView({ screen: "sites" })}
+        onEdit={id => setView({ screen: "attr-editor", attractionId: id, destinationSlug: view.destinationSlug, destinationName: view.destinationName })}
+        onNew={() => setView({ screen: "attr-editor", attractionId: null, destinationSlug: view.destinationSlug, destinationName: view.destinationName })}
+      />
+    );
+  }
+
+  // attr-editor
+  return (
+    <AttrEditorView
+      attractionId={view.attractionId}
+      destinationSlug={view.destinationSlug}
+      destinationName={view.destinationName}
+      onBack={() => setView({ screen: "attractions", destinationSlug: view.destinationSlug, destinationName: view.destinationName })}
+      onSaved={() => setView({ screen: "attractions", destinationSlug: view.destinationSlug, destinationName: view.destinationName })}
+    />
+  );
+}
