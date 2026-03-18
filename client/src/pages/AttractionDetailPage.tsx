@@ -5,6 +5,7 @@ import type { TourSite, Attraction } from "@shared/schema";
 import { railwayFetch } from "@/lib/queryClient";
 import AudioPlayer from "@/components/AudioPlayer";
 import VisitModal from "@/components/VisitModal";
+import MiniMap from "@/components/MiniMap";
 import { useState } from "react";
 import { Clock, Star, Lightbulb, Navigation, ChevronRight, MapPin } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -197,16 +198,11 @@ export default function AttractionDetailPage() {
 
       {/* Mini-map */}
       <div className="rounded-xl border border-border overflow-hidden" data-testid="mini-map">
-        <a href={`https://www.google.com/maps?q=${attraction.lat},${attraction.lng}`} target="_blank" rel="noopener noreferrer" className="block relative">
-          <div style={{ width: "100%", height: "200px", background: "hsl(var(--muted))", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-            <span style={{ fontSize: "2rem" }}>📍</span>
-            <span style={{ fontSize: "0.8rem", color: "hsl(var(--muted-foreground))" }}>{attraction.lat.toFixed(4)}, {attraction.lng.toFixed(4)}</span>
-          </div>
-        </a>
+        <MiniMap lat={attraction.lat} lng={attraction.lng} label={aName} />
         <a href={`https://www.google.com/maps?q=${attraction.lat},${attraction.lng}`} target="_blank" rel="noopener noreferrer"
           className="flex items-center gap-2 p-3 text-sm text-primary hover:bg-muted transition-colors border-t border-border">
           <Navigation size={14} />
-          {lang === "al" ? "Merr Udhëzimet" : lang === "gr" ? "Λήψη Οδηγιών" : "Get Directions"}
+          {lang === "al" ? "Merr Udhëzimet" : lang === "gr" ? "Λήψη Oδηγιών" : "Get Directions"}
         </a>
       </div>
 

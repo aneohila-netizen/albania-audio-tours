@@ -4,6 +4,7 @@ import { useApp } from "@/App";
 import type { TourSite } from "@shared/schema";
 import AudioPlayer from "@/components/AudioPlayer";
 import VisitModal from "@/components/VisitModal";
+import MiniMap from "@/components/MiniMap";
 import { useState } from "react";
 import { ArrowLeft, MapPin, Clock, Star, Lightbulb, Navigation } from "lucide-react";
 import { STATIC_SITES } from "@/lib/staticData";
@@ -171,28 +172,7 @@ export default function SiteDetailPage() {
 
       {/* Map mini preview */}
       <div className="rounded-xl border border-border overflow-hidden" data-testid="mini-map">
-        {/* Static map image via OpenStreetMap tile — avoids iframe referer block */}
-        <a
-          href={`https://www.google.com/maps?q=${site.lat},${site.lng}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block relative"
-        >
-          <img
-            src={`https://maps.geoapify.com/v1/staticmap?style=osm-carto&width=600&height=200&center=lonlat:${site.lng},${site.lat}&zoom=13&marker=lonlat:${site.lng},${site.lat};color:%23C0392B;size:medium&apiKey=YOUR_KEY`}
-            alt={`Map of ${name}`}
-            style={{ width: "100%", height: "200px", objectFit: "cover", display: "block" }}
-            onError={(e) => {
-              // Fallback: show a styled placeholder with coordinates
-              const el = e.currentTarget;
-              el.style.display = "none";
-              const parent = el.parentElement;
-              if (parent) {
-                parent.innerHTML = `<div style="width:100%;height:200px;background:hsl(var(--muted));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;"><span style="font-size:2rem">📍</span><span style="font-size:0.8rem;color:hsl(var(--muted-foreground))">${site.lat.toFixed(4)}, ${site.lng.toFixed(4)}</span></div>`;
-              }
-            }}
-          />
-        </a>
+        <MiniMap lat={site.lat} lng={site.lng} label={name} />
         <a
           href={`https://www.google.com/maps?q=${site.lat},${site.lng}`}
           target="_blank"

@@ -602,7 +602,7 @@ function MapPicker({
     if (!containerRef.current || mapRef.current) return;
     let mounted = true;
 
-    import("leaflet").then(L => {
+    const initLeaflet = (L: any) => {
       if (!mounted || !containerRef.current) return;
 
       // Fix default icon paths
@@ -638,7 +638,22 @@ function MapPicker({
 
       mapRef.current = map;
       markerRef.current = marker;
-    });
+
+      // Fix blank map when container is hidden (inside a tab) — invalidate size once visible
+      const ro = new ResizeObserver(() => {
+        if (containerRef.current && containerRef.current.offsetWidth > 0) {
+          map.invalidateSize();
+          ro.disconnect();
+        }
+      });
+      ro.observe(containerRef.current!);
+
+      // Also fix on first render if already visible
+      setTimeout(() => map.invalidateSize(), 50);
+      setTimeout(() => map.invalidateSize(), 300);
+    };
+
+    import("leaflet").then(initLeaflet);
 
     return () => {
       mounted = false;

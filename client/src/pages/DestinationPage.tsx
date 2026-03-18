@@ -3,7 +3,8 @@ import { useApp } from "@/App";
 import { useQuery } from "@tanstack/react-query";
 import type { TourSite, Attraction } from "@shared/schema";
 import { railwayFetch } from "@/lib/queryClient";
-import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb } from "lucide-react";
+import MiniMap from "@/components/MiniMap";
+import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb, Navigation } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -197,12 +198,15 @@ export default function DestinationPage() {
         </div>
       )}
 
-      {/* Maps link */}
-      <a href={`https://www.google.com/maps?q=${dest.lat},${dest.lng}`} target="_blank" rel="noopener noreferrer"
-        className="flex items-center gap-2 p-3 rounded-xl border border-border text-sm text-primary hover:bg-muted transition-colors">
-        <MapPin size={14} />
-        {lang === "al" ? `Hap ${name} në Google Maps` : lang === "gr" ? `Άνοιγμα ${name} στο Google Maps` : `Open ${name} in Google Maps`}
-      </a>
+      {/* Mini-map + Get Directions */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <MiniMap lat={dest.lat} lng={dest.lng} label={name} />
+        <a href={`https://www.google.com/maps?q=${dest.lat},${dest.lng}`} target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-2 p-3 text-sm text-primary hover:bg-muted transition-colors border-t border-border">
+          <Navigation size={14} />
+          {lang === "al" ? `Udhëzime për ${name}` : lang === "gr" ? `Oδηγίες για ${name}` : `Get Directions to ${name}`}
+        </a>
+      </div>
     </div>
   );
 }
