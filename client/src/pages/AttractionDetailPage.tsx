@@ -10,8 +10,6 @@ import { apiRequest } from "@/lib/queryClient";
 import { getSessionId } from "@/lib/session";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
-
 const CATEGORY_COLORS: Record<string, string> = {
   city: "#C0392B", archaeology: "#8B4513", castle: "#4A4A6A",
   beach: "#0A6E8C", nature: "#2D7A22", "historic-town": "#8B6914",
@@ -36,13 +34,13 @@ export default function AttractionDetailPage() {
 
   // Fetch destination (site) from API
   const { data: dest } = useQuery<TourSite>({
-    queryKey: [`${RAILWAY_URL}/api/sites/${params?.dest}`],
+    queryKey: ["/api/sites", params?.dest],
     enabled: !!params?.dest,
   });
 
   // Fetch attraction from API
   const { data: attraction, isLoading } = useQuery<Attraction>({
-    queryKey: [`${RAILWAY_URL}/api/attractions/${params?.dest}/${params?.attr}`],
+    queryKey: ["/api/attractions", params?.dest, params?.attr],
     enabled: !!params?.dest && !!params?.attr,
   });
 

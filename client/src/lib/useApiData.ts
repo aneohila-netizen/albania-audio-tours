@@ -7,12 +7,10 @@ import type { TourSite, Attraction } from "@shared/schema";
 import { DESTINATIONS, ATTRACTIONS } from "./staticData";
 import type { Destination } from "./staticData";
 
-const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
-
 /** Returns destinations merged with live API imageUrls */
 export function useDestinations() {
   const { data: apiSites } = useQuery<TourSite[]>({
-    queryKey: [`${RAILWAY_URL}/api/sites`],
+    queryKey: ["/api/sites"],
     staleTime: 60_000,
   });
 
@@ -35,8 +33,8 @@ export function useDestinations() {
 export function useAttractions(destinationSlug?: string) {
   const { data: apiAttrs } = useQuery<Attraction[]>({
     queryKey: destinationSlug
-      ? [`${RAILWAY_URL}/api/attractions/${destinationSlug}`]
-      : [`${RAILWAY_URL}/api/attractions`],
+      ? ["/api/attractions", destinationSlug]
+      : ["/api/attractions"],
     staleTime: 60_000,
     enabled: true,
   });

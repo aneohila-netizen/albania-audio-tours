@@ -5,8 +5,6 @@ import type { TourSite, Attraction } from "@shared/schema";
 import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
-
 const CATEGORY_COLORS: Record<string, string> = {
   city: "#C0392B", archaeology: "#8B4513", castle: "#4A4A6A",
   beach: "#0A6E8C", nature: "#2D7A22", "historic-town": "#8B6914",
@@ -31,13 +29,13 @@ export default function DestinationPage() {
 
   // Fetch destination from API
   const { data: dest, isLoading: destLoading } = useQuery<TourSite>({
-    queryKey: [`${RAILWAY_URL}/api/sites/${params?.dest}`],
+    queryKey: ["/api/sites", params?.dest],
     enabled: !!params?.dest,
   });
 
   // Fetch attractions for this destination from API
   const { data: attractions = [], isLoading: attrsLoading } = useQuery<Attraction[]>({
-    queryKey: [`${RAILWAY_URL}/api/attractions/${params?.dest}`],
+    queryKey: ["/api/attractions", params?.dest],
     enabled: !!params?.dest,
   });
 
