@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { TourSite, Attraction } from "@shared/schema";
 import { railwayFetch } from "@/lib/queryClient";
 import MiniMap from "@/components/MiniMap";
+import AudioPlayer from "@/components/AudioPlayer";
 import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb, Navigation } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -131,6 +132,9 @@ export default function DestinationPage() {
       <div className="prose prose-sm max-w-none">
         <p className="text-base leading-relaxed text-foreground">{desc}</p>
       </div>
+
+      {/* Audio Guide */}
+      <AudioPlayer site={dest} />
 
       {/* Attractions */}
       {attractions.length > 0 && (
