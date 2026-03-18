@@ -479,18 +479,34 @@ function AttractionsView({
 }) {
   const [attractions, setAttractions] = useState<Attraction[]>([]);
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const all = loadPersistedAttractions();
-    setAttractions(all.filter(a => a.destinationSlug === destinationSlug));
+    setLoading(true);
+    adminFetch(`/api/admin/attractions/${destinationSlug}`)
+      .then(r => r.ok ? r.json() : [])
+      .then((data: Attraction[]) => { setAttractions(data); })
+      .catch(() => {
+        // Fall back to local cache
+        const all = loadPersistedAttractions();
+        setAttractions(all.filter(a => a.destinationSlug === destinationSlug));
+      })
+      .finally(() => setLoading(false));
   }, [destinationSlug]);
 
-  function deleteAttraction(id: number, name: string) {
+  async function deleteAttraction(id: number, name: string) {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
     setDeleting(id);
-    const all = loadPersistedAttractions().filter(a => a.id !== id);
-    savePersistedAttractions(all);
-    setAttractions(all.filter(a => a.destinationSlug === destinationSlug));
+    try {
+      const res = await adminFetch(`/api/admin/attractions/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setAttractions(prev => prev.filter(a => a.id !== id));
+      } else {
+        alert("Delete failed");
+      }
+    } catch {
+      alert("Delete failed: network error");
+    }
     setDeleting(null);
   }
 
@@ -654,7 +670,7 @@ function MapPicker({
 
 // ─── AUDIO CARD ────────────────────────────────────────────────────────────────
 function AudioCard({
-  siteId, lang, label, flag, currentUrl, onUpdate,
+  siteId, lang, label, flag, currentUrl, onUpdate, entityType = "sites",
 }: {
   siteId: number | null;
   lang: "en" | "al" | "gr";
@@ -662,6 +678,7 @@ function AudioCard({
   flag: string;
   currentUrl: string | null;
   onUpdate: (url: string | null) => void;
+  entityType?: "sites" | "attractions";
 }) {
   const [uploading, setUploading] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -676,10 +693,10 @@ function AudioCard({
     const formData = new FormData();
     formData.append("audio", file);
     try {
-      const res = await adminUpload(`/api/admin/sites/${siteId}/audio/${lang}`, formData);
+      const res = await adminUpload(`/api/admin/${entityType}/${siteId}/audio/${lang}`, formData);
       const data = await res.json();
       if (res.ok) {
-        // Make URL absolute for cross-origin playback
+        // URL is already absolute (Railway backend prepends base URL)
         const absUrl = data.url.startsWith("http") ? data.url : `${RAILWAY_API}${data.url}`;
         onUpdate(absUrl);
       }
@@ -692,7 +709,7 @@ function AudioCard({
 
   async function handleDelete() {
     if (!confirm("Remove this audio file?") || siteId === null) return;
-    const res = await adminFetch(`/api/admin/sites/${siteId}/audio/${lang}`, { method: "DELETE" });
+    const res = await adminFetch(`/api/admin/${entityType}/${siteId}/audio/${lang}`, { method: "DELETE" });
     if (res.ok) onUpdate(null);
   }
 
@@ -1404,6 +1421,7 @@ type AttrFormData = {
   nameEn: string; nameAl: string; nameGr: string;
   descEn: string; descAl: string; descGr: string;
   funFactEn: string; funFactAl: string; funFactGr: string;
+  audioUrlEn: string; audioUrlAl: string; audioUrlGr: string;
   category: string;
   points: string;
   lat: string; lng: string;
@@ -1415,6 +1433,7 @@ const EMPTY_ATTR_FORM: AttrFormData = {
   slug: "", nameEn: "", nameAl: "", nameGr: "",
   descEn: "", descAl: "", descGr: "",
   funFactEn: "", funFactAl: "", funFactGr: "",
+  audioUrlEn: "", audioUrlAl: "", audioUrlGr: "",
   category: "", points: "50", lat: "", lng: "",
   visitDuration: "30", imageUrl: "",
 };
@@ -1424,7 +1443,8 @@ function attrToForm(a: Attraction): AttrFormData {
     slug: a.slug,
     nameEn: a.nameEn, nameAl: a.nameAl, nameGr: a.nameGr,
     descEn: a.descEn, descAl: a.descAl, descGr: a.descGr,
-    funFactEn: a.funFactEn, funFactAl: a.funFactAl, funFactGr: a.funFactGr,
+    funFactEn: a.funFactEn || "", funFactAl: a.funFactAl || "", funFactGr: a.funFactGr || "",
+    audioUrlEn: a.audioUrlEn || "", audioUrlAl: a.audioUrlAl || "", audioUrlGr: a.audioUrlGr || "",
     category: a.category,
     points: String(a.points),
     lat: String(a.lat), lng: String(a.lng),
@@ -1454,10 +1474,26 @@ function AttrEditorView({
 
   useEffect(() => {
     if (!isNew && attractionId !== null) {
-      const all = loadPersistedAttractions();
-      const attr = all.find(a => a.id === attractionId);
-      if (attr) setFormState(attrToForm(attr));
-      else onBack();
+      // Load from API first, fall back to local cache
+      adminFetch(`/api/admin/attractions/all/${attractionId}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(attr => {
+          if (attr) { setFormState(attrToForm(attr)); return; }
+          // Fallback: search all attractions
+          return adminFetch("/api/admin/attractions")
+            .then(r => r.ok ? r.json() : [])
+            .then((all: Attraction[]) => {
+              const found = all.find(a => a.id === attractionId);
+              if (found) setFormState(attrToForm(found));
+              else onBack();
+            });
+        })
+        .catch(() => {
+          const all = loadPersistedAttractions();
+          const attr = all.find(a => a.id === attractionId);
+          if (attr) setFormState(attrToForm(attr));
+          else onBack();
+        });
     }
   }, []);
 
@@ -1478,35 +1514,43 @@ function AttrEditorView({
     return Object.keys(e).length === 0;
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!validate()) return;
     setSaving(true);
 
-    const newAttr: Attraction = {
-      id: isNew ? Date.now() : attractionId!,
+    const payload = {
       slug: form.slug,
       destinationSlug,
       nameEn: form.nameEn, nameAl: form.nameAl || form.nameEn, nameGr: form.nameGr || form.nameEn,
       descEn: form.descEn, descAl: form.descAl || form.descEn, descGr: form.descGr || form.descEn,
-      funFactEn: form.funFactEn, funFactAl: form.funFactAl || form.funFactEn, funFactGr: form.funFactGr || form.funFactEn,
+      funFactEn: form.funFactEn || "", funFactAl: form.funFactAl || form.funFactEn || "", funFactGr: form.funFactGr || form.funFactEn || "",
       category: form.category,
       points: parseInt(form.points) || 50,
       lat: parseFloat(form.lat),
       lng: parseFloat(form.lng),
       visitDuration: parseInt(form.visitDuration) || 30,
-      imageUrl: form.imageUrl || "",
+      imageUrl: form.imageUrl || null,
+      audioUrlEn: form.audioUrlEn || null,
+      audioUrlAl: form.audioUrlAl || null,
+      audioUrlGr: form.audioUrlGr || null,
     };
 
-    const all = loadPersistedAttractions();
-    if (isNew) {
-      savePersistedAttractions([...all, newAttr]);
-    } else {
-      savePersistedAttractions(all.map(a => a.id === attractionId ? newAttr : a));
-    }
+    try {
+      const res = isNew
+        ? await adminFetch("/api/admin/attractions", { method: "POST", body: JSON.stringify(payload) })
+        : await adminFetch(`/api/admin/attractions/${attractionId}`, { method: "PUT", body: JSON.stringify(payload) });
 
+      if (res.ok) {
+        setSavedOk(true);
+        setTimeout(() => { setSavedOk(false); onSaved(); }, 800);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(`Save failed: ${err.error || res.status}`);
+      }
+    } catch (e) {
+      alert("Save failed: network error");
+    }
     setSaving(false);
-    setSavedOk(true);
-    setTimeout(() => { setSavedOk(false); onSaved(); }, 800);
   }
 
   const latNum = parseFloat(form.lat);
@@ -1645,6 +1689,23 @@ function AttrEditorView({
           {/* Media */}
           <TabsContent value="media" className="space-y-5">
             <ImageUploadCard imageUrl={form.imageUrl} onUpdate={url => set("imageUrl", url)} />
+            <Card className="border-border/60">
+              <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Music className="w-4 h-4 text-primary" /> Audio Guide</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                {(["en", "al", "gr"] as const).map(lang => (
+                  <AudioCard
+                    key={lang}
+                    siteId={attractionId}
+                    lang={lang}
+                    label={lang === "en" ? "English" : lang === "al" ? "Albanian" : "Greek"}
+                    flag={lang === "en" ? "🇬🇧" : lang === "al" ? "🇦🇱" : "🇬🇷"}
+                    currentUrl={form[`audioUrl${lang.charAt(0).toUpperCase() + lang.slice(1)}` as keyof AttrFormData] as string || null}
+                    onUpdate={url => set(`audioUrl${lang.charAt(0).toUpperCase() + lang.slice(1)}` as keyof AttrFormData, url || "")}
+                    entityType="attractions"
+                  />
+                ))}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Preview */}

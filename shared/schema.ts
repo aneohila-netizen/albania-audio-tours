@@ -27,6 +27,31 @@ export const tourSites = pgTable("tour_sites", {
   funFactGr: text("fun_fact_gr"),
 });
 
+// Attractions: sub-sites within a destination
+export const attractions = pgTable("attractions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  slug: text("slug").notNull(),
+  destinationSlug: text("destination_slug").notNull(),
+  nameEn: text("name_en").notNull(),
+  nameAl: text("name_al").notNull().default(""),
+  nameGr: text("name_gr").notNull().default(""),
+  descEn: text("desc_en").notNull().default(""),
+  descAl: text("desc_al").notNull().default(""),
+  descGr: text("desc_gr").notNull().default(""),
+  funFactEn: text("fun_fact_en").notNull().default(""),
+  funFactAl: text("fun_fact_al").notNull().default(""),
+  funFactGr: text("fun_fact_gr").notNull().default(""),
+  audioUrlEn: text("audio_url_en"),
+  audioUrlAl: text("audio_url_al"),
+  audioUrlGr: text("audio_url_gr"),
+  category: text("category").notNull().default("landmark"),
+  points: integer("points").notNull().default(50),
+  lat: real("lat").notNull().default(0),
+  lng: real("lng").notNull().default(0),
+  imageUrl: text("image_url"),
+  visitDuration: integer("visit_duration").notNull().default(30),
+});
+
 export const userProgress = pgTable("user_progress", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   sessionId: text("session_id").notNull(),
@@ -37,9 +62,12 @@ export const userProgress = pgTable("user_progress", {
 });
 
 export const insertTourSiteSchema = createInsertSchema(tourSites).omit({ id: true });
+export const insertAttractionSchema = createInsertSchema(attractions).omit({ id: true });
 export const insertUserProgressSchema = createInsertSchema(userProgress).omit({ id: true });
 
 export type TourSite = typeof tourSites.$inferSelect;
+export type Attraction = typeof attractions.$inferSelect;
 export type InsertTourSite = z.infer<typeof insertTourSiteSchema>;
+export type InsertAttraction = z.infer<typeof insertAttractionSchema>;
 export type UserProgress = typeof userProgress.$inferSelect;
 export type InsertUserProgress = z.infer<typeof insertUserProgressSchema>;

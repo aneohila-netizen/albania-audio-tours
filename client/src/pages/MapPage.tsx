@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useApp } from "@/App";
 import type { TourSite } from "@shared/schema";
-import { DESTINATIONS, ATTRACTIONS } from "@/lib/staticData";
+import { useDestinations, useAttractions } from "@/lib/useApiData";
 import type { Destination, Attraction } from "@/lib/staticData";
 import VisitModal from "@/components/VisitModal";
 import { apiRequest } from "@/lib/queryClient";
@@ -78,6 +78,8 @@ export default function MapPage() {
   const [layerMode, setLayerMode] = useState<LayerMode>("attractions");
   const [, navigate] = useLocation();
   const { t, lang, visitedSiteIds, markVisited } = useApp();
+  const DESTINATIONS = useDestinations();
+  const ATTRACTIONS = useAttractions();
 
   // Helper: name in current language
   const destName = (d: Destination) =>

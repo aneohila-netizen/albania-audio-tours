@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useApp } from "@/App";
-import { DESTINATIONS, ATTRACTIONS } from "@/lib/staticData";
+import { useDestinations, useAttractions } from "@/lib/useApiData";
 import type { Destination } from "@/lib/staticData";
 import { Search, MapPin, Star, ChevronRight, LayoutGrid, List } from "lucide-react";
 
@@ -44,6 +44,9 @@ export default function SitesPage() {
     lang === "al" ? d.taglineAl : lang === "gr" ? d.taglineGr : d.taglineEn;
   const desc = (d: Destination) =>
     lang === "al" ? d.descAl : lang === "gr" ? d.descGr : d.descEn;
+
+  const DESTINATIONS = useDestinations();
+  const ATTRACTIONS = useAttractions();
 
   const categories = ["all", ...Array.from(new Set(DESTINATIONS.map(d => d.category)))];
 

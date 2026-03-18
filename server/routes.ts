@@ -4,7 +4,15 @@ import path from "path";
 import fs from "fs";
 import multer from "multer";
 import { storage } from "./storage";
-import { insertUserProgressSchema, insertTourSiteSchema } from "@shared/schema";
+import { insertUserProgressSchema, insertTourSiteSchema, insertAttractionSchema } from "@shared/schema";
+
+// ─── Config ───────────────────────────────────────────────────────────────────
+// Absolute base URL used to form persistent media URLs stored in the DB.
+// On Railway this resolves to the public domain; locally it falls back to localhost.
+const RAILWAY_BASE = process.env.RAILWAY_PUBLIC_DOMAIN
+  ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+  : process.env.PUBLIC_URL
+  || "https://albania-audio-tours-production.up.railway.app";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "AlbaTour2026!";
@@ -120,6 +128,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ── Public: Attractions ────────────────────────────────────────────────────
+  app.get("/api/attractions", async (_req, res) => {
+    const attrs = await storage.getAllAttractions();
+    res.json(attrs);
+  });
+
+  app.get("/api/attractions/:destinationSlug", async (req, res) => {
+    const attrs = await storage.getAttractionsByDestination(req.params.destinationSlug);
+    res.json(attrs);
+  });
+
+  app.get("/api/attractions/:destinationSlug/:slug", async (req, res) => {
+    const attr = await storage.getAttractionBySlug(req.params.destinationSlug, req.params.slug);
+    if (!attr) return res.status(404).json({ error: "Not found" });
+    res.json(attr);
+  });
+
   // Health check
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", backend: "railway", db: process.env.DATABASE_URL ? "postgres" : "memory" });
@@ -134,6 +159,90 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.status(401).json({ error: "Invalid password" });
     }
   });
+
+  // ── Admin: Attractions CRUD ────────────────────────────────────────────────
+  app.get("/api/admin/attractions", requireAdmin, async (_req, res) => {
+    const attrs = await storage.getAllAttractions();
+    res.json(attrs);
+  });
+
+  app.get("/api/admin/attractions/:destinationSlug", requireAdmin, async (req, res) => {
+    const attrs = await storage.getAttractionsByDestination(req.params.destinationSlug);
+    res.json(attrs);
+  });
+
+  app.post("/api/admin/attractions", requireAdmin, async (req, res) => {
+    const parsed = insertAttractionSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error });
+    const attr = await storage.createAttraction(parsed.data);
+    res.json(attr);
+  });
+
+  app.get("/api/admin/attractions/all/:id", requireAdmin, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const attr = await storage.getAttractionById(id);
+    if (!attr) return res.status(404).json({ error: "Not found" });
+    res.json(attr);
+  });
+
+  app.put("/api/admin/attractions/:id", requireAdmin, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const updated = await storage.updateAttraction(id, req.body);
+    if (!updated) return res.status(404).json({ error: "Not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/admin/attractions/:id", requireAdmin, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const ok = await storage.deleteAttraction(id);
+    if (!ok) return res.status(404).json({ error: "Not found" });
+    res.json({ success: true });
+  });
+
+  // ── Admin: Attraction Audio Upload ──────────────────────────────────────────
+  app.post(
+    "/api/admin/attractions/:id/audio/:lang",
+    requireAdmin,
+    upload.single("audio"),
+    async (req: any, res) => {
+      const id = parseInt(req.params.id);
+      const lang = req.params.lang as "en" | "al" | "gr";
+      if (!["en", "al", "gr"].includes(lang)) return res.status(400).json({ error: "lang must be en|al|gr" });
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      const audioUrl = `${RAILWAY_BASE}/api/audio/${req.file.filename}`;
+      const field = lang === "en" ? "audioUrlEn" : lang === "al" ? "audioUrlAl" : "audioUrlGr";
+      const updated = await storage.updateAttraction(id, { [field]: audioUrl } as any);
+      if (!updated) return res.status(404).json({ error: "Attraction not found" });
+      res.json({ url: audioUrl, attraction: updated });
+    }
+  );
+
+  app.delete("/api/admin/attractions/:id/audio/:lang", requireAdmin, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const lang = req.params.lang as "en" | "al" | "gr";
+    const field = lang === "en" ? "audioUrlEn" : lang === "al" ? "audioUrlAl" : "audioUrlGr";
+    const updated = await storage.updateAttraction(id, { [field]: null } as any);
+    if (!updated) return res.status(404).json({ error: "Not found" });
+    res.json({ success: true, attraction: updated });
+  });
+
+  // ── Admin: Attraction Image Upload ──────────────────────────────────────────
+  app.post(
+    "/api/admin/attractions/:id/image",
+    requireAdmin,
+    imageUpload.single("image"),
+    async (req: any, res) => {
+      const id = parseInt(req.params.id);
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      const imageUrl = `${RAILWAY_BASE}/api/images/${req.file.filename}`;
+      const updated = await storage.updateAttraction(id, { imageUrl } as any);
+      if (!updated) return res.status(404).json({ error: "Attraction not found" });
+      res.json({ url: imageUrl, attraction: updated });
+    }
+  );
 
   // ── Admin: Sites CRUD ───────────────────────────────────────────────────────
   app.get("/api/admin/sites", requireAdmin, async (_req, res) => {
@@ -176,7 +285,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!["en", "al", "gr"].includes(lang)) return res.status(400).json({ error: "lang must be en|al|gr" });
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
-      const audioUrl = `/api/audio/${req.file.filename}`;
+      const audioUrl = `${RAILWAY_BASE}/api/audio/${req.file.filename}`;
       const field = lang === "en" ? "audioUrlEn" : lang === "al" ? "audioUrlAl" : "audioUrlGr";
       const updated = await storage.updateSite(id, { [field]: audioUrl } as any);
       if (!updated) return res.status(404).json({ error: "Site not found" });
@@ -202,21 +311,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     async (req: any, res) => {
       const id = parseInt(req.params.id);
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      const imageUrl = `/api/images/${req.file.filename}`;
+      const imageUrl = `${RAILWAY_BASE}/api/images/${req.file.filename}`;
       const updated = await storage.updateSite(id, { imageUrl } as any);
       if (!updated) return res.status(404).json({ error: "Site not found" });
       res.json({ url: imageUrl, site: updated });
     }
   );
 
-  // POST /api/admin/upload-image — generic image upload (returns URL, caller updates site separately)
+  // POST /api/admin/upload-image — generic image upload (returns absolute URL)
   app.post(
     "/api/admin/upload-image",
     requireAdmin,
     imageUpload.single("image"),
     async (req: any, res) => {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      const imageUrl = `/api/images/${req.file.filename}`;
+      const imageUrl = `${RAILWAY_BASE}/api/images/${req.file.filename}`;
       res.json({ url: imageUrl });
     }
   );
