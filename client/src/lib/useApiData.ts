@@ -6,11 +6,13 @@ import { useQuery } from "@tanstack/react-query";
 import type { TourSite, Attraction } from "@shared/schema";
 import { DESTINATIONS, ATTRACTIONS } from "./staticData";
 import type { Destination } from "./staticData";
+import { railwayFetch } from "./queryClient";
 
 /** Returns destinations merged with live API imageUrls */
 export function useDestinations() {
   const { data: apiSites } = useQuery<TourSite[]>({
-    queryKey: ["/api/sites"],
+    queryKey: ["railway", "sites"],
+    queryFn: () => railwayFetch<TourSite[]>("/api/sites"),
     staleTime: 60_000,
   });
 
@@ -33,8 +35,11 @@ export function useDestinations() {
 export function useAttractions(destinationSlug?: string) {
   const { data: apiAttrs } = useQuery<Attraction[]>({
     queryKey: destinationSlug
-      ? ["/api/attractions", destinationSlug]
-      : ["/api/attractions"],
+      ? ["railway", "attractions", destinationSlug]
+      : ["railway", "attractions"],
+    queryFn: () => destinationSlug
+      ? railwayFetch<Attraction[]>(`/api/attractions/${destinationSlug}`)
+      : railwayFetch<Attraction[]>("/api/attractions"),
     staleTime: 60_000,
     enabled: true,
   });

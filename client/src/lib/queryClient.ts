@@ -1,7 +1,17 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
+export const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
 const API_BASE = "__PORT_5000__".startsWith("__") ? RAILWAY_URL : "__PORT_5000__";
+
+/** Direct Railway fetch — always goes to Railway, never through Perplexity proxy */
+export async function railwayFetch<T>(path: string): Promise<T> {
+  const res = await fetch(`${RAILWAY_URL}${path}`, { credentials: "include" });
+  if (!res.ok) {
+    const text = (await res.text()) || res.statusText;
+    throw new Error(`${res.status}: ${text}`);
+  }
+  return res.json() as Promise<T>;
+}
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {

@@ -2,6 +2,7 @@ import { useRoute, useLocation } from "wouter";
 import { useApp } from "@/App";
 import { useQuery } from "@tanstack/react-query";
 import type { TourSite, Attraction } from "@shared/schema";
+import { railwayFetch } from "@/lib/queryClient";
 import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -27,15 +28,17 @@ export default function DestinationPage() {
   const [, navigate] = useLocation();
   const { lang, visitedSiteIds } = useApp();
 
-  // Fetch destination from API
+  // Fetch destination directly from Railway (bypasses Perplexity proxy)
   const { data: dest, isLoading: destLoading } = useQuery<TourSite>({
-    queryKey: ["/api/sites", params?.dest],
+    queryKey: ["railway", "sites", params?.dest],
+    queryFn: () => railwayFetch<TourSite>(`/api/sites/${params?.dest}`),
     enabled: !!params?.dest,
   });
 
-  // Fetch attractions for this destination from API
+  // Fetch attractions directly from Railway (bypasses Perplexity proxy)
   const { data: attractions = [], isLoading: attrsLoading } = useQuery<Attraction[]>({
-    queryKey: ["/api/attractions", params?.dest],
+    queryKey: ["railway", "attractions", params?.dest],
+    queryFn: () => railwayFetch<Attraction[]>(`/api/attractions/${params?.dest}`),
     enabled: !!params?.dest,
   });
 

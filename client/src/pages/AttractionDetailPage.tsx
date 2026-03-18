@@ -2,6 +2,7 @@ import { useRoute, useLocation } from "wouter";
 import { useApp } from "@/App";
 import { useQuery } from "@tanstack/react-query";
 import type { TourSite, Attraction } from "@shared/schema";
+import { railwayFetch } from "@/lib/queryClient";
 import AudioPlayer from "@/components/AudioPlayer";
 import VisitModal from "@/components/VisitModal";
 import { useState } from "react";
@@ -32,15 +33,17 @@ export default function AttractionDetailPage() {
   const { lang, visitedSiteIds, markVisited } = useApp();
   const [showModal, setShowModal] = useState(false);
 
-  // Fetch destination (site) from API
+  // Fetch destination directly from Railway (bypasses Perplexity proxy)
   const { data: dest } = useQuery<TourSite>({
-    queryKey: ["/api/sites", params?.dest],
+    queryKey: ["railway", "sites", params?.dest],
+    queryFn: () => railwayFetch<TourSite>(`/api/sites/${params?.dest}`),
     enabled: !!params?.dest,
   });
 
-  // Fetch attraction from API
+  // Fetch attraction directly from Railway (bypasses Perplexity proxy)
   const { data: attraction, isLoading } = useQuery<Attraction>({
-    queryKey: ["/api/attractions", params?.dest, params?.attr],
+    queryKey: ["railway", "attractions", params?.dest, params?.attr],
+    queryFn: () => railwayFetch<Attraction>(`/api/attractions/${params?.dest}/${params?.attr}`),
     enabled: !!params?.dest && !!params?.attr,
   });
 
