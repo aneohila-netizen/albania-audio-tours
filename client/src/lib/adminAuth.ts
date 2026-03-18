@@ -1,41 +1,43 @@
-// Admin token store — uses localStorage when available (Railway URL), falls back to memory (sandboxed Perplexity iframe)
+// Admin token store — uses sessionStorage when available, falls back to memory
+// sessionStorage survives F5 page refresh (same tab) and works in all contexts.
 const STORAGE_KEY = "albatour_admin_token";
 
 let _adminToken: string | null = null;
 
-function tryLocalStorage(): boolean {
+function trySessionStorage(): boolean {
   try {
-    localStorage.setItem("__test__", "1");
-    localStorage.removeItem("__test__");
+    const ss = window.sessionStorage;
+    ss.setItem("__test__", "1");
+    ss.removeItem("__test__");
     return true;
   } catch {
     return false;
   }
 }
 
-const HAS_LOCALSTORAGE = tryLocalStorage();
+const HAS_SESSION_STORAGE = trySessionStorage();
 
 export function getAdminToken(): string | null {
-  if (HAS_LOCALSTORAGE) {
-    return localStorage.getItem(STORAGE_KEY);
+  if (HAS_SESSION_STORAGE) {
+    return window.sessionStorage.getItem(STORAGE_KEY);
   }
   return _adminToken;
 }
 
 export function setAdminToken(token: string | null) {
   _adminToken = token;
-  if (HAS_LOCALSTORAGE) {
+  if (HAS_SESSION_STORAGE) {
     if (token) {
-      localStorage.setItem(STORAGE_KEY, token);
+      window.sessionStorage.setItem(STORAGE_KEY, token);
     } else {
-      localStorage.removeItem(STORAGE_KEY);
+      window.sessionStorage.removeItem(STORAGE_KEY);
     }
   }
 }
 
 export function clearAdminToken() {
   _adminToken = null;
-  if (HAS_LOCALSTORAGE) {
-    localStorage.removeItem(STORAGE_KEY);
+  if (HAS_SESSION_STORAGE) {
+    window.sessionStorage.removeItem(STORAGE_KEY);
   }
 }
