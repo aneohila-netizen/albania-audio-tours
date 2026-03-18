@@ -28,6 +28,7 @@ app.use(cors({
     "https://albanianaudiotours.com",
     "https://audiotours.albanianeagletours.com",
     /\.perplexity\.ai$/,
+    /\.pplx\.app$/,
   ],
   credentials: true,
 }));
