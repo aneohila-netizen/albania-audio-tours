@@ -143,10 +143,9 @@ function stripAudioData(obj: any, type: 'attraction'|'site'): any {
     const field = `audioUrl${lang}` as string;
     const val: string | null = out[field];
     if (val && val.startsWith('data:')) {
-      // Use a short version hash (chars 100-108 of b64) to bust browser cache when audio changes
+      // Use b64 length as version to bust browser cache when audio is re-uploaded
       const b64 = val.split(',')[1] || '';
-      const vhash = b64.slice(100, 108).replace(/[^a-zA-Z0-9]/g, 'x');
-      out[field] = `${RAILWAY_BASE}/api/audio/serve/${type}/${obj.id}/${lang.toLowerCase()}?v=${vhash}`;
+      out[field] = `${RAILWAY_BASE}/api/audio/serve/${type}/${obj.id}/${lang.toLowerCase()}?v=${b64.length}`;
     }
   }
   return out;
