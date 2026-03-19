@@ -257,9 +257,9 @@ export default function MapPage() {
           lat: selectedPin.data.lat,
           lng: selectedPin.data.lng,
           imageUrl: selectedPin.data.imageUrl,
-          audioUrlEn: null,
-          audioUrlAl: null,
-          audioUrlGr: null,
+          audioUrlEn: selectedPin.data.audioUrlEn || null,
+          audioUrlAl: selectedPin.data.audioUrlAl || null,
+          audioUrlGr: (selectedPin.data as any).audioUrlGr || null,
           // New language audio fields (passthrough from attraction)
           ...Object.fromEntries(
             ["It","Es","De","Fr","Ar","Sl"].map(s => [`audioUrl${s}`, (selectedPin.data as any)[`audioUrl${s}`] || null])

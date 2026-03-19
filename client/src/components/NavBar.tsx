@@ -36,7 +36,7 @@ export default function NavBar() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm">
+    <header className="sticky top-0 z-[2000] border-b border-border bg-background/95 backdrop-blur-sm">
       <div className="flex items-center justify-between px-4 h-14 max-w-7xl mx-auto">
         {/* Logo */}
         <Link href="/">
@@ -103,7 +103,7 @@ export default function NavBar() {
             {langOpen && (
               <div
                 role="listbox"
-                className="absolute right-0 top-full mt-1.5 w-44 rounded-xl border border-border bg-card shadow-lg overflow-hidden z-50"
+                className="absolute right-0 top-full mt-1.5 w-44 rounded-xl border border-border bg-card shadow-lg overflow-hidden z-[3000]"
               >
                 {allLangs.map(l => (
                   <button

@@ -1192,6 +1192,7 @@ function EditorView({
   const [savedOk, setSavedOk] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [translatingLang, setTranslatingLang] = useState<string | null>(null);
+  const [translateError, setTranslateError] = useState("");
 
   useEffect(() => {
     if (!isNew && siteId !== null) {
@@ -1220,17 +1221,31 @@ function EditorView({
   async function handleTranslateDest(langKey: string) {
     if (!form.nameEn && !form.descEn) return;
     setTranslatingLang(langKey);
+    setTranslateError("");
     try {
       const cap = langKey.charAt(0).toUpperCase() + langKey.slice(1);
-      const [nameRes, descRes, funRes] = await Promise.all([
-        form.nameEn ? adminFetch("/api/admin/translate", { method: "POST", body: JSON.stringify({ text: form.nameEn, targetLang: langKey }) }).then(r => r.json()) : Promise.resolve({ translated: "" }),
-        form.descEn ? adminFetch("/api/admin/translate", { method: "POST", body: JSON.stringify({ text: form.descEn, targetLang: langKey }) }).then(r => r.json()) : Promise.resolve({ translated: "" }),
-        form.funFactEn ? adminFetch("/api/admin/translate", { method: "POST", body: JSON.stringify({ text: form.funFactEn, targetLang: langKey }) }).then(r => r.json()) : Promise.resolve({ translated: "" }),
+      const doTranslate = async (text: string) => {
+        const r = await adminFetch("/api/admin/translate", { method: "POST", body: JSON.stringify({ text, targetLang: langKey }) });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+        return d.translated || "";
+      };
+      const [nameT, descT, funT] = await Promise.all([
+        form.nameEn ? doTranslate(form.nameEn) : Promise.resolve(""),
+        form.descEn ? doTranslate(form.descEn) : Promise.resolve(""),
+        form.funFactEn ? doTranslate(form.funFactEn) : Promise.resolve(""),
       ]);
-      if (nameRes.translated) set(`name${cap}` as keyof DestFormData, nameRes.translated);
-      if (descRes.translated) set(`desc${cap}` as keyof DestFormData, descRes.translated);
-      if (funRes.translated) set(`funFact${cap}` as keyof DestFormData, funRes.translated);
-    } catch { /* ignore */ }
+      if (nameT) set(`name${cap}` as keyof DestFormData, nameT);
+      if (descT) set(`desc${cap}` as keyof DestFormData, descT);
+      if (funT) set(`funFact${cap}` as keyof DestFormData, funT);
+    } catch (e: any) {
+      const msg = e.message || "Translation failed";
+      if (msg.includes("GEMINI_API_KEY") || msg.includes("not configured")) {
+        setTranslateError("⚠️ Translation requires a GEMINI_API_KEY. Go to Railway → inspiring-exploration → albania-audio-tours → Variables → add GEMINI_API_KEY.");
+      } else {
+        setTranslateError(`Translation error: ${msg}`);
+      }
+    }
     setTranslatingLang(null);
   }
 
@@ -1448,6 +1463,9 @@ function EditorView({
           {/* Translations */}
           <TabsContent value="translations" className="space-y-5">
             <p className="text-sm text-muted-foreground">Translations for all languages. Click "Auto-translate" to fill all three fields from the English version. English is used as fallback if left blank.</p>
+            {translateError && (
+              <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive border border-destructive/20">{translateError}</div>
+            )}
             {LANGS.filter(l => l.key !== "en").map(lang => {
               const cap = lang.key.charAt(0).toUpperCase() + lang.key.slice(1);
               const isTranslating = translatingLang === lang.key;
@@ -1613,6 +1631,7 @@ function AttrEditorView({
   const [savedOk, setSavedOk] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [translatingLang, setTranslatingLang] = useState<string | null>(null);
+  const [translateError, setTranslateError] = useState("");
 
   useEffect(() => {
     if (!isNew && attractionId !== null) {
@@ -1647,6 +1666,7 @@ function AttrEditorView({
   async function handleTranslateAttr(langKey: string) {
     if (!form.nameEn && !form.descEn) return;
     setTranslatingLang(langKey);
+    setTranslateError("");
     try {
       const cap = langKey.charAt(0).toUpperCase() + langKey.slice(1);
       const [nameRes, descRes, funRes] = await Promise.all([
@@ -1654,10 +1674,28 @@ function AttrEditorView({
         form.descEn ? adminFetch("/api/admin/translate", { method: "POST", body: JSON.stringify({ text: form.descEn, targetLang: langKey }) }).then(r => r.json()) : Promise.resolve({ translated: "" }),
         form.funFactEn ? adminFetch("/api/admin/translate", { method: "POST", body: JSON.stringify({ text: form.funFactEn, targetLang: langKey }) }).then(r => r.json()) : Promise.resolve({ translated: "" }),
       ]);
-      if (nameRes.translated) set(`name${cap}` as keyof AttrFormData, nameRes.translated);
-      if (descRes.translated) set(`desc${cap}` as keyof AttrFormData, descRes.translated);
-      if (funRes.translated) set(`funFact${cap}` as keyof AttrFormData, funRes.translated);
-    } catch { /* ignore */ }
+      // Check if the API returned an error payload
+      const firstRes = nameRes || descRes;
+      if (firstRes?.error) {
+        const msg = firstRes.error || "";
+        if (msg.includes("503") || msg.includes("GEMINI") || msg.includes("API key") || firstRes.error === "Translation service unavailable") {
+          setTranslateError("⚠️ Translation requires a GEMINI_API_KEY. Go to Railway → inspiring-exploration → albania-audio-tours → Variables → add GEMINI_API_KEY.");
+        } else {
+          setTranslateError(`Translation error: ${msg}`);
+        }
+      } else {
+        if (nameRes.translated) set(`name${cap}` as keyof AttrFormData, nameRes.translated);
+        if (descRes.translated) set(`desc${cap}` as keyof AttrFormData, descRes.translated);
+        if (funRes.translated) set(`funFact${cap}` as keyof AttrFormData, funRes.translated);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("503") || msg.includes("GEMINI") || msg.includes("API key")) {
+        setTranslateError("⚠️ Translation requires a GEMINI_API_KEY. Go to Railway → inspiring-exploration → albania-audio-tours → Variables → add GEMINI_API_KEY.");
+      } else {
+        setTranslateError(`Translation error: ${msg}`);
+      }
+    }
     setTranslatingLang(null);
   }
 
@@ -1820,6 +1858,9 @@ function AttrEditorView({
           {/* Translations */}
           <TabsContent value="translations" className="space-y-5">
             <p className="text-sm text-muted-foreground">Translations for all languages. Click "Auto-translate" to fill all three fields from the English version. English is used as fallback if left blank.</p>
+            {translateError && (
+              <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive border border-destructive/20">{translateError}</div>
+            )}
             {LANGS.filter(l => l.key !== "en").map(lang => {
               const cap = lang.key.charAt(0).toUpperCase() + lang.key.slice(1);
               const isTranslating = translatingLang === lang.key;
