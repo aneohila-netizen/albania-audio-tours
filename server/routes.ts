@@ -217,8 +217,24 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const mimeType = mimeMatch ? mimeMatch[1] : 'audio/wav';
       const b64 = val.split(',')[1];
       const buf = Buffer.from(b64, 'base64');
-      // Use must-revalidate so stale cached responses are rechecked
-      res.set({ 'Content-Type': mimeType, 'Content-Length': buf.length, 'Cache-Control': 'public, max-age=3600, must-revalidate', 'Accept-Ranges': 'none' });
+      // Support HTTP range requests — required for browsers to stream <audio> elements
+      const totalSize = buf.length;
+      const rangeHeader = req.headers['range'];
+      res.set('Content-Type', mimeType);
+      res.set('Accept-Ranges', 'bytes');
+      res.set('Cache-Control', 'public, max-age=3600, must-revalidate');
+
+      if (rangeHeader) {
+        const match = rangeHeader.match(/bytes=(\d*)-(\d*)/);
+        const start = match?.[1] ? parseInt(match[1]) : 0;
+        const end = match?.[2] ? parseInt(match[2]) : totalSize - 1;
+        const chunkSize = end - start + 1;
+        res.set('Content-Range', `bytes ${start}-${end}/${totalSize}`);
+        res.set('Content-Length', chunkSize.toString());
+        res.status(206);
+        return res.send(buf.slice(start, end + 1));
+      }
+      res.set('Content-Length', totalSize.toString());
       return res.send(buf);
     }
     // Legacy: redirect to file URL
