@@ -205,6 +205,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json({ status: "ok", backend: "railway", db: process.env.DATABASE_URL ? "postgres" : "memory" });
   });
 
+  // Temp: list available Gemini models
+  app.get("/api/debug/gemini-models", requireAdmin, async (_req, res) => {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) return res.json({ error: "No GEMINI_API_KEY" });
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+      const d = await r.json() as any;
+      const names = (d.models || []).map((m: any) => m.name);
+      res.json({ count: names.length, models: names });
+    } catch (e: any) { res.json({ error: e.message }); }
+  });
+
   // ── Admin: Auth ─────────────────────────────────────────────────────────────
   app.post("/api/admin/login", (req, res) => {
     const { password } = req.body;
