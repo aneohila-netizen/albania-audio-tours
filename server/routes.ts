@@ -330,21 +330,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const audioB64 = ttsData?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (!audioB64) return res.status(500).json({ error: "No audio data in TTS response" });
 
-      // Save MP3 to AUDIO_DIR
+      // Save MP3 to AUDIO_DIR (ephemeral, for fast serving)
       const filename = `tts_${entityType}_${entityId}_${lang}_${Date.now()}.mp3`;
       const filePath = path.join(AUDIO_DIR, filename);
-      fs.writeFileSync(filePath, Buffer.from(audioB64, "base64"));
+      const audioBuffer = Buffer.from(audioB64, "base64");
+      fs.writeFileSync(filePath, audioBuffer);
 
-      // Store URL in DB
-      const audioUrl = `${RAILWAY_BASE}/api/audio/${filename}`;
+      // Store as data URI in DB — survives Railway redeploys permanently
+      const dataUri = `data:audio/mpeg;base64,${audioB64}`;
       const field = audioField(lang as SupportedLang);
       if (entityType === "sites") {
-        await storage.updateSite(entityId, { [field]: audioUrl } as any);
+        await storage.updateSite(entityId, { [field]: dataUri } as any);
       } else {
-        await storage.updateAttraction(entityId, { [field]: audioUrl } as any);
+        await storage.updateAttraction(entityId, { [field]: dataUri } as any);
       }
 
-      res.json({ url: audioUrl });
+      res.json({ url: dataUri });
     } catch (e: any) {
       res.status(500).json({ error: e.message || "TTS generation failed" });
     }
@@ -359,11 +360,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const lang = req.params.lang as SupportedLang;
       if (!SUPPORTED_LANGS.includes(lang)) return res.status(400).json({ error: `lang must be one of: ${SUPPORTED_LANGS.join("|")}` });
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      const audioUrl = `${RAILWAY_BASE}/api/audio/${req.file.filename}`;
+      // Store as data URI in DB — survives Railway redeploys permanently
+      const audioB64 = req.file.buffer
+        ? req.file.buffer.toString("base64")
+        : fs.readFileSync(req.file.path).toString("base64");
+      const dataUri = `data:audio/mpeg;base64,${audioB64}`;
       const field = audioField(lang);
-      const updated = await storage.updateAttraction(id, { [field]: audioUrl } as any);
+      const updated = await storage.updateAttraction(id, { [field]: dataUri } as any);
       if (!updated) return res.status(404).json({ error: "Attraction not found" });
-      res.json({ url: audioUrl, attraction: updated });
+      res.json({ url: dataUri, [`audioUrl${lang.charAt(0).toUpperCase()+lang.slice(1)}`]: dataUri, attraction: updated });
     }
   );
 
@@ -431,11 +436,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const lang = req.params.lang as SupportedLang;
       if (!SUPPORTED_LANGS.includes(lang)) return res.status(400).json({ error: `lang must be one of: ${SUPPORTED_LANGS.join("|")}`});
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      const audioUrl = `${RAILWAY_BASE}/api/audio/${req.file.filename}`;
+      // Store as data URI in DB — survives Railway redeploys permanently
+      const audioB64 = req.file.buffer
+        ? req.file.buffer.toString("base64")
+        : fs.readFileSync(req.file.path).toString("base64");
+      const dataUri = `data:audio/mpeg;base64,${audioB64}`;
       const field = audioField(lang);
-      const updated = await storage.updateSite(id, { [field]: audioUrl } as any);
+      const updated = await storage.updateSite(id, { [field]: dataUri } as any);
       if (!updated) return res.status(404).json({ error: "Site not found" });
-      res.json({ url: audioUrl, site: updated });
+      res.json({ url: dataUri, site: updated });
     }
   );
 
