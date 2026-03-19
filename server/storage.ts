@@ -250,26 +250,42 @@ class PgStorage implements IStorage {
     return {
       id: r.id, slug: r.slug,
       nameEn: r.name_en, nameAl: r.name_al, nameGr: r.name_gr,
+      nameIt: r.name_it||'', nameEs: r.name_es||'', nameDe: r.name_de||'',
+      nameFr: r.name_fr||'', nameAr: r.name_ar||'', nameSl: r.name_sl||'',
       descEn: r.desc_en, descAl: r.desc_al, descGr: r.desc_gr,
+      descIt: r.desc_it||'', descEs: r.desc_es||'', descDe: r.desc_de||'',
+      descFr: r.desc_fr||'', descAr: r.desc_ar||'', descSl: r.desc_sl||'',
       funFactEn: r.fun_fact_en, funFactAl: r.fun_fact_al, funFactGr: r.fun_fact_gr,
+      funFactIt: r.fun_fact_it||null, funFactEs: r.fun_fact_es||null, funFactDe: r.fun_fact_de||null,
+      funFactFr: r.fun_fact_fr||null, funFactAr: r.fun_fact_ar||null, funFactSl: r.fun_fact_sl||null,
       audioUrlEn: r.audio_url_en, audioUrlAl: r.audio_url_al, audioUrlGr: r.audio_url_gr,
+      audioUrlIt: r.audio_url_it||null, audioUrlEs: r.audio_url_es||null, audioUrlDe: r.audio_url_de||null,
+      audioUrlFr: r.audio_url_fr||null, audioUrlAr: r.audio_url_ar||null, audioUrlSl: r.audio_url_sl||null,
       lat: parseFloat(r.lat), lng: parseFloat(r.lng),
       region: r.region, category: r.category, difficulty: r.difficulty,
       points: r.points, imageUrl: r.image_url, visitDuration: r.visit_duration,
-    };
+    } as any;
   }
 
   private rowToAttraction(r: any): Attraction {
     return {
       id: r.id, slug: r.slug, destinationSlug: r.destination_slug,
       nameEn: r.name_en, nameAl: r.name_al, nameGr: r.name_gr,
+      nameIt: r.name_it||'', nameEs: r.name_es||'', nameDe: r.name_de||'',
+      nameFr: r.name_fr||'', nameAr: r.name_ar||'', nameSl: r.name_sl||'',
       descEn: r.desc_en, descAl: r.desc_al, descGr: r.desc_gr,
+      descIt: r.desc_it||'', descEs: r.desc_es||'', descDe: r.desc_de||'',
+      descFr: r.desc_fr||'', descAr: r.desc_ar||'', descSl: r.desc_sl||'',
       funFactEn: r.fun_fact_en||'', funFactAl: r.fun_fact_al||'', funFactGr: r.fun_fact_gr||'',
+      funFactIt: r.fun_fact_it||null, funFactEs: r.fun_fact_es||null, funFactDe: r.fun_fact_de||null,
+      funFactFr: r.fun_fact_fr||null, funFactAr: r.fun_fact_ar||null, funFactSl: r.fun_fact_sl||null,
       audioUrlEn: r.audio_url_en, audioUrlAl: r.audio_url_al, audioUrlGr: r.audio_url_gr,
+      audioUrlIt: r.audio_url_it||null, audioUrlEs: r.audio_url_es||null, audioUrlDe: r.audio_url_de||null,
+      audioUrlFr: r.audio_url_fr||null, audioUrlAr: r.audio_url_ar||null, audioUrlSl: r.audio_url_sl||null,
       category: r.category, points: r.points,
       lat: parseFloat(r.lat), lng: parseFloat(r.lng),
       imageUrl: r.image_url, visitDuration: r.visit_duration,
-    };
+    } as any;
   }
 
   async getAllSites(): Promise<TourSite[]> {
@@ -312,9 +328,15 @@ class PgStorage implements IStorage {
     let i = 1;
     const map: Record<string, string> = {
       slug: "slug", nameEn: "name_en", nameAl: "name_al", nameGr: "name_gr",
+      nameIt: "name_it", nameEs: "name_es", nameDe: "name_de", nameFr: "name_fr", nameAr: "name_ar", nameSl: "name_sl",
       descEn: "desc_en", descAl: "desc_al", descGr: "desc_gr",
+      descIt: "desc_it", descEs: "desc_es", descDe: "desc_de", descFr: "desc_fr", descAr: "desc_ar", descSl: "desc_sl",
       funFactEn: "fun_fact_en", funFactAl: "fun_fact_al", funFactGr: "fun_fact_gr",
+      funFactIt: "fun_fact_it", funFactEs: "fun_fact_es", funFactDe: "fun_fact_de",
+      funFactFr: "fun_fact_fr", funFactAr: "fun_fact_ar", funFactSl: "fun_fact_sl",
       audioUrlEn: "audio_url_en", audioUrlAl: "audio_url_al", audioUrlGr: "audio_url_gr",
+      audioUrlIt: "audio_url_it", audioUrlEs: "audio_url_es", audioUrlDe: "audio_url_de",
+      audioUrlFr: "audio_url_fr", audioUrlAr: "audio_url_ar", audioUrlSl: "audio_url_sl",
       lat: "lat", lng: "lng", region: "region", category: "category",
       difficulty: "difficulty", points: "points", imageUrl: "image_url", visitDuration: "visit_duration",
     };
@@ -388,9 +410,15 @@ class PgStorage implements IStorage {
     const map: Record<string, string> = {
       slug: "slug", destinationSlug: "destination_slug",
       nameEn: "name_en", nameAl: "name_al", nameGr: "name_gr",
+      nameIt: "name_it", nameEs: "name_es", nameDe: "name_de", nameFr: "name_fr", nameAr: "name_ar", nameSl: "name_sl",
       descEn: "desc_en", descAl: "desc_al", descGr: "desc_gr",
+      descIt: "desc_it", descEs: "desc_es", descDe: "desc_de", descFr: "desc_fr", descAr: "desc_ar", descSl: "desc_sl",
       funFactEn: "fun_fact_en", funFactAl: "fun_fact_al", funFactGr: "fun_fact_gr",
+      funFactIt: "fun_fact_it", funFactEs: "fun_fact_es", funFactDe: "fun_fact_de",
+      funFactFr: "fun_fact_fr", funFactAr: "fun_fact_ar", funFactSl: "fun_fact_sl",
       audioUrlEn: "audio_url_en", audioUrlAl: "audio_url_al", audioUrlGr: "audio_url_gr",
+      audioUrlIt: "audio_url_it", audioUrlEs: "audio_url_es", audioUrlDe: "audio_url_de",
+      audioUrlFr: "audio_url_fr", audioUrlAr: "audio_url_ar", audioUrlSl: "audio_url_sl",
       category: "category", points: "points",
       lat: "lat", lng: "lng", imageUrl: "image_url", visitDuration: "visit_duration",
     };
