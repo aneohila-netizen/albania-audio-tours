@@ -1,7 +1,8 @@
 import { Link, useLocation } from "wouter";
 import { useApp } from "@/App";
-import { LANG_LABELS, type Lang } from "@/lib/i18n";
-import { Map, List, BookOpen, Trophy, Moon, Sun, Settings } from "lucide-react";
+import { LANG_LABELS, LANG_NAMES, type Lang } from "@/lib/i18n";
+import { Map, List, BookOpen, Trophy, Moon, Sun, Settings, ChevronDown } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 
 export default function NavBar() {
   const [location] = useLocation();
@@ -14,7 +15,25 @@ export default function NavBar() {
     { href: "/leaderboard", icon: Trophy, label: t.leaderboard },
   ];
 
-  const langs: Lang[] = ["en", "al", "gr"];
+  const allLangs: Lang[] = ["en", "al", "gr", "it", "es", "de", "fr", "ar", "sl"];
+  const FLAG: Record<Lang, string> = {
+    en: "🇬🇧", al: "🇦🇱", gr: "🇬🇷", it: "🇮🇹",
+    es: "🇪🇸", de: "🇩🇪", fr: "🇫🇷", ar: "🇸🇦", sl: "🇸🇮",
+  };
+
+  const [langOpen, setLangOpen] = useState(false);
+  const langRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (langRef.current && !langRef.current.contains(e.target as Node)) {
+        setLangOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm">
@@ -68,18 +87,44 @@ export default function NavBar() {
             {totalPoints} pts
           </div>
 
-          {/* Language switcher */}
-          <div className="flex items-center gap-0.5 bg-muted rounded-full p-0.5">
-            {langs.map(l => (
-              <button
-                key={l}
-                data-testid={`lang-${l}`}
-                className={`lang-btn ${lang === l ? "active" : ""}`}
-                onClick={() => setLang(l)}
+          {/* Language switcher — compact dropdown */}
+          <div className="relative" ref={langRef}>
+            <button
+              data-testid="lang-dropdown-trigger"
+              onClick={() => setLangOpen(v => !v)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-border bg-card hover:bg-muted transition-colors"
+              aria-haspopup="listbox"
+              aria-expanded={langOpen}
+            >
+              <span>{FLAG[lang as Lang]}</span>
+              <span>{LANG_LABELS[lang as Lang]}</span>
+              <ChevronDown size={11} className={`transition-transform duration-150 ${langOpen ? "rotate-180" : ""}`} />
+            </button>
+            {langOpen && (
+              <div
+                role="listbox"
+                className="absolute right-0 top-full mt-1.5 w-44 rounded-xl border border-border bg-card shadow-lg overflow-hidden z-50"
               >
-                {LANG_LABELS[l]}
-              </button>
-            ))}
+                {allLangs.map(l => (
+                  <button
+                    key={l}
+                    role="option"
+                    aria-selected={lang === l}
+                    data-testid={`lang-${l}`}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors text-left ${
+                      lang === l
+                        ? "bg-primary/10 text-primary font-semibold"
+                        : "hover:bg-muted text-foreground"
+                    }`}
+                    onClick={() => { setLang(l); setLangOpen(false); }}
+                  >
+                    <span className="text-base leading-none">{FLAG[l]}</span>
+                    <span className="flex-1">{LANG_NAMES[l]}</span>
+                    <span className="text-xs text-muted-foreground">{LANG_LABELS[l]}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Dark mode toggle */}

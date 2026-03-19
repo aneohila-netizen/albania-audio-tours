@@ -221,3 +221,22 @@ export const TRANSLATIONS: Record<Lang, Translations> = {
   en: EN, al: AL, gr: GR,
   it: EN, es: EN, de: EN, fr: EN, ar: EN, sl: EN,
 };
+
+/**
+ * Resolve a localised field on any object using the current language.
+ * e.g. getLangText(site, "name", "it") → site.nameIt || site.nameEn || ""
+ * The capitalisation follows the database column convention: nameEn, descAl, funFactGr …
+ */
+export function getLangText(obj: any, field: string, lang: Lang): string {
+  if (!obj) return "";
+  const cap = lang.charAt(0).toUpperCase() + lang.slice(1); // "en" → "En"
+  return obj[`${field}${cap}`] || obj[`${field}En`] || "";
+}
+
+/**
+ * Resolve the correct audioUrl for the given language with EN fallback.
+ */
+export function getLangAudioUrl(obj: any, lang: Lang): string | null {
+  const cap = lang.charAt(0).toUpperCase() + lang.slice(1);
+  return obj[`audioUrl${cap}`] || obj[`audioUrlEn`] || null;
+}

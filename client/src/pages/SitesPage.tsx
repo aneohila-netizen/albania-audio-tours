@@ -4,6 +4,7 @@ import { useApp } from "@/App";
 import { useDestinations, useAttractions } from "@/lib/useApiData";
 import type { Destination } from "@/lib/staticData";
 import { Search, MapPin, Star, ChevronRight, LayoutGrid, List } from "lucide-react";
+import { getLangText } from "@/lib/i18n";
 
 const CATEGORY_COLORS: Record<string, string> = {
   city: "#C0392B",
@@ -38,12 +39,9 @@ export default function SitesPage() {
   const [filterCat, setFilterCat] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
-  const name = (d: Destination) =>
-    lang === "al" ? d.nameAl : lang === "gr" ? d.nameGr : d.nameEn;
-  const tagline = (d: Destination) =>
-    lang === "al" ? d.taglineAl : lang === "gr" ? d.taglineGr : d.taglineEn;
-  const desc = (d: Destination) =>
-    lang === "al" ? d.descAl : lang === "gr" ? d.descGr : d.descEn;
+  const name = (d: Destination) => getLangText(d, "name", lang);
+  const tagline = (d: Destination) => getLangText(d, "tagline", lang);
+  const desc = (d: Destination) => getLangText(d, "desc", lang);
 
   const DESTINATIONS = useDestinations();
   const ATTRACTIONS = useAttractions();
@@ -66,14 +64,10 @@ export default function SitesPage() {
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold mb-1" style={{ fontFamily: "var(--font-display)" }}>
-            {lang === "al" ? "Destinacionet" : lang === "gr" ? "Προορισμοί" : "Destinations"}
+            Destinations
           </h1>
           <p className="text-sm text-muted-foreground">
-            {lang === "al"
-              ? `${filtered.length} destinacione për të zbuluar`
-              : lang === "gr"
-              ? `${filtered.length} προορισμοί για εξερεύνηση`
-              : `${filtered.length} destinations to explore`}
+            {filtered.length} destinations to explore
           </p>
         </div>
 
@@ -114,13 +108,7 @@ export default function SitesPage() {
             data-testid="search-input"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder={
-              lang === "al"
-                ? "Kërko destinacione..."
-                : lang === "gr"
-                ? "Αναζήτηση προορισμών..."
-                : "Search destinations..."
-            }
+            placeholder="Search destinations..."
             className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
@@ -137,9 +125,7 @@ export default function SitesPage() {
                   : "border-border bg-card text-muted-foreground hover:border-primary/50"
               }`}
             >
-              {cat === "all" ? (
-                lang === "al" ? "Të Gjitha" : lang === "gr" ? "Όλα" : "All"
-              ) : (
+              {cat === "all" ? "All" : (
                 <>{CATEGORY_EMOJI[cat] || "📍"} {catLabel(cat)}</>
               )}
             </button>
@@ -201,12 +187,12 @@ export default function SitesPage() {
                       </span>
                       {attrCount > 0 && (
                         <span className="flex items-center gap-1">
-                          📍 {attrCount} {lang === "al" ? "vende" : lang === "gr" ? "μέρη" : "places"}
+                          📍 {attrCount} places
                         </span>
                       )}
                     </div>
                     <span className="flex items-center gap-1 text-xs font-semibold text-primary">
-                      {lang === "al" ? "Eksploro" : lang === "gr" ? "Εξερεύνηση" : "Explore"}
+                      Explore
                       <ChevronRight size={13} />
                     </span>
                   </div>
@@ -280,12 +266,12 @@ export default function SitesPage() {
                       </span>
                       {attrCount > 0 && (
                         <span>
-                          📍 {attrCount} {lang === "al" ? "vende" : lang === "gr" ? "μέρη" : "places"}
+                          📍 {attrCount} places
                         </span>
                       )}
                     </div>
                     <span className="flex items-center gap-1 text-xs font-semibold text-primary whitespace-nowrap">
-                      {lang === "al" ? "Eksploro" : lang === "gr" ? "Εξερεύνηση" : "Explore"}
+                      Explore
                       <ChevronRight size={13} />
                     </span>
                   </div>
@@ -299,12 +285,8 @@ export default function SitesPage() {
       {filtered.length === 0 && (
         <div className="text-center py-16 text-muted-foreground">
           <Search size={40} className="mx-auto mb-4 opacity-30" />
-          <p className="font-medium">
-            {lang === "al" ? "Asnjë destinacion nuk u gjet" : lang === "gr" ? "Δεν βρέθηκαν προορισμοί" : "No destinations found"}
-          </p>
-          <p className="text-sm">
-            {lang === "al" ? "Provo një kërkim tjetër" : lang === "gr" ? "Δοκιμάστε άλλη αναζήτηση" : "Try a different search or filter"}
-          </p>
+          <p className="font-medium">No destinations found</p>
+          <p className="text-sm">Try a different search or filter</p>
         </div>
       )}
     </div>

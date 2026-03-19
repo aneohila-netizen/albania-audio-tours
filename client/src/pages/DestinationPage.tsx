@@ -7,6 +7,7 @@ import MiniMap from "@/components/MiniMap";
 import AudioPlayer from "@/components/AudioPlayer";
 import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb, Navigation } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getLangText } from "@/lib/i18n";
 
 const CATEGORY_COLORS: Record<string, string> = {
   city: "#C0392B", archaeology: "#8B4513", castle: "#4A4A6A",
@@ -65,14 +66,13 @@ export default function DestinationPage() {
     );
   }
 
-  const name = lang === "al" ? dest.nameAl : lang === "gr" ? dest.nameGr : dest.nameEn;
-  // Use funFactEn as tagline if no dedicated field (destinations use descEn as tagline in staticData)
-  const desc = lang === "al" ? dest.descAl : lang === "gr" ? dest.descGr : dest.descEn;
+  const name = getLangText(dest, "name", lang);
+  const desc = getLangText(dest, "desc", lang);
   // Derive tagline: first sentence of description
   const tagline = desc.split(".")[0];
 
-  const attrName = (a: Attraction) => lang === "al" ? a.nameAl : lang === "gr" ? a.nameGr : a.nameEn;
-  const attrDesc = (a: Attraction) => lang === "al" ? a.descAl : lang === "gr" ? a.descGr : a.descEn;
+  const attrName = (a: Attraction) => getLangText(a, "name", lang);
+  const attrDesc = (a: Attraction) => getLangText(a, "desc", lang);
   const totalVisited = attractions.filter(a => visitedSiteIds.has(a.id)).length;
   const totalAttrPoints = attractions.reduce((s, a) => s + a.points, 0);
 
@@ -82,7 +82,7 @@ export default function DestinationPage() {
       <button data-testid="back-btn" onClick={() => navigate("/sites")}
         className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft size={16} />
-        {lang === "al" ? "Kthehu te Destinacionet" : lang === "gr" ? "Πίσω στους Προορισμούς" : "All Destinations"}
+        All Destinations
       </button>
 
       {/* Hero */}
@@ -116,9 +116,9 @@ export default function DestinationPage() {
       {attractions.length > 0 && (
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center justify-between text-sm mb-2">
-            <span className="font-semibold">{lang === "al" ? "Progresi juaj" : lang === "gr" ? "Η πρόοδός σας" : "Your Progress"}</span>
+            <span className="font-semibold">Your Progress</span>
             <span className="text-muted-foreground">
-              {totalVisited} / {attractions.length} {lang === "al" ? "atraksione" : lang === "gr" ? "αξιοθέατα" : "attractions"}
+              {totalVisited} / {attractions.length} attractions
             </span>
           </div>
           <div className="h-2 rounded-full bg-muted overflow-hidden">
@@ -140,7 +140,7 @@ export default function DestinationPage() {
       {attractions.length > 0 && (
         <div>
           <h2 className="text-lg font-bold mb-4" style={{ fontFamily: "var(--font-display)" }}>
-            {lang === "al" ? `Atraksionet e ${name}` : lang === "gr" ? `Αξιοθέατα στο ${name}` : `Attractions in ${name}`}
+            Attractions in {name}
           </h2>
           <div className="grid gap-4 sm:grid-cols-2">
             {attractions.map(attr => {
@@ -162,7 +162,7 @@ export default function DestinationPage() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                     {isVisited && (
                       <div className="absolute top-2 right-2 rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: "#2D7A22", color: "white" }}>
-                        ✓ {lang === "al" ? "Vizituar" : lang === "gr" ? "Επισκέφθηκα" : "Visited"}
+                        ✓ Visited
                       </div>
                     )}
                     <div className="absolute bottom-2 left-2">
@@ -198,7 +198,7 @@ export default function DestinationPage() {
       {attractions.length === 0 && (
         <div className="rounded-xl border border-border bg-muted/30 p-6 text-center text-muted-foreground">
           <Lightbulb size={28} className="mx-auto mb-3 opacity-40" />
-          <p className="text-sm">{lang === "al" ? "Atraksionet po shtohen së shpejti." : lang === "gr" ? "Αξιοθέατα σύντομα." : "Attractions coming soon."}</p>
+          <p className="text-sm">Attractions coming soon.</p>
         </div>
       )}
 
@@ -208,7 +208,7 @@ export default function DestinationPage() {
         <a href={`https://www.google.com/maps?q=${dest.lat},${dest.lng}`} target="_blank" rel="noopener noreferrer"
           className="flex items-center gap-2 p-3 text-sm text-primary hover:bg-muted transition-colors border-t border-border">
           <Navigation size={14} />
-          {lang === "al" ? `Udhëzime për ${name}` : lang === "gr" ? `Oδηγίες για ${name}` : `Get Directions to ${name}`}
+          {`Get Directions to ${name}`}
         </a>
       </div>
     </div>

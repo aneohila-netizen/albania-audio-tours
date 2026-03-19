@@ -10,6 +10,7 @@ import { ArrowLeft, MapPin, Clock, Star, Lightbulb, Navigation } from "lucide-re
 import { STATIC_SITES } from "@/lib/staticData";
 import { apiRequest } from "@/lib/queryClient";
 import { getSessionId } from "@/lib/session";
+import { getLangText } from "@/lib/i18n";
 
 const CATEGORY_COLORS: Record<string, string> = {
   archaeology: "#8B4513",
@@ -83,9 +84,9 @@ export default function SiteDetailPage() {
     );
   }
 
-  const name = lang === "al" ? site.nameAl : lang === "gr" ? site.nameGr : site.nameEn;
-  const desc = lang === "al" ? site.descAl : lang === "gr" ? site.descGr : site.descEn;
-  const funFact = lang === "al" ? site.funFactAl : lang === "gr" ? site.funFactGr : site.funFactEn;
+  const name = getLangText(site, "name", lang);
+  const desc = getLangText(site, "desc", lang);
+  const funFact = getLangText(site, "funFact", lang);
   const isVisited = visitedSiteIds.has(site.id);
 
   return (

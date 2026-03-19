@@ -8,6 +8,7 @@ import VisitModal from "@/components/VisitModal";
 import { apiRequest } from "@/lib/queryClient";
 import { getSessionId } from "@/lib/session";
 import { MapPin, X, Layers } from "lucide-react";
+import { getLangText } from "@/lib/i18n";
 
 type LeafletLib = any;
 type LeafletMap = any;
@@ -81,15 +82,11 @@ export default function MapPage() {
   const DESTINATIONS = useDestinations();
   const ATTRACTIONS = useAttractions();
 
-  // Helper: name in current language
-  const destName = (d: Destination) =>
-    lang === "al" ? d.nameAl : lang === "gr" ? d.nameGr : d.nameEn;
-  const attrName = (a: Attraction) =>
-    lang === "al" ? a.nameAl : lang === "gr" ? a.nameGr : a.nameEn;
-  const destDesc = (d: Destination) =>
-    lang === "al" ? d.descAl : lang === "gr" ? d.descGr : d.descEn;
-  const attrDesc = (a: Attraction) =>
-    lang === "al" ? a.descAl : lang === "gr" ? a.descGr : a.descEn;
+  // Helper: name/desc in current language (supports all 9 langs)
+  const destName = (d: Destination) => getLangText(d, "name", lang);
+  const attrName = (a: Attraction) => getLangText(a, "name", lang);
+  const destDesc = (d: Destination) => getLangText(d, "desc", lang);
+  const attrDesc = (a: Attraction) => getLangText(a, "desc", lang);
 
   // ── Build markers ────────────────────────────────────────────────────────────
   function buildMarkers() {
@@ -263,6 +260,10 @@ export default function MapPage() {
           audioUrlEn: null,
           audioUrlAl: null,
           audioUrlGr: null,
+          // New language audio fields (passthrough from attraction)
+          ...Object.fromEntries(
+            ["It","Es","De","Fr","Ar","Sl"].map(s => [`audioUrl${s}`, (selectedPin.data as any)[`audioUrl${s}`] || null])
+          ),
           visitDuration: selectedPin.data.visitDuration,
           points: selectedPin.data.points,
         }
@@ -348,7 +349,7 @@ export default function MapPage() {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <MapPin size={12} /> {lang === "al" ? "Atraksione" : lang === "gr" ? "Αξιοθέατα" : "Attractions"}
+            <MapPin size={12} /> Attractions
           </button>
           <button
             onClick={() => setLayerMode("destinations")}
@@ -358,7 +359,7 @@ export default function MapPage() {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Layers size={12} /> {lang === "al" ? "Destinacione" : lang === "gr" ? "Προορισμοί" : "Destinations"}
+            <Layers size={12} /> Destinations
           </button>
         </div>
       </div>
@@ -383,7 +384,7 @@ export default function MapPage() {
                   </span>
                   {selectedPin.type === "attraction" && isAttractionVisited && (
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full text-white" style={{ background: "#2D7A22" }}>
-                      ✓ {lang === "al" ? "Vizituar" : lang === "gr" ? "Επισκέφθηκα" : "Visited"}
+                      ✓ Visited
                     </span>
                   )}
                 </div>
@@ -444,7 +445,7 @@ export default function MapPage() {
                   onClick={handleViewDetails}
                   className="flex-1 py-2 rounded-lg text-sm font-medium border border-border hover:bg-muted transition-colors"
                 >
-                  {lang === "al" ? "Shiko Detajet" : lang === "gr" ? "Προβολή" : "View Details"}
+                  View Details
                 </button>
                 {selectedPin.type === "attraction" && (
                   <button
@@ -467,7 +468,7 @@ export default function MapPage() {
                     className="flex-1 py-2 rounded-lg text-sm font-semibold transition-colors"
                     style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
                   >
-                    {lang === "al" ? "Eksploro" : lang === "gr" ? "Εξερεύνηση" : "Explore"}
+                    Explore
                   </button>
                 )}
               </div>

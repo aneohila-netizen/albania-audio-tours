@@ -11,6 +11,7 @@ import { Clock, Star, Lightbulb, Navigation, ChevronRight, MapPin } from "lucide
 import { apiRequest } from "@/lib/queryClient";
 import { getSessionId } from "@/lib/session";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getLangText } from "@/lib/i18n";
 
 const CATEGORY_COLORS: Record<string, string> = {
   city: "#C0392B", archaeology: "#8B4513", castle: "#4A4A6A",
@@ -86,10 +87,10 @@ export default function AttractionDetailPage() {
     );
   }
 
-  const aName = lang === "al" ? attraction.nameAl : lang === "gr" ? attraction.nameGr : attraction.nameEn;
-  const aDesc = lang === "al" ? attraction.descAl : lang === "gr" ? attraction.descGr : attraction.descEn;
-  const aFunFact = lang === "al" ? attraction.funFactAl : lang === "gr" ? attraction.funFactGr : attraction.funFactEn;
-  const destName = dest ? (lang === "al" ? dest.nameAl : lang === "gr" ? dest.nameGr : dest.nameEn) : params?.dest;
+  const aName = getLangText(attraction, "name", lang);
+  const aDesc = getLangText(attraction, "desc", lang);
+  const aFunFact = getLangText(attraction, "funFact", lang);
+  const destName = dest ? getLangText(dest, "name", lang) : params?.dest;
   const isVisited = visitedSiteIds.has(attraction.id);
   const destRegion = dest?.region || params?.dest || "";
 
@@ -114,6 +115,15 @@ export default function AttractionDetailPage() {
     audioUrlEn: attraction.audioUrlEn || null,
     audioUrlAl: attraction.audioUrlAl || null,
     audioUrlGr: attraction.audioUrlGr || null,
+    // New language audio fields
+    ...({
+      audioUrlIt: (attraction as any).audioUrlIt || null,
+      audioUrlEs: (attraction as any).audioUrlEs || null,
+      audioUrlDe: (attraction as any).audioUrlDe || null,
+      audioUrlFr: (attraction as any).audioUrlFr || null,
+      audioUrlAr: (attraction as any).audioUrlAr || null,
+      audioUrlSl: (attraction as any).audioUrlSl || null,
+    }),
     visitDuration: attraction.visitDuration,
     points: attraction.points,
   };
@@ -123,7 +133,7 @@ export default function AttractionDetailPage() {
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 text-sm text-muted-foreground flex-wrap">
         <button onClick={() => navigate("/sites")} className="hover:text-foreground transition-colors">
-          {lang === "al" ? "Destinacionet" : lang === "gr" ? "Προορισμοί" : "Destinations"}
+          Destinations
         </button>
         <ChevronRight size={13} />
         <button onClick={() => navigate(`/sites/${params?.dest}`)} className="hover:text-foreground transition-colors">
@@ -156,7 +166,7 @@ export default function AttractionDetailPage() {
           </span>
           {isVisited && (
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full text-white" style={{ background: "#2D7A22" }}>
-              ✓ {lang === "al" ? "Vizituar" : lang === "gr" ? "Επισκέφθηκα" : "Visited"}
+              ✓ Visited
             </span>
           )}
         </div>
@@ -165,10 +175,10 @@ export default function AttractionDetailPage() {
         </h1>
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
           <span className="flex items-center gap-1"><MapPin size={14} /> {destRegion}</span>
-          <span className="flex items-center gap-1"><Clock size={14} /> {attraction.visitDuration} {lang === "al" ? "min vizitë" : lang === "gr" ? "λεπτά" : "min visit"}</span>
+          <span className="flex items-center gap-1"><Clock size={14} /> {attraction.visitDuration} min visit</span>
           <span className="flex items-center gap-1">
             <Star size={14} fill="currentColor" style={{ color: "var(--color-gold)" }} />
-            {attraction.points} {lang === "al" ? "pikë" : lang === "gr" ? "πόντοι" : "points"}
+            {attraction.points} points
           </span>
         </div>
       </div>
@@ -187,9 +197,7 @@ export default function AttractionDetailPage() {
           <div className="flex items-start gap-3">
             <Lightbulb size={18} style={{ color: "var(--color-gold)", flexShrink: 0, marginTop: "2px" }} />
             <div>
-              <p className="font-semibold text-sm mb-1">
-                {lang === "al" ? "A e Dinit?" : lang === "gr" ? "Γνωρίζατε ότι;" : "Did You Know?"}
-              </p>
+              <p className="font-semibold text-sm mb-1">Did You Know?</p>
               <p className="text-sm text-muted-foreground">{aFunFact}</p>
             </div>
           </div>
@@ -202,7 +210,7 @@ export default function AttractionDetailPage() {
         <a href={`https://www.google.com/maps?q=${attraction.lat},${attraction.lng}`} target="_blank" rel="noopener noreferrer"
           className="flex items-center gap-2 p-3 text-sm text-primary hover:bg-muted transition-colors border-t border-border">
           <Navigation size={14} />
-          {lang === "al" ? "Merr Udhëzimet" : lang === "gr" ? "Λήψη Oδηγιών" : "Get Directions"}
+          Get Directions
         </a>
       </div>
 
@@ -210,9 +218,7 @@ export default function AttractionDetailPage() {
       <button data-testid="mark-visited-btn" onClick={handleMarkVisited} disabled={isVisited}
         className="w-full py-3 rounded-xl font-semibold text-sm transition-all active:scale-95 disabled:opacity-60"
         style={{ background: isVisited ? "hsl(var(--muted))" : "hsl(var(--primary))", color: isVisited ? "hsl(var(--muted-foreground))" : "hsl(var(--primary-foreground))" }}>
-        {isVisited
-          ? (lang === "al" ? "Vizituar ✓" : lang === "gr" ? "Επισκέφθηκα ✓" : "Visited ✓")
-          : (lang === "al" ? "Shëno si Vizituar" : lang === "gr" ? "Σήμανση ως Επισκέφθηκα" : "Mark as Visited")}
+        {isVisited ? "Visited ✓" : "Mark as Visited"}
       </button>
 
       {showModal && <VisitModal site={siteCompat} onClose={() => setShowModal(false)} />}
