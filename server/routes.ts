@@ -39,7 +39,7 @@ Write in complete natural sentences. Do not add any explanation or commentary, o
 Text to translate:
 ${text}`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
   const body = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
@@ -205,18 +205,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json({ status: "ok", backend: "railway", db: process.env.DATABASE_URL ? "postgres" : "memory" });
   });
 
-  // Temp: list available Gemini models
-  app.get("/api/debug/gemini-models", requireAdmin, async (_req, res) => {
-    const key = process.env.GEMINI_API_KEY;
-    if (!key) return res.json({ error: "No GEMINI_API_KEY" });
-    try {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
-      const d = await r.json() as any;
-      const names = (d.models || []).map((m: any) => m.name);
-      res.json({ count: names.length, models: names });
-    } catch (e: any) { res.json({ error: e.message }); }
-  });
-
   // ── Admin: Auth ─────────────────────────────────────────────────────────────
   app.post("/api/admin/login", (req, res) => {
     const { password } = req.body;
@@ -314,7 +302,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         .trim();
 
       // Call Gemini TTS REST API
-      const ttsUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-tts:generateContent?key=${GEMINI_API_KEY}`;
+      const ttsUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${GEMINI_API_KEY}`;
       const ttsBody = {
         contents: [{ parts: [{ text: cleanText }] }],
         generationConfig: {
