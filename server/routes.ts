@@ -143,8 +143,10 @@ function stripAudioData(obj: any, type: 'attraction'|'site'): any {
     const field = `audioUrl${lang}` as string;
     const val: string | null = out[field];
     if (val && val.startsWith('data:')) {
-      // Replace with a lightweight URL that the client can use to fetch audio on demand
-      out[field] = `${RAILWAY_BASE}/api/audio/serve/${type}/${obj.id}/${lang.toLowerCase()}`;
+      // Use a short version hash (last 8 chars of b64) to bust browser cache when audio changes
+      const b64 = val.split(',')[1] || '';
+      const vhash = b64.slice(-8).replace(/[^a-zA-Z0-9]/g, 'x');
+      out[field] = `${RAILWAY_BASE}/api/audio/serve/${type}/${obj.id}/${lang.toLowerCase()}?v=${vhash}`;
     }
   }
   return out;
@@ -216,7 +218,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const mimeType = mimeMatch ? mimeMatch[1] : 'audio/wav';
       const b64 = val.split(',')[1];
       const buf = Buffer.from(b64, 'base64');
-      res.set({ 'Content-Type': mimeType, 'Content-Length': buf.length, 'Cache-Control': 'public, max-age=86400', 'Accept-Ranges': 'none' });
+      // Use must-revalidate so stale cached responses are rechecked
+      res.set({ 'Content-Type': mimeType, 'Content-Length': buf.length, 'Cache-Control': 'public, max-age=3600, must-revalidate', 'Accept-Ranges': 'none' });
       return res.send(buf);
     }
     // Legacy: redirect to file URL
