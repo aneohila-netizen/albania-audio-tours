@@ -133,17 +133,34 @@ const imageUpload = multer({
   },
 });
 
+const AUDIO_LANGS = ['En','Al','Gr','It','Es','De','Fr','Ar','Sl'] as const;
+
+// Replace any data URI audio fields with a lightweight serve URL
+function stripAudioData(obj: any, type: 'attraction'|'site'): any {
+  if (!obj) return obj;
+  const out = { ...obj };
+  for (const lang of AUDIO_LANGS) {
+    const field = `audioUrl${lang}` as string;
+    const val: string | null = out[field];
+    if (val && val.startsWith('data:')) {
+      // Replace with a lightweight URL that the client can use to fetch audio on demand
+      out[field] = `${RAILWAY_BASE}/api/audio/serve/${type}/${obj.id}/${lang.toLowerCase()}`;
+    }
+  }
+  return out;
+}
+
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   // ── Public API ──────────────────────────────────────────────────────────────
   app.get("/api/sites", async (_req, res) => {
     const sites = await storage.getAllSites();
-    res.json(sites);
+    res.json(sites.map(s => stripAudioData(s, 'site')));
   });
 
   app.get("/api/sites/:slug", async (req, res) => {
     const site = await storage.getSiteBySlug(req.params.slug);
     if (!site) return res.status(404).json({ error: "Not found" });
-    res.json(site);
+    res.json(stripAudioData(site, 'site'));
   });
 
   app.get("/api/progress/:sessionId", async (req, res) => {
@@ -163,14 +180,44 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(lb);
   });
 
-  // Serve uploaded audio files
+  // Serve uploaded audio files (legacy file-based)
   app.use("/api/audio", (req, res, next) => {
+    // Skip the new serve routes
+    if (req.path.startsWith('/serve/')) return next();
     const filePath = path.join(AUDIO_DIR, req.path.replace(/^\//, ""));
     if (fs.existsSync(filePath)) {
       res.sendFile(filePath);
     } else {
       next();
     }
+  });
+
+  // ── Dedicated audio serve endpoint (reads data URI from DB) ───────────────
+  app.get("/api/audio/serve/:type/:id/:lang", async (req, res) => {
+    const { type, id, lang } = req.params;
+    const entityId = parseInt(id);
+    if (isNaN(entityId)) return res.status(400).send('Invalid id');
+    const cap = lang.charAt(0).toUpperCase() + lang.slice(1);
+    const field = `audioUrl${cap}`;
+    let val: string | null | undefined;
+    try {
+      if (type === 'site') {
+        const site = await storage.getSiteById(entityId);
+        val = site ? (site as any)[field] : null;
+      } else {
+        const attr = await storage.getAttractionById(entityId);
+        val = attr ? (attr as any)[field] : null;
+      }
+    } catch { val = null; }
+    if (!val) return res.status(404).send('Audio not found');
+    if (val.startsWith('data:')) {
+      const b64 = val.split(',')[1];
+      const buf = Buffer.from(b64, 'base64');
+      res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': buf.length, 'Cache-Control': 'public, max-age=86400' });
+      return res.send(buf);
+    }
+    // Legacy: redirect to file URL
+    res.redirect(val);
   });
 
   // Serve uploaded image files
@@ -186,18 +233,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ── Public: Attractions ────────────────────────────────────────────────────
   app.get("/api/attractions", async (_req, res) => {
     const attrs = await storage.getAllAttractions();
-    res.json(attrs);
+    res.json(attrs.map(a => stripAudioData(a, 'attraction')));
   });
 
   app.get("/api/attractions/:destinationSlug", async (req, res) => {
     const attrs = await storage.getAttractionsByDestination(req.params.destinationSlug);
-    res.json(attrs);
+    res.json(attrs.map(a => stripAudioData(a, 'attraction')));
   });
 
   app.get("/api/attractions/:destinationSlug/:slug", async (req, res) => {
     const attr = await storage.getAttractionBySlug(req.params.destinationSlug, req.params.slug);
     if (!attr) return res.status(404).json({ error: "Not found" });
-    res.json(attr);
+    res.json(stripAudioData(attr, 'attraction'));
   });
 
   // Health check
@@ -218,12 +265,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ── Admin: Attractions CRUD ────────────────────────────────────────────────
   app.get("/api/admin/attractions", requireAdmin, async (_req, res) => {
     const attrs = await storage.getAllAttractions();
-    res.json(attrs);
+    res.json(attrs.map(a => stripAudioData(a, 'attraction')));
   });
 
   app.get("/api/admin/attractions/:destinationSlug", requireAdmin, async (req, res) => {
     const attrs = await storage.getAttractionsByDestination(req.params.destinationSlug);
-    res.json(attrs);
+    res.json(attrs.map(a => stripAudioData(a, 'attraction')));
   });
 
   app.post("/api/admin/attractions", requireAdmin, async (req, res) => {
@@ -238,15 +285,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
     const attr = await storage.getAttractionById(id);
     if (!attr) return res.status(404).json({ error: "Not found" });
-    res.json(attr);
+    res.json(stripAudioData(attr, 'attraction'));
   });
 
   app.put("/api/admin/attractions/:id", requireAdmin, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
-    const updated = await storage.updateAttraction(id, req.body);
+    // Strip audioUrl fields — audio is managed via dedicated upload/TTS endpoints.
+    // If we allow the form to overwrite them with serve-URLs, audio gets corrupted.
+    const { audioUrlEn, audioUrlAl, audioUrlGr, audioUrlIt, audioUrlEs, audioUrlDe, audioUrlFr, audioUrlAr, audioUrlSl, ...safeBody } = req.body;
+    const updated = await storage.updateAttraction(id, safeBody);
     if (!updated) return res.status(404).json({ error: "Not found" });
-    res.json(updated);
+    res.json(stripAudioData(updated, 'attraction'));
   });
 
   app.delete("/api/admin/attractions/:id", requireAdmin, async (req, res) => {
@@ -345,7 +395,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         await storage.updateAttraction(entityId, { [field]: dataUri } as any);
       }
 
-      res.json({ url: dataUri });
+      // Return a lightweight serve URL — not the raw data URI
+      const serveUrl = `${RAILWAY_BASE}/api/audio/serve/${entityType === 'sites' ? 'site' : 'attraction'}/${entityId}/${lang}`;
+      res.json({ url: serveUrl });
     } catch (e: any) {
       res.status(500).json({ error: e.message || "TTS generation failed" });
     }
@@ -368,7 +420,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const field = audioField(lang);
       const updated = await storage.updateAttraction(id, { [field]: dataUri } as any);
       if (!updated) return res.status(404).json({ error: "Attraction not found" });
-      res.json({ url: dataUri, [`audioUrl${lang.charAt(0).toUpperCase()+lang.slice(1)}`]: dataUri, attraction: updated });
+      const serveUrl = `${RAILWAY_BASE}/api/audio/serve/attraction/${id}/${lang}`;
+      res.json({ url: serveUrl, [`audioUrl${lang.charAt(0).toUpperCase()+lang.slice(1)}`]: serveUrl, attraction: stripAudioData(updated, 'attraction') });
     }
   );
 
@@ -399,7 +452,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ── Admin: Sites CRUD ───────────────────────────────────────────────────────
   app.get("/api/admin/sites", requireAdmin, async (_req, res) => {
     const sites = await storage.getAllSites();
-    res.json(sites);
+    res.json(sites.map(s => stripAudioData(s, 'site')));
   });
 
   app.post("/api/admin/sites", requireAdmin, async (req, res) => {
@@ -412,9 +465,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.put("/api/admin/sites/:id", requireAdmin, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
-    const updated = await storage.updateSite(id, req.body);
+    // Strip audioUrl fields — audio managed via dedicated upload/TTS endpoints.
+    const { audioUrlEn, audioUrlAl, audioUrlGr, audioUrlIt, audioUrlEs, audioUrlDe, audioUrlFr, audioUrlAr, audioUrlSl, ...safeBody } = req.body;
+    const updated = await storage.updateSite(id, safeBody);
     if (!updated) return res.status(404).json({ error: "Not found" });
-    res.json(updated);
+    res.json(stripAudioData(updated, 'site'));
   });
 
   app.delete("/api/admin/sites/:id", requireAdmin, async (req, res) => {
@@ -444,7 +499,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const field = audioField(lang);
       const updated = await storage.updateSite(id, { [field]: dataUri } as any);
       if (!updated) return res.status(404).json({ error: "Site not found" });
-      res.json({ url: dataUri, site: updated });
+      const serveUrl = `${RAILWAY_BASE}/api/audio/serve/site/${id}/${lang}`;
+      res.json({ url: serveUrl, site: stripAudioData(updated, 'site') });
     }
   );
 

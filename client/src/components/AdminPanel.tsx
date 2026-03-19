@@ -780,7 +780,9 @@ function AudioCard({
             <Button variant="ghost" size="sm" onClick={togglePlay} className="h-7 w-7 p-0 flex-shrink-0">
               {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
             </Button>
-            <span className="text-xs text-muted-foreground truncate flex-1">{currentUrl.split("/").pop()}</span>
+            <span className="text-xs text-muted-foreground truncate flex-1">
+              {currentUrl.startsWith('data:') ? 'Audio stored in DB' : currentUrl.includes('/api/audio/serve/') ? `Audio ready (${currentUrl.split('/').pop()?.toUpperCase()})` : currentUrl.split('/').pop()}
+            </span>
             <Button variant="ghost" size="sm" onClick={handleDelete} className="h-7 w-7 p-0 flex-shrink-0 text-destructive hover:text-destructive">
               <Trash2 className="w-3.5 h-3.5" />
             </Button>
