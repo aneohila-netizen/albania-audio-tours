@@ -481,6 +481,92 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ── On-demand TTS: streams MP3 directly, no DB storage ────────────────────
+  // POST /api/tts { text: string, lang: string } → MP3 audio/mpeg
+  // The frontend calls this when Play is pressed; result cached in browser blob URL.
+  app.post("/api/tts", async (req, res) => {
+    const { text, lang } = req.body as { text: string; lang: string };
+    if (!text || !lang)
+      return res.status(400).json({ error: "text and lang are required" });
+    if (!SUPPORTED_LANGS.includes(lang as SupportedLang))
+      return res.status(400).json({ error: `Unsupported lang: ${lang}` });
+    if (!GEMINI_API_KEY)
+      return res.status(503).json({ error: "TTS not configured" });
+
+    // Guard: max 3000 chars to avoid abuse
+    const cappedText = text.slice(0, 3000);
+
+    try {
+      // Clean text for speech
+      const cleanText = cappedText
+        .replace(/[—–]/g, ", ")
+        .replace(/\.\.\./g, ". ")
+        .replace(/[\(\)\[\]]/g, "")
+        .replace(/[*#_~`]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      // Call Gemini TTS
+      const ttsUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${GEMINI_API_KEY}`;
+      const ttsBody = {
+        contents: [{ parts: [{ text: cleanText }] }],
+        generationConfig: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: "charon" },
+            },
+          },
+        },
+      };
+
+      const ttsResp = await fetch(ttsUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(ttsBody),
+      });
+
+      if (!ttsResp.ok) {
+        const err = await ttsResp.text();
+        return res.status(500).json({ error: `Gemini TTS error ${ttsResp.status}: ${err.slice(0, 200)}` });
+      }
+
+      const ttsData = await ttsResp.json() as any;
+      const audioB64 = ttsData?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (!audioB64)
+        return res.status(500).json({ error: "No audio data returned by TTS" });
+
+      // Transcode raw PCM → proper MP3 (MPEG-1, 44.1kHz, 128kbps)
+      if (!fs.existsSync(AUDIO_DIR)) fs.mkdirSync(AUDIO_DIR, { recursive: true });
+      const tmpPcm = path.join(AUDIO_DIR, `ondemand_pcm_${Date.now()}.raw`);
+      const tmpMp3 = path.join(AUDIO_DIR, `ondemand_mp3_${Date.now()}.mp3`);
+      let mp3Buffer: Buffer;
+      try {
+        fs.writeFileSync(tmpPcm, Buffer.from(audioB64, 'base64'));
+        await execFileAsync('ffmpeg', [
+          '-y',
+          '-f', 's16le', '-ar', '24000', '-ac', '1', '-i', tmpPcm,
+          '-ar', '44100', '-ab', '128k', '-ac', '1', '-f', 'mp3', tmpMp3,
+        ]);
+        mp3Buffer = fs.readFileSync(tmpMp3);
+      } finally {
+        try { fs.unlinkSync(tmpPcm); } catch {}
+        try { fs.unlinkSync(tmpMp3); } catch {}
+      }
+
+      // Stream MP3 directly to browser
+      res.set({
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': mp3Buffer.length,
+        'Cache-Control': 'public, max-age=3600',
+      });
+      res.send(mp3Buffer);
+    } catch (e: any) {
+      console.error('[TTS on-demand error]', e.message);
+      res.status(500).json({ error: e.message || "TTS generation failed" });
+    }
+  });
+
   app.post(
     "/api/admin/attractions/:id/audio/:lang",
     requireAdmin,

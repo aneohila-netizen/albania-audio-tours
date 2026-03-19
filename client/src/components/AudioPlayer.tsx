@@ -3,21 +3,9 @@ import { Play, Pause, RotateCcw, Volume2, Loader2 } from "lucide-react";
 import { useApp } from "@/App";
 import type { TourSite } from "@shared/schema";
 import type { Lang } from "@/lib/i18n";
+import { RAILWAY_URL } from "@/lib/queryClient";
 
-// ── Language code → BCP-47 locale for SpeechSynthesis ─────────────────────
-const SPEECH_LANG: Record<Lang, string> = {
-  en: "en-US",
-  al: "sq-AL",
-  gr: "el-GR",
-  it: "it-IT",
-  es: "es-ES",
-  de: "de-DE",
-  fr: "fr-FR",
-  ar: "ar-SA",
-  sl: "sl-SI",
-};
-
-// ── Helper: get stored MP3 URL (admin-uploaded override) ──────────────────
+// ── Stored MP3 helper (admin-uploaded override) ────────────────────────────
 function getStoredAudioUrl(site: TourSite, lang: Lang): string | null {
   const s = site as any;
   const map: Partial<Record<Lang, string | null>> = {
@@ -41,15 +29,21 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-// ── Estimate speech duration in seconds (avg ~150 words/min) ──────────────
-function estimateDuration(text: string): number {
-  const words = text.trim().split(/\s+/).length;
-  return Math.max(5, Math.round((words / 150) * 60));
+// In-session cache: Map<"siteId:lang:textHash", blob URL>
+const audioCache = new Map<string, string>();
+
+function textHash(text: string): string {
+  // Simple hash for cache keying
+  let h = 0;
+  for (let i = 0; i < Math.min(text.length, 200); i++) {
+    h = (Math.imul(31, h) + text.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h).toString(36);
 }
 
 interface AudioPlayerProps {
   site: TourSite;
-  /** The description text currently shown on the page (already in the selected language) */
+  /** The description text already shown on this page (translated to current lang) */
   text?: string;
   onComplete?: () => void;
 }
@@ -57,7 +51,7 @@ interface AudioPlayerProps {
 export default function AudioPlayer({ site, text, onComplete }: AudioPlayerProps) {
   const { t, lang } = useApp();
 
-  // ── State ──────────────────────────────────────────────────────────────
+  // ── State ─────────────────────────────────────────────────────────────────
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -65,21 +59,23 @@ export default function AudioPlayer({ site, text, onComplete }: AudioPlayerProps
   const [duration, setDuration] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [usingSpeech, setUsingSpeech] = useState(false);
+  // "ready" = audio element loaded and ready; "generating" = fetching from Gemini
+  const [audioStatus, setAudioStatus] = useState<"idle" | "generating" | "ready" | "error">("idle");
 
-  // ── Refs ───────────────────────────────────────────────────────────────
+  // ── Refs ──────────────────────────────────────────────────────────────────
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startTimeRef = useRef<number>(0);
-  const elapsedRef = useRef<number>(0);  // seconds elapsed before last pause
+  const blobUrlRef = useRef<string | null>(null); // owned blob URL (not from cache)
 
-  // ── Decide: use stored MP3 or Web Speech API ──────────────────────────
+  // The audio source: prefer stored URL, else we'll generate on-demand
   const storedUrl = getStoredAudioUrl(site, lang as Lang);
 
-  // Reset everything when lang or site changes
+  // ── Reset when language or site changes ──────────────────────────────────
   useEffect(() => {
-    stopAll();
+    // Tear down old audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
     setIsPlaying(false);
     setIsLoading(false);
     setProgress(0);
@@ -87,20 +83,17 @@ export default function AudioPlayer({ site, text, onComplete }: AudioPlayerProps
     setDuration(0);
     setCompleted(false);
     setError(null);
-    elapsedRef.current = 0;
-    // Decide mode
-    setUsingSpeech(!storedUrl);
-    if (!storedUrl) {
-      const estimatedDur = estimateDuration(text || "");
-      setDuration(estimatedDur);
+    setAudioStatus("idle");
+  }, [lang, site.id]);
+
+  // ── Set up audio element from a URL ──────────────────────────────────────
+  const setupAudio = useCallback((url: string) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
     }
-  }, [lang, site.id, storedUrl]);
 
-  // ── Stored MP3: set up audio element ─────────────────────────────────
-  useEffect(() => {
-    if (usingSpeech || !storedUrl) return;
-
-    const audio = new Audio(storedUrl);
+    const audio = new Audio(url);
     audioRef.current = audio;
 
     audio.addEventListener("loadedmetadata", () => setDuration(audio.duration));
@@ -115,174 +108,129 @@ export default function AudioPlayer({ site, text, onComplete }: AudioPlayerProps
       onComplete?.();
     });
     audio.addEventListener("error", () => {
-      // MP3 failed — fall back to speech
-      setUsingSpeech(true);
-      setError(null);
-      const estimatedDur = estimateDuration(text || "");
-      setDuration(estimatedDur);
-      audioRef.current = null;
+      setIsPlaying(false);
+      setIsLoading(false);
+      setError("Audio failed to load. Please try again.");
+      setAudioStatus("error");
     });
     audio.addEventListener("waiting", () => setIsLoading(true));
-    audio.addEventListener("canplay", () => setIsLoading(false));
+    audio.addEventListener("canplay", () => { setIsLoading(false); setAudioStatus("ready"); });
 
-    return () => {
-      audio.pause();
-      audioRef.current = null;
-    };
-  }, [storedUrl, usingSpeech]);
+    return audio;
+  }, [onComplete]);
 
-  // ── Cleanup on unmount ────────────────────────────────────────────────
+  // If storedUrl exists and changes, set up audio immediately
   useEffect(() => {
-    return () => stopAll();
-  }, []);
+    if (!storedUrl) return;
+    const audio = setupAudio(storedUrl);
+    setAudioStatus("ready");
+    return () => { audio.pause(); audioRef.current = null; };
+  }, [storedUrl, setupAudio]);
 
-  // ── Helper: stop everything ────────────────────────────────────────────
-  function stopAll() {
-    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
+  // ── Generate audio on-demand via Gemini TTS ───────────────────────────────
+  const generateAudio = useCallback(async () => {
+    if (!text) { setError("No description text available."); return; }
+
+    const cacheKey = `${site.id}:${lang}:${textHash(text)}`;
+    const cached = audioCache.get(cacheKey);
+
+    if (cached) {
+      // Already generated this session — reuse blob URL
+      const audio = setupAudio(cached);
+      setAudioStatus("ready");
+      setIsLoading(true);
+      audio.play()
+        .then(() => { setIsPlaying(true); setIsLoading(false); })
+        .catch(() => { setError("Playback failed."); setIsLoading(false); });
+      return;
     }
-    if (audioRef.current) { audioRef.current.pause(); }
-  }
 
-  // ── Speech progress timer ─────────────────────────────────────────────
-  function startSpeechTimer(totalDuration: number) {
-    if (timerRef.current) clearInterval(timerRef.current);
-    startTimeRef.current = Date.now();
-    timerRef.current = setInterval(() => {
-      const elapsed = elapsedRef.current + (Date.now() - startTimeRef.current) / 1000;
-      const clamped = Math.min(elapsed, totalDuration);
-      setCurrentTime(clamped);
-      setProgress(totalDuration > 0 ? (clamped / totalDuration) * 100 : 0);
-      if (clamped >= totalDuration) {
-        clearInterval(timerRef.current!);
-        timerRef.current = null;
+    setAudioStatus("generating");
+    setError(null);
+
+    try {
+      // POST text + lang → Railway server generates MP3 via Gemini TTS
+      const response = await fetch(`${RAILWAY_URL}/api/tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, lang }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(errData.error || `HTTP ${response.status}`);
       }
-    }, 250);
-  }
 
-  // ── Toggle play / pause ────────────────────────────────────────────────
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      // Cache for this session
+      audioCache.set(cacheKey, blobUrl);
+      blobUrlRef.current = blobUrl;
+
+      const audio = setupAudio(blobUrl);
+      setAudioStatus("ready");
+      setIsLoading(true);
+      audio.play()
+        .then(() => { setIsPlaying(true); setIsLoading(false); })
+        .catch(() => { setError("Playback failed."); setIsLoading(false); });
+
+    } catch (e: any) {
+      setAudioStatus("error");
+      setError(e.message || "Audio generation failed. Please try again.");
+    }
+  }, [text, lang, site.id, setupAudio]);
+
+  // ── Play / Pause toggle ───────────────────────────────────────────────────
   const toggle = useCallback(() => {
     if (completed) return;
 
-    // ── MP3 mode ──
-    if (!usingSpeech && audioRef.current) {
+    const audio = audioRef.current;
+
+    // Audio already loaded — toggle play/pause
+    if (audio && audioStatus === "ready") {
       if (isPlaying) {
-        audioRef.current.pause();
+        audio.pause();
         setIsPlaying(false);
       } else {
         setIsLoading(true);
-        audioRef.current.play()
+        audio.play()
           .then(() => { setIsPlaying(true); setIsLoading(false); })
-          .catch(() => {
-            setIsLoading(false);
-            // Fall back to speech
-            setUsingSpeech(true);
-            const estimatedDur = estimateDuration(text || "");
-            setDuration(estimatedDur);
-          });
+          .catch(() => { setError("Playback failed."); setIsLoading(false); });
       }
       return;
     }
 
-    // ── Speech mode ──
-    if (!text) { setError("No text available to read."); return; }
-    if (!("speechSynthesis" in window)) {
-      setError("Audio guide not supported in this browser. Try Chrome or Safari.");
-      return;
+    // No audio yet — either use stored URL or generate
+    if (storedUrl) {
+      // Already set up via useEffect above; if not ready yet just play
+      if (audio) {
+        setIsLoading(true);
+        audio.play()
+          .then(() => { setIsPlaying(true); setIsLoading(false); })
+          .catch(() => setIsLoading(false));
+      }
+    } else {
+      // Generate on-demand
+      generateAudio();
     }
+  }, [isPlaying, audioStatus, storedUrl, completed, generateAudio]);
 
-    if (isPlaying) {
-      window.speechSynthesis.pause();
-      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-      elapsedRef.current = elapsedRef.current + (Date.now() - startTimeRef.current) / 1000;
-      setIsPlaying(false);
-      return;
-    }
-
-    // Resume paused utterance
-    if (window.speechSynthesis.paused) {
-      window.speechSynthesis.resume();
-      startSpeechTimer(duration);
-      setIsPlaying(true);
-      return;
-    }
-
-    // Fresh start
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = SPEECH_LANG[lang as Lang] || "en-US";
-    utterance.rate = 0.95;
-    utterance.pitch = 1.0;
-
-    // Pick best matching voice
-    const voices = window.speechSynthesis.getVoices();
-    const targetLang = SPEECH_LANG[lang as Lang] || "en-US";
-    const langPrefix = targetLang.split("-")[0];
-    const match =
-      voices.find(v => v.lang === targetLang) ||
-      voices.find(v => v.lang.startsWith(langPrefix));
-    if (match) utterance.voice = match;
-
-    utteranceRef.current = utterance;
-    elapsedRef.current = 0;
-
-    utterance.onstart = () => {
-      setIsLoading(false);
-      setIsPlaying(true);
-      startSpeechTimer(duration);
-    };
-    utterance.onpause = () => {
-      setIsPlaying(false);
-    };
-    utterance.onresume = () => {
-      startSpeechTimer(duration);
-      setIsPlaying(true);
-    };
-    utterance.onend = () => {
-      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-      setIsPlaying(false);
-      setCompleted(true);
-      setProgress(100);
-      setCurrentTime(duration);
-      onComplete?.();
-    };
-    utterance.onerror = (e) => {
-      if (e.error === "interrupted" || e.error === "canceled") return;
-      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-      setIsPlaying(false);
-      setIsLoading(false);
-      setError("Audio guide error. Please try again.");
-    };
-
-    setIsLoading(true);
-    setError(null);
-    window.speechSynthesis.speak(utterance);
-
-    // Chrome bug: speechSynthesis stops after ~15s unless poked
-    const chromePoke = setInterval(() => {
-      if (!window.speechSynthesis.speaking) { clearInterval(chromePoke); return; }
-      window.speechSynthesis.pause();
-      window.speechSynthesis.resume();
-    }, 14000);
-  }, [isPlaying, usingSpeech, text, lang, duration, completed]);
-
-  // ── Restart ────────────────────────────────────────────────────────────
+  // ── Restart ───────────────────────────────────────────────────────────────
   const restart = useCallback(() => {
-    stopAll();
-    elapsedRef.current = 0;
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
     setIsPlaying(false);
     setCompleted(false);
     setProgress(0);
     setCurrentTime(0);
-    if (!usingSpeech && audioRef.current) {
-      audioRef.current.currentTime = 0;
-    }
-  }, [usingSpeech]);
+  }, []);
 
-  // ── Seek (MP3 only; speech doesn't support seek) ──────────────────────
+  // ── Seek ──────────────────────────────────────────────────────────────────
   const seek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (usingSpeech) return; // can't seek speech
     const audio = audioRef.current;
     if (!audio || !audio.duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -291,9 +239,16 @@ export default function AudioPlayer({ site, text, onComplete }: AudioPlayerProps
     audio.currentTime = pct * audio.duration;
     setProgress(pct * 100);
     setCurrentTime(audio.currentTime);
-  }, [usingSpeech]);
+  }, []);
 
-  // ── No text and no audio ───────────────────────────────────────────────
+  // ── Cleanup blobs on unmount ──────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) audioRef.current.pause();
+    };
+  }, []);
+
+  // ── Nothing to play ───────────────────────────────────────────────────────
   if (!text && !storedUrl) {
     return (
       <div
@@ -306,6 +261,10 @@ export default function AudioPlayer({ site, text, onComplete }: AudioPlayerProps
     );
   }
 
+  const isGenerating = audioStatus === "generating";
+  const buttonDisabled = isGenerating || !!error;
+  const showLoadingSpinner = isLoading || isGenerating;
+
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-3" data-testid="audio-player">
       {/* Header */}
@@ -313,9 +272,6 @@ export default function AudioPlayer({ site, text, onComplete }: AudioPlayerProps
         <div className="flex items-center gap-2">
           <Volume2 size={16} style={{ color: "hsl(var(--primary))" }} />
           <span className="font-semibold text-sm">{t.audioTourTitle}</span>
-          {usingSpeech && (
-            <span className="text-xs text-muted-foreground opacity-60">({SPEECH_LANG[lang as Lang]?.split("-")[0].toUpperCase()})</span>
-          )}
         </div>
         {completed && (
           <span className="text-xs font-medium" style={{ color: "var(--color-gold, #d4af37)" }}>
@@ -324,10 +280,24 @@ export default function AudioPlayer({ site, text, onComplete }: AudioPlayerProps
         )}
       </div>
 
+      {/* Generating hint */}
+      {isGenerating && (
+        <div className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground flex items-center gap-2">
+          <Loader2 size={12} className="animate-spin shrink-0" />
+          Preparing your audio guide… this takes a few seconds
+        </div>
+      )}
+
       {/* Error */}
       {error && (
         <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
           {error}
+          <button
+            className="ml-2 underline text-xs"
+            onClick={() => { setError(null); setAudioStatus("idle"); }}
+          >
+            Try again
+          </button>
         </div>
       )}
 
@@ -339,22 +309,18 @@ export default function AudioPlayer({ site, text, onComplete }: AudioPlayerProps
       {/* Progress bar */}
       <div className="space-y-1">
         <div
-          className={`h-2 bg-muted rounded-full overflow-hidden relative ${usingSpeech ? "cursor-default" : "cursor-pointer"}`}
+          className="h-2 bg-muted rounded-full overflow-hidden cursor-pointer relative"
           onClick={seek}
           data-testid="audio-progress-bar"
-          role={usingSpeech ? undefined : "slider"}
+          role="slider"
           aria-label="Audio progress"
           aria-valuenow={Math.round(progress)}
           aria-valuemin={0}
           aria-valuemax={100}
         >
           <div
-            className="h-full rounded-full"
-            style={{
-              width: `${progress}%`,
-              background: "hsl(var(--primary))",
-              transition: isPlaying ? "width 0.25s linear" : "none",
-            }}
+            className="h-full rounded-full transition-none"
+            style={{ width: `${progress}%`, background: "hsl(var(--primary))" }}
           />
         </div>
         <div className="flex justify-between text-xs text-muted-foreground">
@@ -368,19 +334,25 @@ export default function AudioPlayer({ site, text, onComplete }: AudioPlayerProps
         <button
           data-testid="audio-play-btn"
           onClick={toggle}
-          disabled={!!error}
+          disabled={buttonDisabled}
           className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors disabled:opacity-50"
           style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
           aria-label={isPlaying ? "Pause audio" : "Play audio"}
         >
-          {isLoading ? (
+          {showLoadingSpinner ? (
             <Loader2 size={16} className="animate-spin" />
           ) : isPlaying ? (
             <Pause size={16} />
           ) : (
             <Play size={16} />
           )}
-          {isLoading ? "Loading..." : isPlaying ? t.pauseAudio : (completed ? t.resumeAudio : t.resumeAudio)}
+          {isGenerating
+            ? "Generating…"
+            : showLoadingSpinner
+            ? "Loading…"
+            : isPlaying
+            ? t.pauseAudio
+            : t.resumeAudio}
         </button>
 
         <button
