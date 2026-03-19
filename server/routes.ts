@@ -2,9 +2,42 @@ import type { Express } from "express";
 import { type Server } from "http";
 import path from "path";
 import fs from "fs";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import multer from "multer";
 import { storage } from "./storage";
 import { insertUserProgressSchema, insertTourSiteSchema, insertAttractionSchema } from "@shared/schema";
+
+const execFileAsync = promisify(execFile);
+
+// ─── Audio transcoding helper ─────────────────────────────────────────────────
+// Converts any audio buffer (PCM/WAV/MP3/etc) to browser-compatible MP3
+// (MPEG-1, 44.1kHz, 128kbps mono). Uses ffmpeg.
+async function transcodeToMp3(inputBuf: Buffer, inputFormat?: string): Promise<Buffer> {
+  const tmpIn = path.join(AUDIO_DIR_LAZY, `tmp_in_${Date.now()}.raw`);
+  const tmpOut = path.join(AUDIO_DIR_LAZY, `tmp_out_${Date.now()}.mp3`);
+  try {
+    fs.writeFileSync(tmpIn, inputBuf);
+    const inputArgs = inputFormat ? ["-f", inputFormat] : [];
+    await execFileAsync("ffmpeg", [
+      "-y",
+      ...inputArgs,
+      "-i", tmpIn,
+      "-ar", "44100",
+      "-ab", "128k",
+      "-ac", "1",
+      "-f", "mp3",
+      tmpOut,
+    ]);
+    return fs.readFileSync(tmpOut);
+  } finally {
+    try { fs.unlinkSync(tmpIn); } catch {}
+    try { fs.unlinkSync(tmpOut); } catch {}
+  }
+}
+
+// Lazy-init AUDIO_DIR path so it's accessible in transcodeToMp3 before route registration
+const AUDIO_DIR_LAZY = path.join(process.cwd(), "data", "audio");
 
 // ─── Supported languages ─────────────────────────────────────────────────────
 const SUPPORTED_LANGS = ["en", "al", "gr", "it", "es", "de", "fr", "ar", "sl"] as const;
@@ -403,38 +436,36 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!audioB64) return res.status(500).json({ error: "No audio data in TTS response" });
 
       // Gemini TTS returns raw 16-bit PCM at 24 kHz mono.
-      // We must wrap it in a WAV container so browsers can play it.
+      // Transcode to browser-compatible MP3 (MPEG-1, 44.1kHz, 128kbps) via ffmpeg.
       const pcmBuffer = Buffer.from(audioB64, 'base64');
-      const sampleRate = 24000;
-      const numChannels = 1;
-      const bitsPerSample = 16;
-      const byteRate = sampleRate * numChannels * bitsPerSample / 8;
-      const blockAlign = numChannels * bitsPerSample / 8;
-      const dataSize = pcmBuffer.length;
-      const wavHeader = Buffer.alloc(44);
-      wavHeader.write('RIFF', 0);
-      wavHeader.writeUInt32LE(36 + dataSize, 4);
-      wavHeader.write('WAVE', 8);
-      wavHeader.write('fmt ', 12);
-      wavHeader.writeUInt32LE(16, 16);           // PCM chunk size
-      wavHeader.writeUInt16LE(1, 20);            // PCM format
-      wavHeader.writeUInt16LE(numChannels, 22);
-      wavHeader.writeUInt32LE(sampleRate, 24);
-      wavHeader.writeUInt32LE(byteRate, 28);
-      wavHeader.writeUInt16LE(blockAlign, 32);
-      wavHeader.writeUInt16LE(bitsPerSample, 34);
-      wavHeader.write('data', 36);
-      wavHeader.writeUInt32LE(dataSize, 40);
-      const audioBuffer = Buffer.concat([wavHeader, pcmBuffer]);
-      const wavB64 = audioBuffer.toString('base64');
-
-      // Save WAV to AUDIO_DIR (ephemeral, for fast serving)
-      const filename = `tts_${entityType}_${entityId}_${lang}_${Date.now()}.wav`;
-      const filePath = path.join(AUDIO_DIR, filename);
-      fs.writeFileSync(filePath, audioBuffer);
+      // ffmpeg input format: s16le = signed 16-bit little-endian PCM, 24kHz, mono
+      if (!fs.existsSync(AUDIO_DIR)) fs.mkdirSync(AUDIO_DIR, { recursive: true });
+      const tmpPcm = path.join(AUDIO_DIR, `tts_pcm_${Date.now()}.raw`);
+      const tmpMp3 = path.join(AUDIO_DIR, `tts_mp3_${Date.now()}.mp3`);
+      let mp3Buffer: Buffer;
+      try {
+        fs.writeFileSync(tmpPcm, pcmBuffer);
+        await execFileAsync('ffmpeg', [
+          '-y',
+          '-f', 's16le',       // input format: raw PCM
+          '-ar', '24000',      // input sample rate
+          '-ac', '1',          // input channels
+          '-i', tmpPcm,
+          '-ar', '44100',      // output sample rate
+          '-ab', '128k',       // output bitrate
+          '-ac', '1',
+          '-f', 'mp3',
+          tmpMp3,
+        ]);
+        mp3Buffer = fs.readFileSync(tmpMp3);
+      } finally {
+        try { fs.unlinkSync(tmpPcm); } catch {}
+        try { fs.unlinkSync(tmpMp3); } catch {}
+      }
+      const mp3B64 = mp3Buffer.toString('base64');
 
       // Store as data URI in DB — survives Railway redeploys permanently
-      const dataUri = `data:audio/wav;base64,${wavB64}`;
+      const dataUri = `data:audio/mpeg;base64,${mp3B64}`;
       const field = audioField(lang as SupportedLang);
       if (entityType === "sites") {
         await storage.updateSite(entityId, { [field]: dataUri } as any);
@@ -459,12 +490,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const lang = req.params.lang as SupportedLang;
       if (!SUPPORTED_LANGS.includes(lang)) return res.status(400).json({ error: `lang must be one of: ${SUPPORTED_LANGS.join("|")}` });
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      // Detect actual MIME type from file bytes (WAV vs MP3)
-      const audioBuf = req.file.buffer ?? fs.readFileSync(req.file.path);
-      const isWav = audioBuf.slice(0, 4).toString() === 'RIFF';
-      const audioMime = isWav ? 'audio/wav' : 'audio/mpeg';
-      const audioB64 = audioBuf.toString('base64');
-      const dataUri = `data:${audioMime};base64,${audioB64}`;
+      // Transcode to browser-compatible MP3 (MPEG-1, 44.1kHz, 128kbps)
+      let rawBuf = req.file.buffer ?? fs.readFileSync(req.file.path);
+      const mp3Buf = await transcodeToMp3(rawBuf);
+      const dataUri = `data:audio/mpeg;base64,${mp3Buf.toString('base64')}`;
       const field = audioField(lang);
       const updated = await storage.updateAttraction(id, { [field]: dataUri } as any);
       if (!updated) return res.status(404).json({ error: "Attraction not found" });
@@ -539,12 +568,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const lang = req.params.lang as SupportedLang;
       if (!SUPPORTED_LANGS.includes(lang)) return res.status(400).json({ error: `lang must be one of: ${SUPPORTED_LANGS.join("|")}`});
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      // Detect actual MIME type from file bytes (WAV vs MP3)
-      const audioBuf = req.file.buffer ?? fs.readFileSync(req.file.path);
-      const isWav = audioBuf.slice(0, 4).toString() === 'RIFF';
-      const audioMime = isWav ? 'audio/wav' : 'audio/mpeg';
-      const audioB64 = audioBuf.toString('base64');
-      const dataUri = `data:${audioMime};base64,${audioB64}`;
+      // Transcode to browser-compatible MP3 (MPEG-1, 44.1kHz, 128kbps)
+      let rawBuf = req.file.buffer ?? fs.readFileSync(req.file.path);
+      const mp3Buf = await transcodeToMp3(rawBuf);
+      const dataUri = `data:audio/mpeg;base64,${mp3Buf.toString('base64')}`;
       const field = audioField(lang);
       const updated = await storage.updateSite(id, { [field]: dataUri } as any);
       if (!updated) return res.status(404).json({ error: "Site not found" });
