@@ -6,6 +6,61 @@ import multer from "multer";
 import { storage } from "./storage";
 import { insertUserProgressSchema, insertTourSiteSchema, insertAttractionSchema } from "@shared/schema";
 
+// ─── Supported languages ─────────────────────────────────────────────────────
+const SUPPORTED_LANGS = ["en", "al", "gr", "it", "es", "de", "fr", "ar", "sl"] as const;
+type SupportedLang = typeof SUPPORTED_LANGS[number];
+
+function audioField(lang: SupportedLang): string {
+  const map: Record<SupportedLang, string> = {
+    en: "audioUrlEn", al: "audioUrlAl", gr: "audioUrlGr",
+    it: "audioUrlIt", es: "audioUrlEs", de: "audioUrlDe",
+    fr: "audioUrlFr", ar: "audioUrlAr", sl: "audioUrlSl",
+  };
+  return map[lang];
+}
+
+// ─── Gemini translation helper ────────────────────────────────────────────────
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+
+async function translateWithGemini(text: string, targetLang: string): Promise<string> {
+  const langNames: Record<string, string> = {
+    al: "Albanian", gr: "Greek", it: "Italian", es: "Spanish",
+    de: "German", fr: "French", ar: "Arabic",
+    sl: "Slovenian (standard Slavic reference language)",
+  };
+  const langName = langNames[targetLang] || targetLang;
+
+  // Use fetch to call Gemini REST API
+  const prompt = `Translate the following tourism description text into ${langName}.
+Keep the tone warm, friendly, and natural — like a knowledgeable local guide speaking to a visitor.
+Do NOT use em-dashes (—), avoid ellipses (...), avoid parentheses where possible.
+Write in complete natural sentences. Do not add any explanation or commentary, only output the translated text.
+
+Text to translate:
+${text}`;
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const body = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
+  };
+
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`Gemini API error ${resp.status}: ${err}`);
+  }
+
+  const data = await resp.json() as any;
+  const translated = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  return translated.trim();
+}
+
 // ─── Config ───────────────────────────────────────────────────────────────────
 // Absolute base URL used to form persistent media URLs stored in the DB.
 // On Railway this resolves to the public domain; locally it falls back to localhost.
@@ -203,17 +258,109 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // ── Admin: Attraction Audio Upload ──────────────────────────────────────────
+  // ── Admin: Translate text ────────────────────────────────────────────────────
+  app.post("/api/admin/translate", requireAdmin, async (req, res) => {
+    const { text, targetLang } = req.body as { text: string; targetLang: string };
+    if (!text || !targetLang) return res.status(400).json({ error: "text and targetLang required" });
+    if (targetLang === "en") return res.json({ translated: text });
+    if (!SUPPORTED_LANGS.includes(targetLang as SupportedLang))
+      return res.status(400).json({ error: `Unsupported lang: ${targetLang}` });
+    if (!GEMINI_API_KEY)
+      return res.status(503).json({ error: "Translation not configured (no GEMINI_API_KEY)" });
+    try {
+      const translated = await translateWithGemini(text, targetLang);
+      res.json({ translated });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Translation failed" });
+    }
+  });
+
+  // ── Admin: Generate TTS from description text ──────────────────────────────
+  app.post("/api/admin/generate-tts", requireAdmin, async (req, res) => {
+    const { text, lang, entityType, entityId } = req.body as {
+      text: string;
+      lang: string;
+      entityType: "sites" | "attractions";
+      entityId: number;
+    };
+    if (!text || !lang || !entityType || !entityId)
+      return res.status(400).json({ error: "text, lang, entityType, entityId required" });
+    if (!SUPPORTED_LANGS.includes(lang as SupportedLang))
+      return res.status(400).json({ error: `Unsupported lang: ${lang}` });
+    if (!GEMINI_API_KEY)
+      return res.status(503).json({ error: "TTS not configured (no GEMINI_API_KEY)" });
+
+    try {
+      // Clean text for speech: remove special chars that sound robotic
+      const cleanText = text
+        .replace(/[—–]/g, ", ")          // em/en dashes → pause
+        .replace(/\.\.\./g, ". ")         // ellipsis → period
+        .replace(/[\(\)]/g, "")          // remove parentheses
+        .replace(/[\[\]]/g, "")          // remove brackets
+        .replace(/[*#_~`]/g, "")         // remove markdown symbols
+        .replace(/\s+/g, " ")
+        .trim();
+
+      // Call Gemini TTS REST API
+      const ttsUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-tts:generateContent?key=${GEMINI_API_KEY}`;
+      const ttsBody = {
+        contents: [{ parts: [{ text: cleanText }] }],
+        generationConfig: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: "charon" },
+            },
+          },
+        },
+      };
+
+      const ttsResp = await fetch(ttsUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(ttsBody),
+      });
+
+      if (!ttsResp.ok) {
+        const err = await ttsResp.text();
+        return res.status(500).json({ error: `Gemini TTS error ${ttsResp.status}: ${err}` });
+      }
+
+      const ttsData = await ttsResp.json() as any;
+      const audioB64 = ttsData?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (!audioB64) return res.status(500).json({ error: "No audio data in TTS response" });
+
+      // Save MP3 to AUDIO_DIR
+      const filename = `tts_${entityType}_${entityId}_${lang}_${Date.now()}.mp3`;
+      const filePath = path.join(AUDIO_DIR, filename);
+      fs.writeFileSync(filePath, Buffer.from(audioB64, "base64"));
+
+      // Store URL in DB
+      const audioUrl = `${RAILWAY_BASE}/api/audio/${filename}`;
+      const field = audioField(lang as SupportedLang);
+      if (entityType === "sites") {
+        await storage.updateSite(entityId, { [field]: audioUrl } as any);
+      } else {
+        await storage.updateAttraction(entityId, { [field]: audioUrl } as any);
+      }
+
+      res.json({ url: audioUrl });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "TTS generation failed" });
+    }
+  });
+
   app.post(
     "/api/admin/attractions/:id/audio/:lang",
     requireAdmin,
     upload.single("audio"),
     async (req: any, res) => {
       const id = parseInt(req.params.id);
-      const lang = req.params.lang as "en" | "al" | "gr";
-      if (!["en", "al", "gr"].includes(lang)) return res.status(400).json({ error: "lang must be en|al|gr" });
+      const lang = req.params.lang as SupportedLang;
+      if (!SUPPORTED_LANGS.includes(lang)) return res.status(400).json({ error: `lang must be one of: ${SUPPORTED_LANGS.join("|")}` });
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
       const audioUrl = `${RAILWAY_BASE}/api/audio/${req.file.filename}`;
-      const field = lang === "en" ? "audioUrlEn" : lang === "al" ? "audioUrlAl" : "audioUrlGr";
+      const field = audioField(lang);
       const updated = await storage.updateAttraction(id, { [field]: audioUrl } as any);
       if (!updated) return res.status(404).json({ error: "Attraction not found" });
       res.json({ url: audioUrl, attraction: updated });
@@ -222,8 +369,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.delete("/api/admin/attractions/:id/audio/:lang", requireAdmin, async (req, res) => {
     const id = parseInt(req.params.id);
-    const lang = req.params.lang as "en" | "al" | "gr";
-    const field = lang === "en" ? "audioUrlEn" : lang === "al" ? "audioUrlAl" : "audioUrlGr";
+    const lang = req.params.lang as SupportedLang;
+    const field = audioField(lang);
     const updated = await storage.updateAttraction(id, { [field]: null } as any);
     if (!updated) return res.status(404).json({ error: "Not found" });
     res.json({ success: true, attraction: updated });
@@ -274,19 +421,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // ── Admin: Audio Upload ─────────────────────────────────────────────────────
-  // POST /api/admin/sites/:id/audio/:lang  (lang = en | al | gr)
+  // POST /api/admin/sites/:id/audio/:lang
   app.post(
     "/api/admin/sites/:id/audio/:lang",
     requireAdmin,
     upload.single("audio"),
     async (req: any, res) => {
       const id = parseInt(req.params.id);
-      const lang = req.params.lang as "en" | "al" | "gr";
-      if (!["en", "al", "gr"].includes(lang)) return res.status(400).json({ error: "lang must be en|al|gr" });
+      const lang = req.params.lang as SupportedLang;
+      if (!SUPPORTED_LANGS.includes(lang)) return res.status(400).json({ error: `lang must be one of: ${SUPPORTED_LANGS.join("|")}`});
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-
       const audioUrl = `${RAILWAY_BASE}/api/audio/${req.file.filename}`;
-      const field = lang === "en" ? "audioUrlEn" : lang === "al" ? "audioUrlAl" : "audioUrlGr";
+      const field = audioField(lang);
       const updated = await storage.updateSite(id, { [field]: audioUrl } as any);
       if (!updated) return res.status(404).json({ error: "Site not found" });
       res.json({ url: audioUrl, site: updated });
@@ -296,8 +442,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // DELETE audio for a site/lang
   app.delete("/api/admin/sites/:id/audio/:lang", requireAdmin, async (req, res) => {
     const id = parseInt(req.params.id);
-    const lang = req.params.lang as "en" | "al" | "gr";
-    const field = lang === "en" ? "audioUrlEn" : lang === "al" ? "audioUrlAl" : "audioUrlGr";
+    const lang = req.params.lang as SupportedLang;
+    const field = audioField(lang);
     const updated = await storage.updateSite(id, { [field]: null } as any);
     if (!updated) return res.status(404).json({ error: "Site not found" });
     res.json({ success: true, site: updated });

@@ -1,15 +1,27 @@
-export type Lang = "en" | "al" | "gr";
+export type Lang = "en" | "al" | "gr" | "it" | "es" | "de" | "fr" | "ar" | "sl";
 
 export const LANG_LABELS: Record<Lang, string> = {
   en: "EN",
   al: "SQ",
   gr: "ΕΛ",
+  it: "IT",
+  es: "ES",
+  de: "DE",
+  fr: "FR",
+  ar: "AR",
+  sl: "SL",
 };
 
 export const LANG_NAMES: Record<Lang, string> = {
   en: "English",
   al: "Shqip",
   gr: "Ελληνικά",
+  it: "Italiano",
+  es: "Español",
+  de: "Deutsch",
+  fr: "Français",
+  ar: "العربية",
+  sl: "Slovenščina",
 };
 
 export interface Translations {
@@ -204,4 +216,8 @@ const GR: Translations = {
   allRegions: "Όλες οι Περιοχές",
 };
 
-export const TRANSLATIONS: Record<Lang, Translations> = { en: EN, al: AL, gr: GR };
+// New languages fall back to English UI strings (content is translated separately)
+export const TRANSLATIONS: Record<Lang, Translations> = {
+  en: EN, al: AL, gr: GR,
+  it: EN, es: EN, de: EN, fr: EN, ar: EN, sl: EN,
+};

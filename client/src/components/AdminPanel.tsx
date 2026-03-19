@@ -62,10 +62,16 @@ const ATTR_CATEGORIES = [
 ];
 const DIFFICULTIES = ["easy", "moderate", "hard"];
 const REGIONS = ["Tirana", "Durrës", "Shkodër", "Lezha", "Berat", "Elbasan", "Korçë", "Vlorë", "Gjirokastër", "Sarandë", "Fier", "Other"];
-const LANGS: { key: "en" | "al" | "gr"; label: string; flag: string }[] = [
+const LANGS: { key: "en" | "al" | "gr" | "it" | "es" | "de" | "fr" | "ar" | "sl"; label: string; flag: string }[] = [
   { key: "en", label: "English", flag: "🇬🇧" },
   { key: "al", label: "Albanian", flag: "🇦🇱" },
   { key: "gr", label: "Greek", flag: "🇬🇷" },
+  { key: "it", label: "Italian", flag: "🇮🇹" },
+  { key: "es", label: "Spanish", flag: "🇪🇸" },
+  { key: "de", label: "German", flag: "🇩🇪" },
+  { key: "fr", label: "French", flag: "🇫🇷" },
+  { key: "ar", label: "Arabic", flag: "🇸🇦" },
+  { key: "sl", label: "Slovenian", flag: "🇸🇮" },
 ];
 
 // ─── In-memory session persistence (survives component remounts, not page reload)
@@ -685,21 +691,47 @@ function MapPicker({
 
 // ─── AUDIO CARD ────────────────────────────────────────────────────────────────
 function AudioCard({
-  siteId, lang, label, flag, currentUrl, onUpdate, entityType = "sites",
+  siteId, lang, label, flag, currentUrl, onUpdate, entityType = "sites", descText, onTtsGenerated,
 }: {
   siteId: number | null;
-  lang: "en" | "al" | "gr";
+  lang: "en" | "al" | "gr" | "it" | "es" | "de" | "fr" | "ar" | "sl";
   label: string;
   flag: string;
   currentUrl: string | null;
   onUpdate: (url: string | null) => void;
   entityType?: "sites" | "attractions";
+  descText?: string;
+  onTtsGenerated?: (url: string) => void;
 }) {
   const [uploading, setUploading] = useState(false);
+  const [generatingTts, setGeneratingTts] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  async function handleGenerateTts() {
+    if (!descText || !siteId) return;
+    setGeneratingTts(true);
+    setError("");
+    try {
+      const res = await adminFetch(`/api/admin/generate-tts`, {
+        method: "POST",
+        body: JSON.stringify({ text: descText, lang, entityType, entityId: siteId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        const absUrl = data.url.startsWith("http") ? data.url : `${RAILWAY_API}${data.url}`;
+        onUpdate(absUrl);
+        if (onTtsGenerated) onTtsGenerated(absUrl);
+      } else {
+        setError(data.error || "TTS generation failed");
+      }
+    } catch {
+      setError("Network error during TTS generation");
+    }
+    setGeneratingTts(false);
+  }
 
   async function handleUpload(file: File) {
     if (!file || siteId === null) return;
@@ -758,22 +790,36 @@ function AudioCard({
           </Button>
         </div>
       ) : (
-        <div
-          className="border-2 border-dashed border-border/60 rounded-lg p-4 text-center cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-colors"
-          onClick={() => fileRef.current?.click()}
-          onDragOver={e => e.preventDefault()}
-          onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleUpload(f); }}
-        >
-          {uploading ? (
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" /><span>Uploading…</span>
-            </div>
-          ) : (
-            <>
-              <Music className="w-6 h-6 mx-auto mb-1.5 text-muted-foreground/50" />
-              <p className="text-xs text-muted-foreground">Drop MP3 here or <span className="text-primary font-medium">click to browse</span></p>
-              <p className="text-xs text-muted-foreground/60 mt-0.5">MP3, WAV, M4A · Max 100 MB</p>
-            </>
+        <div className="space-y-2">
+          <div
+            className="border-2 border-dashed border-border/60 rounded-lg p-4 text-center cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-colors"
+            onClick={() => fileRef.current?.click()}
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleUpload(f); }}
+          >
+            {uploading ? (
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" /><span>Uploading…</span>
+              </div>
+            ) : (
+              <>
+                <Music className="w-6 h-6 mx-auto mb-1.5 text-muted-foreground/50" />
+                <p className="text-xs text-muted-foreground">Drop MP3 here or <span className="text-primary font-medium">click to browse</span></p>
+                <p className="text-xs text-muted-foreground/60 mt-0.5">MP3, WAV, M4A · Max 100 MB</p>
+              </>
+            )}
+          </div>
+          {descText && siteId && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateTts}
+              disabled={generatingTts}
+              className="w-full text-xs gap-1.5 h-8 border-primary/30 text-primary hover:bg-primary/5"
+            >
+              {generatingTts ? <Loader2 className="w-3 h-3 animate-spin" /> : <span className="text-sm">🎙️</span>}
+              {generatingTts ? "Generating audio…" : "Generate Audio from Description"}
+            </Button>
           )}
         </div>
       )}
@@ -1089,20 +1135,23 @@ function Field({ label, required, error, children }: { label: string; required?:
 // ─── DESTINATION EDITOR ───────────────────────────────────────────────────────
 type DestFormData = {
   slug: string;
-  nameEn: string; nameAl: string; nameGr: string;
-  descEn: string; descAl: string; descGr: string;
-  funFactEn: string; funFactAl: string; funFactGr: string;
+  nameEn: string; nameAl: string; nameGr: string; nameIt: string; nameEs: string; nameDe: string; nameFr: string; nameAr: string; nameSl: string;
+  descEn: string; descAl: string; descGr: string; descIt: string; descEs: string; descDe: string; descFr: string; descAr: string; descSl: string;
+  funFactEn: string; funFactAl: string; funFactGr: string; funFactIt: string; funFactEs: string; funFactDe: string; funFactFr: string; funFactAr: string; funFactSl: string;
   audioUrlEn: string | null; audioUrlAl: string | null; audioUrlGr: string | null;
+  audioUrlIt: string | null; audioUrlEs: string | null; audioUrlDe: string | null; audioUrlFr: string | null; audioUrlAr: string | null; audioUrlSl: string | null;
   lat: string; lng: string;
   region: string; category: string; difficulty: string;
   points: string; visitDuration: string; imageUrl: string;
 };
 
 const EMPTY_DEST_FORM: DestFormData = {
-  slug: "", nameEn: "", nameAl: "", nameGr: "",
-  descEn: "", descAl: "", descGr: "",
-  funFactEn: "", funFactAl: "", funFactGr: "",
+  slug: "",
+  nameEn: "", nameAl: "", nameGr: "", nameIt: "", nameEs: "", nameDe: "", nameFr: "", nameAr: "", nameSl: "",
+  descEn: "", descAl: "", descGr: "", descIt: "", descEs: "", descDe: "", descFr: "", descAr: "", descSl: "",
+  funFactEn: "", funFactAl: "", funFactGr: "", funFactIt: "", funFactEs: "", funFactDe: "", funFactFr: "", funFactAr: "", funFactSl: "",
   audioUrlEn: null, audioUrlAl: null, audioUrlGr: null,
+  audioUrlIt: null, audioUrlEs: null, audioUrlDe: null, audioUrlFr: null, audioUrlAr: null, audioUrlSl: null,
   lat: "", lng: "", region: "", category: "", difficulty: "easy",
   points: "100", visitDuration: "120", imageUrl: "",
 };
@@ -1111,9 +1160,17 @@ function siteToForm(s: TourSite): DestFormData {
   return {
     slug: s.slug,
     nameEn: s.nameEn, nameAl: s.nameAl, nameGr: s.nameGr,
+    nameIt: (s as any).nameIt || "", nameEs: (s as any).nameEs || "", nameDe: (s as any).nameDe || "",
+    nameFr: (s as any).nameFr || "", nameAr: (s as any).nameAr || "", nameSl: (s as any).nameSl || "",
     descEn: s.descEn, descAl: s.descAl, descGr: s.descGr,
+    descIt: (s as any).descIt || "", descEs: (s as any).descEs || "", descDe: (s as any).descDe || "",
+    descFr: (s as any).descFr || "", descAr: (s as any).descAr || "", descSl: (s as any).descSl || "",
     funFactEn: s.funFactEn || "", funFactAl: s.funFactAl || "", funFactGr: s.funFactGr || "",
+    funFactIt: (s as any).funFactIt || "", funFactEs: (s as any).funFactEs || "", funFactDe: (s as any).funFactDe || "",
+    funFactFr: (s as any).funFactFr || "", funFactAr: (s as any).funFactAr || "", funFactSl: (s as any).funFactSl || "",
     audioUrlEn: s.audioUrlEn, audioUrlAl: s.audioUrlAl, audioUrlGr: s.audioUrlGr,
+    audioUrlIt: (s as any).audioUrlIt || null, audioUrlEs: (s as any).audioUrlEs || null, audioUrlDe: (s as any).audioUrlDe || null,
+    audioUrlFr: (s as any).audioUrlFr || null, audioUrlAr: (s as any).audioUrlAr || null, audioUrlSl: (s as any).audioUrlSl || null,
     lat: String(s.lat), lng: String(s.lng),
     region: s.region, category: s.category, difficulty: s.difficulty,
     points: String(s.points), visitDuration: String(s.visitDuration),
@@ -1134,6 +1191,7 @@ function EditorView({
   const [saving, setSaving] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [translatingLang, setTranslatingLang] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isNew && siteId !== null) {
@@ -1157,6 +1215,23 @@ function EditorView({
   function set(field: keyof DestFormData, value: string | null) {
     setFormState(prev => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors(prev => { const e = { ...prev }; delete e[field]; return e; });
+  }
+
+  async function handleTranslateDest(langKey: string) {
+    if (!form.nameEn && !form.descEn) return;
+    setTranslatingLang(langKey);
+    try {
+      const cap = langKey.charAt(0).toUpperCase() + langKey.slice(1);
+      const [nameRes, descRes, funRes] = await Promise.all([
+        form.nameEn ? adminFetch("/api/admin/translate", { method: "POST", body: JSON.stringify({ text: form.nameEn, targetLang: langKey }) }).then(r => r.json()) : Promise.resolve({ translated: "" }),
+        form.descEn ? adminFetch("/api/admin/translate", { method: "POST", body: JSON.stringify({ text: form.descEn, targetLang: langKey }) }).then(r => r.json()) : Promise.resolve({ translated: "" }),
+        form.funFactEn ? adminFetch("/api/admin/translate", { method: "POST", body: JSON.stringify({ text: form.funFactEn, targetLang: langKey }) }).then(r => r.json()) : Promise.resolve({ translated: "" }),
+      ]);
+      if (nameRes.translated) set(`name${cap}` as keyof DestFormData, nameRes.translated);
+      if (descRes.translated) set(`desc${cap}` as keyof DestFormData, descRes.translated);
+      if (funRes.translated) set(`funFact${cap}` as keyof DestFormData, funRes.translated);
+    } catch { /* ignore */ }
+    setTranslatingLang(null);
   }
 
   function validate(): boolean {
@@ -1185,10 +1260,28 @@ function EditorView({
       funFactEn: form.funFactEn || null,
       funFactAl: form.funFactAl || null,
       funFactGr: form.funFactGr || null,
+      funFactIt: form.funFactIt || null,
+      funFactEs: form.funFactEs || null,
+      funFactDe: form.funFactDe || null,
+      funFactFr: form.funFactFr || null,
+      funFactAr: form.funFactAr || null,
+      funFactSl: form.funFactSl || null,
       nameAl: form.nameAl || form.nameEn,
       nameGr: form.nameGr || form.nameEn,
+      nameIt: form.nameIt || null,
+      nameEs: form.nameEs || null,
+      nameDe: form.nameDe || null,
+      nameFr: form.nameFr || null,
+      nameAr: form.nameAr || null,
+      nameSl: form.nameSl || null,
       descAl: form.descAl || form.descEn,
       descGr: form.descGr || form.descEn,
+      descIt: form.descIt || null,
+      descEs: form.descEs || null,
+      descDe: form.descDe || null,
+      descFr: form.descFr || null,
+      descAr: form.descAr || null,
+      descSl: form.descSl || null,
     };
     try {
       const res = isNew
@@ -1354,56 +1447,78 @@ function EditorView({
 
           {/* Translations */}
           <TabsContent value="translations" className="space-y-5">
-            <p className="text-sm text-muted-foreground">Albanian and Greek translations. English is used as fallback if left blank.</p>
-            {LANGS.filter(l => l.key !== "en").map(lang => (
-              <Card key={lang.key} className="border-border/60">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2"><span className="text-base">{lang.flag}</span> {lang.label}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Field label={`${lang.label} Name`}>
-                    <Input
-                      value={form[`name${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof DestFormData] as string}
-                      onChange={e => set(`name${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof DestFormData, e.target.value)}
-                      placeholder={form.nameEn}
-                    />
-                  </Field>
-                  <Field label={`${lang.label} Description`}>
-                    <Textarea
-                      value={form[`desc${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof DestFormData] as string}
-                      onChange={e => set(`desc${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof DestFormData, e.target.value)}
-                      rows={4}
-                      placeholder={form.descEn}
-                    />
-                  </Field>
-                  <Field label={`${lang.label} Fun Fact`}>
-                    <Input
-                      value={form[`funFact${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof DestFormData] as string}
-                      onChange={e => set(`funFact${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof DestFormData, e.target.value)}
-                      placeholder={form.funFactEn}
-                    />
-                  </Field>
-                </CardContent>
-              </Card>
-            ))}
+            <p className="text-sm text-muted-foreground">Translations for all languages. Click "Auto-translate" to fill all three fields from the English version. English is used as fallback if left blank.</p>
+            {LANGS.filter(l => l.key !== "en").map(lang => {
+              const cap = lang.key.charAt(0).toUpperCase() + lang.key.slice(1);
+              const isTranslating = translatingLang === lang.key;
+              return (
+                <Card key={lang.key} className="border-border/60">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm flex items-center gap-2"><span className="text-base">{lang.flag}</span> {lang.label}</CardTitle>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleTranslateDest(lang.key)}
+                        disabled={isTranslating || !form.nameEn}
+                        className="text-xs h-7 gap-1.5 border-primary/30 text-primary hover:bg-primary/5"
+                      >
+                        {isTranslating ? <Loader2 className="w-3 h-3 animate-spin" /> : <span className="text-sm">🌐</span>}
+                        {isTranslating ? "Translating…" : "Auto-translate"}
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Field label={`${lang.label} Name`}>
+                      <Input
+                        value={form[`name${cap}` as keyof DestFormData] as string}
+                        onChange={e => set(`name${cap}` as keyof DestFormData, e.target.value)}
+                        placeholder={form.nameEn}
+                      />
+                    </Field>
+                    <Field label={`${lang.label} Description`}>
+                      <Textarea
+                        value={form[`desc${cap}` as keyof DestFormData] as string}
+                        onChange={e => set(`desc${cap}` as keyof DestFormData, e.target.value)}
+                        rows={4}
+                        placeholder={form.descEn}
+                      />
+                    </Field>
+                    <Field label={`${lang.label} Fun Fact`}>
+                      <Input
+                        value={form[`funFact${cap}` as keyof DestFormData] as string}
+                        onChange={e => set(`funFact${cap}` as keyof DestFormData, e.target.value)}
+                        placeholder={form.funFactEn}
+                      />
+                    </Field>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </TabsContent>
 
           {/* Audio */}
           <TabsContent value="audio" className="space-y-5">
-            <p className="text-sm text-muted-foreground">Upload an MP3 narration for each language. Requires the backend server running locally.</p>
+            <p className="text-sm text-muted-foreground">Upload an MP3 narration for each language, or click "Generate Audio" to create TTS from the description text.</p>
             {!isNew && (
               <div className="grid gap-4">
-                {LANGS.map(lang => (
-                  <AudioCard
-                    key={lang.key}
-                    siteId={siteId}
-                    lang={lang.key}
-                    label={lang.label}
-                    flag={lang.flag}
-                    currentUrl={form[`audioUrl${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof DestFormData] as string | null}
-                    onUpdate={url => set(`audioUrl${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof DestFormData, url)}
-                  />
-                ))}
+                {LANGS.map(lang => {
+                  const cap = lang.key.charAt(0).toUpperCase() + lang.key.slice(1);
+                  const descField = `desc${cap}` as keyof DestFormData;
+                  const descText = (form[descField] as string) || form.descEn || "";
+                  return (
+                    <AudioCard
+                      key={lang.key}
+                      siteId={siteId}
+                      lang={lang.key}
+                      label={lang.label}
+                      flag={lang.flag}
+                      currentUrl={form[`audioUrl${cap}` as keyof DestFormData] as string | null}
+                      onUpdate={url => set(`audioUrl${cap}` as keyof DestFormData, url)}
+                      descText={descText}
+                    />
+                  );
+                })}
               </div>
             )}
           </TabsContent>
@@ -1433,10 +1548,11 @@ function EditorView({
 // ─── ATTRACTION EDITOR ────────────────────────────────────────────────────────
 type AttrFormData = {
   slug: string;
-  nameEn: string; nameAl: string; nameGr: string;
-  descEn: string; descAl: string; descGr: string;
-  funFactEn: string; funFactAl: string; funFactGr: string;
+  nameEn: string; nameAl: string; nameGr: string; nameIt: string; nameEs: string; nameDe: string; nameFr: string; nameAr: string; nameSl: string;
+  descEn: string; descAl: string; descGr: string; descIt: string; descEs: string; descDe: string; descFr: string; descAr: string; descSl: string;
+  funFactEn: string; funFactAl: string; funFactGr: string; funFactIt: string; funFactEs: string; funFactDe: string; funFactFr: string; funFactAr: string; funFactSl: string;
   audioUrlEn: string; audioUrlAl: string; audioUrlGr: string;
+  audioUrlIt: string; audioUrlEs: string; audioUrlDe: string; audioUrlFr: string; audioUrlAr: string; audioUrlSl: string;
   category: string;
   points: string;
   lat: string; lng: string;
@@ -1445,10 +1561,12 @@ type AttrFormData = {
 };
 
 const EMPTY_ATTR_FORM: AttrFormData = {
-  slug: "", nameEn: "", nameAl: "", nameGr: "",
-  descEn: "", descAl: "", descGr: "",
-  funFactEn: "", funFactAl: "", funFactGr: "",
+  slug: "",
+  nameEn: "", nameAl: "", nameGr: "", nameIt: "", nameEs: "", nameDe: "", nameFr: "", nameAr: "", nameSl: "",
+  descEn: "", descAl: "", descGr: "", descIt: "", descEs: "", descDe: "", descFr: "", descAr: "", descSl: "",
+  funFactEn: "", funFactAl: "", funFactGr: "", funFactIt: "", funFactEs: "", funFactDe: "", funFactFr: "", funFactAr: "", funFactSl: "",
   audioUrlEn: "", audioUrlAl: "", audioUrlGr: "",
+  audioUrlIt: "", audioUrlEs: "", audioUrlDe: "", audioUrlFr: "", audioUrlAr: "", audioUrlSl: "",
   category: "", points: "50", lat: "", lng: "",
   visitDuration: "30", imageUrl: "",
 };
@@ -1457,9 +1575,17 @@ function attrToForm(a: Attraction): AttrFormData {
   return {
     slug: a.slug,
     nameEn: a.nameEn, nameAl: a.nameAl, nameGr: a.nameGr,
+    nameIt: (a as any).nameIt || "", nameEs: (a as any).nameEs || "", nameDe: (a as any).nameDe || "",
+    nameFr: (a as any).nameFr || "", nameAr: (a as any).nameAr || "", nameSl: (a as any).nameSl || "",
     descEn: a.descEn, descAl: a.descAl, descGr: a.descGr,
+    descIt: (a as any).descIt || "", descEs: (a as any).descEs || "", descDe: (a as any).descDe || "",
+    descFr: (a as any).descFr || "", descAr: (a as any).descAr || "", descSl: (a as any).descSl || "",
     funFactEn: a.funFactEn || "", funFactAl: a.funFactAl || "", funFactGr: a.funFactGr || "",
+    funFactIt: (a as any).funFactIt || "", funFactEs: (a as any).funFactEs || "", funFactDe: (a as any).funFactDe || "",
+    funFactFr: (a as any).funFactFr || "", funFactAr: (a as any).funFactAr || "", funFactSl: (a as any).funFactSl || "",
     audioUrlEn: a.audioUrlEn || "", audioUrlAl: a.audioUrlAl || "", audioUrlGr: a.audioUrlGr || "",
+    audioUrlIt: (a as any).audioUrlIt || "", audioUrlEs: (a as any).audioUrlEs || "", audioUrlDe: (a as any).audioUrlDe || "",
+    audioUrlFr: (a as any).audioUrlFr || "", audioUrlAr: (a as any).audioUrlAr || "", audioUrlSl: (a as any).audioUrlSl || "",
     category: a.category,
     points: String(a.points),
     lat: String(a.lat), lng: String(a.lng),
@@ -1486,6 +1612,7 @@ function AttrEditorView({
   const [saving, setSaving] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [translatingLang, setTranslatingLang] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isNew && attractionId !== null) {
@@ -1517,6 +1644,23 @@ function AttrEditorView({
     if (errors[field]) setErrors(prev => { const e = { ...prev }; delete e[field]; return e; });
   }
 
+  async function handleTranslateAttr(langKey: string) {
+    if (!form.nameEn && !form.descEn) return;
+    setTranslatingLang(langKey);
+    try {
+      const cap = langKey.charAt(0).toUpperCase() + langKey.slice(1);
+      const [nameRes, descRes, funRes] = await Promise.all([
+        form.nameEn ? adminFetch("/api/admin/translate", { method: "POST", body: JSON.stringify({ text: form.nameEn, targetLang: langKey }) }).then(r => r.json()) : Promise.resolve({ translated: "" }),
+        form.descEn ? adminFetch("/api/admin/translate", { method: "POST", body: JSON.stringify({ text: form.descEn, targetLang: langKey }) }).then(r => r.json()) : Promise.resolve({ translated: "" }),
+        form.funFactEn ? adminFetch("/api/admin/translate", { method: "POST", body: JSON.stringify({ text: form.funFactEn, targetLang: langKey }) }).then(r => r.json()) : Promise.resolve({ translated: "" }),
+      ]);
+      if (nameRes.translated) set(`name${cap}` as keyof AttrFormData, nameRes.translated);
+      if (descRes.translated) set(`desc${cap}` as keyof AttrFormData, descRes.translated);
+      if (funRes.translated) set(`funFact${cap}` as keyof AttrFormData, funRes.translated);
+    } catch { /* ignore */ }
+    setTranslatingLang(null);
+  }
+
   function validate(): boolean {
     const e: Record<string, string> = {};
     if (!form.slug.trim()) e.slug = "Slug is required";
@@ -1537,8 +1681,14 @@ function AttrEditorView({
       slug: form.slug,
       destinationSlug,
       nameEn: form.nameEn, nameAl: form.nameAl || form.nameEn, nameGr: form.nameGr || form.nameEn,
+      nameIt: form.nameIt || null, nameEs: form.nameEs || null, nameDe: form.nameDe || null,
+      nameFr: form.nameFr || null, nameAr: form.nameAr || null, nameSl: form.nameSl || null,
       descEn: form.descEn, descAl: form.descAl || form.descEn, descGr: form.descGr || form.descEn,
+      descIt: form.descIt || null, descEs: form.descEs || null, descDe: form.descDe || null,
+      descFr: form.descFr || null, descAr: form.descAr || null, descSl: form.descSl || null,
       funFactEn: form.funFactEn || "", funFactAl: form.funFactAl || form.funFactEn || "", funFactGr: form.funFactGr || form.funFactEn || "",
+      funFactIt: form.funFactIt || null, funFactEs: form.funFactEs || null, funFactDe: form.funFactDe || null,
+      funFactFr: form.funFactFr || null, funFactAr: form.funFactAr || null, funFactSl: form.funFactSl || null,
       category: form.category,
       points: parseInt(form.points) || 50,
       lat: parseFloat(form.lat),
@@ -1548,6 +1698,8 @@ function AttrEditorView({
       audioUrlEn: form.audioUrlEn || null,
       audioUrlAl: form.audioUrlAl || null,
       audioUrlGr: form.audioUrlGr || null,
+      audioUrlIt: form.audioUrlIt || null, audioUrlEs: form.audioUrlEs || null, audioUrlDe: form.audioUrlDe || null,
+      audioUrlFr: form.audioUrlFr || null, audioUrlAr: form.audioUrlAr || null, audioUrlSl: form.audioUrlSl || null,
     };
 
     try {
@@ -1667,38 +1819,54 @@ function AttrEditorView({
 
           {/* Translations */}
           <TabsContent value="translations" className="space-y-5">
-            <p className="text-sm text-muted-foreground">Albanian and Greek translations. English is used as fallback if left blank.</p>
-            {LANGS.filter(l => l.key !== "en").map(lang => (
-              <Card key={lang.key} className="border-border/60">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2"><span className="text-base">{lang.flag}</span> {lang.label}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Field label={`${lang.label} Name`}>
-                    <Input
-                      value={form[`name${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof AttrFormData]}
-                      onChange={e => set(`name${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof AttrFormData, e.target.value)}
-                      placeholder={form.nameEn}
-                    />
-                  </Field>
-                  <Field label={`${lang.label} Description`}>
-                    <Textarea
-                      value={form[`desc${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof AttrFormData]}
-                      onChange={e => set(`desc${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof AttrFormData, e.target.value)}
-                      rows={4}
-                      placeholder={form.descEn}
-                    />
-                  </Field>
-                  <Field label={`${lang.label} Fun Fact`}>
-                    <Input
-                      value={form[`funFact${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof AttrFormData]}
-                      onChange={e => set(`funFact${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof AttrFormData, e.target.value)}
-                      placeholder={form.funFactEn}
-                    />
-                  </Field>
-                </CardContent>
-              </Card>
-            ))}
+            <p className="text-sm text-muted-foreground">Translations for all languages. Click "Auto-translate" to fill all three fields from the English version. English is used as fallback if left blank.</p>
+            {LANGS.filter(l => l.key !== "en").map(lang => {
+              const cap = lang.key.charAt(0).toUpperCase() + lang.key.slice(1);
+              const isTranslating = translatingLang === lang.key;
+              return (
+                <Card key={lang.key} className="border-border/60">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm flex items-center gap-2"><span className="text-base">{lang.flag}</span> {lang.label}</CardTitle>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleTranslateAttr(lang.key)}
+                        disabled={isTranslating || !form.nameEn}
+                        className="text-xs h-7 gap-1.5 border-primary/30 text-primary hover:bg-primary/5"
+                      >
+                        {isTranslating ? <Loader2 className="w-3 h-3 animate-spin" /> : <span className="text-sm">🌐</span>}
+                        {isTranslating ? "Translating…" : "Auto-translate"}
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Field label={`${lang.label} Name`}>
+                      <Input
+                        value={form[`name${cap}` as keyof AttrFormData]}
+                        onChange={e => set(`name${cap}` as keyof AttrFormData, e.target.value)}
+                        placeholder={form.nameEn}
+                      />
+                    </Field>
+                    <Field label={`${lang.label} Description`}>
+                      <Textarea
+                        value={form[`desc${cap}` as keyof AttrFormData]}
+                        onChange={e => set(`desc${cap}` as keyof AttrFormData, e.target.value)}
+                        rows={4}
+                        placeholder={form.descEn}
+                      />
+                    </Field>
+                    <Field label={`${lang.label} Fun Fact`}>
+                      <Input
+                        value={form[`funFact${cap}` as keyof AttrFormData]}
+                        onChange={e => set(`funFact${cap}` as keyof AttrFormData, e.target.value)}
+                        placeholder={form.funFactEn}
+                      />
+                    </Field>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </TabsContent>
 
           {/* Media */}
@@ -1707,18 +1875,24 @@ function AttrEditorView({
             <Card className="border-border/60">
               <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Music className="w-4 h-4 text-primary" /> Audio Guide</CardTitle></CardHeader>
               <CardContent className="space-y-3">
-                {(["en", "al", "gr"] as const).map(lang => (
-                  <AudioCard
-                    key={lang}
-                    siteId={attractionId}
-                    lang={lang}
-                    label={lang === "en" ? "English" : lang === "al" ? "Albanian" : "Greek"}
-                    flag={lang === "en" ? "🇬🇧" : lang === "al" ? "🇦🇱" : "🇬🇷"}
-                    currentUrl={form[`audioUrl${lang.charAt(0).toUpperCase() + lang.slice(1)}` as keyof AttrFormData] as string || null}
-                    onUpdate={url => set(`audioUrl${lang.charAt(0).toUpperCase() + lang.slice(1)}` as keyof AttrFormData, url || "")}
-                    entityType="attractions"
-                  />
-                ))}
+                {LANGS.map(lang => {
+                  const cap = lang.key.charAt(0).toUpperCase() + lang.key.slice(1);
+                  const descField = `desc${cap}` as keyof AttrFormData;
+                  const descText = (form[descField] as string) || form.descEn || "";
+                  return (
+                    <AudioCard
+                      key={lang.key}
+                      siteId={attractionId}
+                      lang={lang.key}
+                      label={lang.label}
+                      flag={lang.flag}
+                      currentUrl={form[`audioUrl${cap}` as keyof AttrFormData] as string || null}
+                      onUpdate={url => set(`audioUrl${cap}` as keyof AttrFormData, url || "")}
+                      entityType="attractions"
+                      descText={descText}
+                    />
+                  );
+                })}
               </CardContent>
             </Card>
           </TabsContent>

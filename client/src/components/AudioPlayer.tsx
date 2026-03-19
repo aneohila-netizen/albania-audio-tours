@@ -10,8 +10,15 @@ interface AudioPlayerProps {
 }
 
 function getAudioUrl(site: TourSite, lang: Lang): string | null {
+  const s = site as any;
   if (lang === "al" && site.audioUrlAl) return site.audioUrlAl;
   if (lang === "gr" && site.audioUrlGr) return site.audioUrlGr;
+  if (lang === "it" && s.audioUrlIt) return s.audioUrlIt;
+  if (lang === "es" && s.audioUrlEs) return s.audioUrlEs;
+  if (lang === "de" && s.audioUrlDe) return s.audioUrlDe;
+  if (lang === "fr" && s.audioUrlFr) return s.audioUrlFr;
+  if (lang === "ar" && s.audioUrlAr) return s.audioUrlAr;
+  if (lang === "sl" && s.audioUrlSl) return s.audioUrlSl;
   // Default: English audio
   return site.audioUrlEn || null;
 }
