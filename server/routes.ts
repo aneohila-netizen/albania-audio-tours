@@ -211,9 +211,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch { val = null; }
     if (!val) return res.status(404).send('Audio not found');
     if (val.startsWith('data:')) {
+      // Detect MIME type from the data URI (audio/wav or audio/mpeg)
+      const mimeMatch = val.match(/^data:(audio\/[^;]+);base64,/);
+      const mimeType = mimeMatch ? mimeMatch[1] : 'audio/wav';
       const b64 = val.split(',')[1];
       const buf = Buffer.from(b64, 'base64');
-      res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': buf.length, 'Cache-Control': 'public, max-age=86400' });
+      res.set({ 'Content-Type': mimeType, 'Content-Length': buf.length, 'Cache-Control': 'public, max-age=86400', 'Accept-Ranges': 'none' });
       return res.send(buf);
     }
     // Legacy: redirect to file URL
@@ -378,16 +381,42 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const ttsData = await ttsResp.json() as any;
       const audioB64 = ttsData?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      const mimeType: string = ttsData?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.mimeType || 'audio/pcm';
       if (!audioB64) return res.status(500).json({ error: "No audio data in TTS response" });
 
-      // Save MP3 to AUDIO_DIR (ephemeral, for fast serving)
-      const filename = `tts_${entityType}_${entityId}_${lang}_${Date.now()}.mp3`;
+      // Gemini TTS returns raw 16-bit PCM at 24 kHz mono.
+      // We must wrap it in a WAV container so browsers can play it.
+      const pcmBuffer = Buffer.from(audioB64, 'base64');
+      const sampleRate = 24000;
+      const numChannels = 1;
+      const bitsPerSample = 16;
+      const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+      const blockAlign = numChannels * bitsPerSample / 8;
+      const dataSize = pcmBuffer.length;
+      const wavHeader = Buffer.alloc(44);
+      wavHeader.write('RIFF', 0);
+      wavHeader.writeUInt32LE(36 + dataSize, 4);
+      wavHeader.write('WAVE', 8);
+      wavHeader.write('fmt ', 12);
+      wavHeader.writeUInt32LE(16, 16);           // PCM chunk size
+      wavHeader.writeUInt16LE(1, 20);            // PCM format
+      wavHeader.writeUInt16LE(numChannels, 22);
+      wavHeader.writeUInt32LE(sampleRate, 24);
+      wavHeader.writeUInt32LE(byteRate, 28);
+      wavHeader.writeUInt16LE(blockAlign, 32);
+      wavHeader.writeUInt16LE(bitsPerSample, 34);
+      wavHeader.write('data', 36);
+      wavHeader.writeUInt32LE(dataSize, 40);
+      const audioBuffer = Buffer.concat([wavHeader, pcmBuffer]);
+      const wavB64 = audioBuffer.toString('base64');
+
+      // Save WAV to AUDIO_DIR (ephemeral, for fast serving)
+      const filename = `tts_${entityType}_${entityId}_${lang}_${Date.now()}.wav`;
       const filePath = path.join(AUDIO_DIR, filename);
-      const audioBuffer = Buffer.from(audioB64, "base64");
       fs.writeFileSync(filePath, audioBuffer);
 
       // Store as data URI in DB — survives Railway redeploys permanently
-      const dataUri = `data:audio/mpeg;base64,${audioB64}`;
+      const dataUri = `data:audio/wav;base64,${wavB64}`;
       const field = audioField(lang as SupportedLang);
       if (entityType === "sites") {
         await storage.updateSite(entityId, { [field]: dataUri } as any);
