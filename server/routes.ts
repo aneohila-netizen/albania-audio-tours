@@ -441,11 +441,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const lang = req.params.lang as SupportedLang;
       if (!SUPPORTED_LANGS.includes(lang)) return res.status(400).json({ error: `lang must be one of: ${SUPPORTED_LANGS.join("|")}` });
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      // Store as data URI in DB — survives Railway redeploys permanently
-      const audioB64 = req.file.buffer
-        ? req.file.buffer.toString("base64")
-        : fs.readFileSync(req.file.path).toString("base64");
-      const dataUri = `data:audio/mpeg;base64,${audioB64}`;
+      // Detect actual MIME type from file bytes (WAV vs MP3)
+      const audioBuf = req.file.buffer ?? fs.readFileSync(req.file.path);
+      const isWav = audioBuf.slice(0, 4).toString() === 'RIFF';
+      const audioMime = isWav ? 'audio/wav' : 'audio/mpeg';
+      const audioB64 = audioBuf.toString('base64');
+      const dataUri = `data:${audioMime};base64,${audioB64}`;
       const field = audioField(lang);
       const updated = await storage.updateAttraction(id, { [field]: dataUri } as any);
       if (!updated) return res.status(404).json({ error: "Attraction not found" });
@@ -520,11 +521,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const lang = req.params.lang as SupportedLang;
       if (!SUPPORTED_LANGS.includes(lang)) return res.status(400).json({ error: `lang must be one of: ${SUPPORTED_LANGS.join("|")}`});
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      // Store as data URI in DB — survives Railway redeploys permanently
-      const audioB64 = req.file.buffer
-        ? req.file.buffer.toString("base64")
-        : fs.readFileSync(req.file.path).toString("base64");
-      const dataUri = `data:audio/mpeg;base64,${audioB64}`;
+      // Detect actual MIME type from file bytes (WAV vs MP3)
+      const audioBuf = req.file.buffer ?? fs.readFileSync(req.file.path);
+      const isWav = audioBuf.slice(0, 4).toString() === 'RIFF';
+      const audioMime = isWav ? 'audio/wav' : 'audio/mpeg';
+      const audioB64 = audioBuf.toString('base64');
+      const dataUri = `data:${audioMime};base64,${audioB64}`;
       const field = audioField(lang);
       const updated = await storage.updateSite(id, { [field]: dataUri } as any);
       if (!updated) return res.status(404).json({ error: "Site not found" });
