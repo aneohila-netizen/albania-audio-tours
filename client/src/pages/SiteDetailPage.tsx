@@ -155,8 +155,8 @@ export default function SiteDetailPage() {
         <p className="text-base leading-relaxed text-muted-foreground">{desc}</p>
       </div>
 
-      {/* Audio player */}
-      <AudioPlayer site={site} onComplete={handleAudioComplete} />
+      {/* Audio player — reads the description text already shown on this page */}
+      <AudioPlayer site={site} text={desc} onComplete={handleAudioComplete} />
 
       {/* Fun fact */}
       {funFact && (

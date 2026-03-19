@@ -189,7 +189,7 @@ export default function AttractionDetailPage() {
       </div>
 
       {/* Audio player */}
-      <AudioPlayer site={siteCompat} onComplete={() => { if (!isVisited) handleMarkVisited(); }} />
+      <AudioPlayer site={siteCompat} text={aDesc} onComplete={() => { if (!isVisited) handleMarkVisited(); }} />
 
       {/* Fun fact */}
       {aFunFact && (

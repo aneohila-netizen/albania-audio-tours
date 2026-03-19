@@ -4,47 +4,82 @@ import { useApp } from "@/App";
 import type { TourSite } from "@shared/schema";
 import type { Lang } from "@/lib/i18n";
 
-interface AudioPlayerProps {
-  site: TourSite;
-  onComplete?: () => void;
-}
+// ── Language code → BCP-47 locale for SpeechSynthesis ─────────────────────
+const SPEECH_LANG: Record<Lang, string> = {
+  en: "en-US",
+  al: "sq-AL",
+  gr: "el-GR",
+  it: "it-IT",
+  es: "es-ES",
+  de: "de-DE",
+  fr: "fr-FR",
+  ar: "ar-SA",
+  sl: "sl-SI",
+};
 
-function getAudioUrl(site: TourSite, lang: Lang): string | null {
+// ── Helper: get stored MP3 URL (admin-uploaded override) ──────────────────
+function getStoredAudioUrl(site: TourSite, lang: Lang): string | null {
   const s = site as any;
-  if (lang === "al" && site.audioUrlAl) return site.audioUrlAl;
-  if (lang === "gr" && site.audioUrlGr) return site.audioUrlGr;
-  if (lang === "it" && s.audioUrlIt) return s.audioUrlIt;
-  if (lang === "es" && s.audioUrlEs) return s.audioUrlEs;
-  if (lang === "de" && s.audioUrlDe) return s.audioUrlDe;
-  if (lang === "fr" && s.audioUrlFr) return s.audioUrlFr;
-  if (lang === "ar" && s.audioUrlAr) return s.audioUrlAr;
-  if (lang === "sl" && s.audioUrlSl) return s.audioUrlSl;
-  // Default: English audio
-  return site.audioUrlEn || null;
+  const map: Partial<Record<Lang, string | null>> = {
+    en: site.audioUrlEn,
+    al: site.audioUrlAl,
+    gr: site.audioUrlGr,
+    it: s.audioUrlIt,
+    es: s.audioUrlEs,
+    de: s.audioUrlDe,
+    fr: s.audioUrlFr,
+    ar: s.audioUrlAr,
+    sl: s.audioUrlSl,
+  };
+  return map[lang] || null;
 }
 
 function formatTime(seconds: number): string {
-  if (!isFinite(seconds) || isNaN(seconds)) return "0:00";
+  if (!isFinite(seconds) || isNaN(seconds) || seconds <= 0) return "0:00";
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function AudioPlayer({ site, onComplete }: AudioPlayerProps) {
+// ── Estimate speech duration in seconds (avg ~150 words/min) ──────────────
+function estimateDuration(text: string): number {
+  const words = text.trim().split(/\s+/).length;
+  return Math.max(5, Math.round((words / 150) * 60));
+}
+
+interface AudioPlayerProps {
+  site: TourSite;
+  /** The description text currently shown on the page (already in the selected language) */
+  text?: string;
+  onComplete?: () => void;
+}
+
+export default function AudioPlayer({ site, text, onComplete }: AudioPlayerProps) {
   const { t, lang } = useApp();
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // ── State ──────────────────────────────────────────────────────────────
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [progress, setProgress] = useState(0);       // 0–100
-  const [currentTime, setCurrentTime] = useState(0); // seconds
-  const [duration, setDuration] = useState(0);       // seconds
+  const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usingSpeech, setUsingSpeech] = useState(false);
 
-  const audioUrl = getAudioUrl(site, lang as Lang);
+  // ── Refs ───────────────────────────────────────────────────────────────
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startTimeRef = useRef<number>(0);
+  const elapsedRef = useRef<number>(0);  // seconds elapsed before last pause
 
-  // Create / update audio element when URL changes
+  // ── Decide: use stored MP3 or Web Speech API ──────────────────────────
+  const storedUrl = getStoredAudioUrl(site, lang as Lang);
+
+  // Reset everything when lang or site changes
   useEffect(() => {
+    stopAll();
     setIsPlaying(false);
     setIsLoading(false);
     setProgress(0);
@@ -52,78 +87,202 @@ export default function AudioPlayer({ site, onComplete }: AudioPlayerProps) {
     setDuration(0);
     setCompleted(false);
     setError(null);
+    elapsedRef.current = 0;
+    // Decide mode
+    setUsingSpeech(!storedUrl);
+    if (!storedUrl) {
+      const estimatedDur = estimateDuration(text || "");
+      setDuration(estimatedDur);
+    }
+  }, [lang, site.id, storedUrl]);
 
-    if (!audioUrl) return;
+  // ── Stored MP3: set up audio element ─────────────────────────────────
+  useEffect(() => {
+    if (usingSpeech || !storedUrl) return;
 
-    const audio = new Audio(audioUrl);
+    const audio = new Audio(storedUrl);
     audioRef.current = audio;
 
-    const onLoadedMetadata = () => {
-      setDuration(audio.duration);
-    };
-    const onTimeUpdate = () => {
+    audio.addEventListener("loadedmetadata", () => setDuration(audio.duration));
+    audio.addEventListener("timeupdate", () => {
       setCurrentTime(audio.currentTime);
       setProgress(audio.duration > 0 ? (audio.currentTime / audio.duration) * 100 : 0);
-    };
-    const onEnded = () => {
+    });
+    audio.addEventListener("ended", () => {
       setIsPlaying(false);
       setCompleted(true);
       setProgress(100);
       onComplete?.();
-    };
-    const onError = () => {
-      setIsLoading(false);
-      setIsPlaying(false);
-      setError("Unable to load audio. Try again later.");
-    };
-    const onWaiting = () => setIsLoading(true);
-    const onCanPlay = () => setIsLoading(false);
-
-    audio.addEventListener("loadedmetadata", onLoadedMetadata);
-    audio.addEventListener("timeupdate", onTimeUpdate);
-    audio.addEventListener("ended", onEnded);
-    audio.addEventListener("error", onError);
-    audio.addEventListener("waiting", onWaiting);
-    audio.addEventListener("canplay", onCanPlay);
+    });
+    audio.addEventListener("error", () => {
+      // MP3 failed — fall back to speech
+      setUsingSpeech(true);
+      setError(null);
+      const estimatedDur = estimateDuration(text || "");
+      setDuration(estimatedDur);
+      audioRef.current = null;
+    });
+    audio.addEventListener("waiting", () => setIsLoading(true));
+    audio.addEventListener("canplay", () => setIsLoading(false));
 
     return () => {
       audio.pause();
-      audio.removeEventListener("loadedmetadata", onLoadedMetadata);
-      audio.removeEventListener("timeupdate", onTimeUpdate);
-      audio.removeEventListener("ended", onEnded);
-      audio.removeEventListener("error", onError);
-      audio.removeEventListener("waiting", onWaiting);
-      audio.removeEventListener("canplay", onCanPlay);
       audioRef.current = null;
     };
-  }, [audioUrl]);
+  }, [storedUrl, usingSpeech]);
 
-  const toggle = useCallback(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (isPlaying) {
-      audio.pause();
-      setIsPlaying(false);
-    } else {
-      setIsLoading(true);
-      audio.play()
-        .then(() => { setIsPlaying(true); setIsLoading(false); })
-        .catch(() => { setError("Playback failed. Please try again."); setIsLoading(false); });
+  // ── Cleanup on unmount ────────────────────────────────────────────────
+  useEffect(() => {
+    return () => stopAll();
+  }, []);
+
+  // ── Helper: stop everything ────────────────────────────────────────────
+  function stopAll() {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
     }
-  }, [isPlaying]);
+    if (audioRef.current) { audioRef.current.pause(); }
+  }
 
+  // ── Speech progress timer ─────────────────────────────────────────────
+  function startSpeechTimer(totalDuration: number) {
+    if (timerRef.current) clearInterval(timerRef.current);
+    startTimeRef.current = Date.now();
+    timerRef.current = setInterval(() => {
+      const elapsed = elapsedRef.current + (Date.now() - startTimeRef.current) / 1000;
+      const clamped = Math.min(elapsed, totalDuration);
+      setCurrentTime(clamped);
+      setProgress(totalDuration > 0 ? (clamped / totalDuration) * 100 : 0);
+      if (clamped >= totalDuration) {
+        clearInterval(timerRef.current!);
+        timerRef.current = null;
+      }
+    }, 250);
+  }
+
+  // ── Toggle play / pause ────────────────────────────────────────────────
+  const toggle = useCallback(() => {
+    if (completed) return;
+
+    // ── MP3 mode ──
+    if (!usingSpeech && audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        setIsLoading(true);
+        audioRef.current.play()
+          .then(() => { setIsPlaying(true); setIsLoading(false); })
+          .catch(() => {
+            setIsLoading(false);
+            // Fall back to speech
+            setUsingSpeech(true);
+            const estimatedDur = estimateDuration(text || "");
+            setDuration(estimatedDur);
+          });
+      }
+      return;
+    }
+
+    // ── Speech mode ──
+    if (!text) { setError("No text available to read."); return; }
+    if (!("speechSynthesis" in window)) {
+      setError("Audio guide not supported in this browser. Try Chrome or Safari.");
+      return;
+    }
+
+    if (isPlaying) {
+      window.speechSynthesis.pause();
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      elapsedRef.current = elapsedRef.current + (Date.now() - startTimeRef.current) / 1000;
+      setIsPlaying(false);
+      return;
+    }
+
+    // Resume paused utterance
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+      startSpeechTimer(duration);
+      setIsPlaying(true);
+      return;
+    }
+
+    // Fresh start
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = SPEECH_LANG[lang as Lang] || "en-US";
+    utterance.rate = 0.95;
+    utterance.pitch = 1.0;
+
+    // Pick best matching voice
+    const voices = window.speechSynthesis.getVoices();
+    const targetLang = SPEECH_LANG[lang as Lang] || "en-US";
+    const langPrefix = targetLang.split("-")[0];
+    const match =
+      voices.find(v => v.lang === targetLang) ||
+      voices.find(v => v.lang.startsWith(langPrefix));
+    if (match) utterance.voice = match;
+
+    utteranceRef.current = utterance;
+    elapsedRef.current = 0;
+
+    utterance.onstart = () => {
+      setIsLoading(false);
+      setIsPlaying(true);
+      startSpeechTimer(duration);
+    };
+    utterance.onpause = () => {
+      setIsPlaying(false);
+    };
+    utterance.onresume = () => {
+      startSpeechTimer(duration);
+      setIsPlaying(true);
+    };
+    utterance.onend = () => {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      setIsPlaying(false);
+      setCompleted(true);
+      setProgress(100);
+      setCurrentTime(duration);
+      onComplete?.();
+    };
+    utterance.onerror = (e) => {
+      if (e.error === "interrupted" || e.error === "canceled") return;
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      setIsPlaying(false);
+      setIsLoading(false);
+      setError("Audio guide error. Please try again.");
+    };
+
+    setIsLoading(true);
+    setError(null);
+    window.speechSynthesis.speak(utterance);
+
+    // Chrome bug: speechSynthesis stops after ~15s unless poked
+    const chromePoke = setInterval(() => {
+      if (!window.speechSynthesis.speaking) { clearInterval(chromePoke); return; }
+      window.speechSynthesis.pause();
+      window.speechSynthesis.resume();
+    }, 14000);
+  }, [isPlaying, usingSpeech, text, lang, duration, completed]);
+
+  // ── Restart ────────────────────────────────────────────────────────────
   const restart = useCallback(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    audio.pause();
-    audio.currentTime = 0;
+    stopAll();
+    elapsedRef.current = 0;
     setIsPlaying(false);
     setCompleted(false);
     setProgress(0);
     setCurrentTime(0);
-  }, []);
+    if (!usingSpeech && audioRef.current) {
+      audioRef.current.currentTime = 0;
+    }
+  }, [usingSpeech]);
 
+  // ── Seek (MP3 only; speech doesn't support seek) ──────────────────────
   const seek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (usingSpeech) return; // can't seek speech
     const audio = audioRef.current;
     if (!audio || !audio.duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -132,10 +291,10 @@ export default function AudioPlayer({ site, onComplete }: AudioPlayerProps) {
     audio.currentTime = pct * audio.duration;
     setProgress(pct * 100);
     setCurrentTime(audio.currentTime);
-  }, []);
+  }, [usingSpeech]);
 
-  // No audio available
-  if (!audioUrl) {
+  // ── No text and no audio ───────────────────────────────────────────────
+  if (!text && !storedUrl) {
     return (
       <div
         className="rounded-xl border border-dashed border-border p-4 text-center"
@@ -154,6 +313,9 @@ export default function AudioPlayer({ site, onComplete }: AudioPlayerProps) {
         <div className="flex items-center gap-2">
           <Volume2 size={16} style={{ color: "hsl(var(--primary))" }} />
           <span className="font-semibold text-sm">{t.audioTourTitle}</span>
+          {usingSpeech && (
+            <span className="text-xs text-muted-foreground opacity-60">({SPEECH_LANG[lang as Lang]?.split("-")[0].toUpperCase()})</span>
+          )}
         </div>
         {completed && (
           <span className="text-xs font-medium" style={{ color: "var(--color-gold, #d4af37)" }}>
@@ -162,7 +324,7 @@ export default function AudioPlayer({ site, onComplete }: AudioPlayerProps) {
         )}
       </div>
 
-      {/* Error state */}
+      {/* Error */}
       {error && (
         <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
           {error}
@@ -174,21 +336,25 @@ export default function AudioPlayer({ site, onComplete }: AudioPlayerProps) {
         {[...Array(5)].map((_, i) => <span key={i} />)}
       </div>
 
-      {/* Seekable progress bar */}
+      {/* Progress bar */}
       <div className="space-y-1">
         <div
-          className="h-2 bg-muted rounded-full overflow-hidden cursor-pointer relative"
+          className={`h-2 bg-muted rounded-full overflow-hidden relative ${usingSpeech ? "cursor-default" : "cursor-pointer"}`}
           onClick={seek}
           data-testid="audio-progress-bar"
-          role="slider"
+          role={usingSpeech ? undefined : "slider"}
           aria-label="Audio progress"
           aria-valuenow={Math.round(progress)}
           aria-valuemin={0}
           aria-valuemax={100}
         >
           <div
-            className="h-full rounded-full transition-none"
-            style={{ width: `${progress}%`, background: "hsl(var(--primary))" }}
+            className="h-full rounded-full"
+            style={{
+              width: `${progress}%`,
+              background: "hsl(var(--primary))",
+              transition: isPlaying ? "width 0.25s linear" : "none",
+            }}
           />
         </div>
         <div className="flex justify-between text-xs text-muted-foreground">
@@ -202,7 +368,7 @@ export default function AudioPlayer({ site, onComplete }: AudioPlayerProps) {
         <button
           data-testid="audio-play-btn"
           onClick={toggle}
-          disabled={completed || !!error}
+          disabled={!!error}
           className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors disabled:opacity-50"
           style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
           aria-label={isPlaying ? "Pause audio" : "Play audio"}
@@ -214,7 +380,7 @@ export default function AudioPlayer({ site, onComplete }: AudioPlayerProps) {
           ) : (
             <Play size={16} />
           )}
-          {isLoading ? "Loading..." : isPlaying ? t.pauseAudio : t.resumeAudio}
+          {isLoading ? "Loading..." : isPlaying ? t.pauseAudio : (completed ? t.resumeAudio : t.resumeAudio)}
         </button>
 
         <button
