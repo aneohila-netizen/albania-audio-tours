@@ -2,8 +2,24 @@ import type { Express } from "express";
 import { type Server } from "http";
 import path from "path";
 import fs from "fs";
-import { execFile } from "child_process";
+import { execFile, execFileSync } from "child_process";
 import { promisify } from "util";
+
+// Resolve ffmpeg binary: system PATH first, then ffmpeg-static npm package
+function resolveFfmpeg(): string {
+  try {
+    execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' });
+    return 'ffmpeg'; // system ffmpeg works
+  } catch {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const ffmpegStatic = require('ffmpeg-static') as string;
+      if (ffmpegStatic && fs.existsSync(ffmpegStatic)) return ffmpegStatic;
+    } catch {}
+    return 'ffmpeg'; // best effort fallback
+  }
+}
+const FFMPEG_BIN = resolveFfmpeg();
 import multer from "multer";
 import { storage } from "./storage";
 import { insertUserProgressSchema, insertTourSiteSchema, insertAttractionSchema } from "@shared/schema";
@@ -19,7 +35,7 @@ async function transcodeToMp3(inputBuf: Buffer, inputFormat?: string): Promise<B
   try {
     fs.writeFileSync(tmpIn, inputBuf);
     const inputArgs = inputFormat ? ["-f", inputFormat] : [];
-    await execFileAsync("ffmpeg", [
+    await execFileAsync(FFMPEG_BIN, [
       "-y",
       ...inputArgs,
       "-i", tmpIn,
@@ -445,7 +461,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       let mp3Buffer: Buffer;
       try {
         fs.writeFileSync(tmpPcm, pcmBuffer);
-        await execFileAsync('ffmpeg', [
+        await execFileAsync(FFMPEG_BIN, [
           '-y',
           '-f', 's16le',       // input format: raw PCM
           '-ar', '24000',      // input sample rate
@@ -543,7 +559,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       let mp3Buffer: Buffer;
       try {
         fs.writeFileSync(tmpPcm, Buffer.from(audioB64, 'base64'));
-        await execFileAsync('ffmpeg', [
+        await execFileAsync(FFMPEG_BIN, [
           '-y',
           '-f', 's16le', '-ar', '24000', '-ac', '1', '-i', tmpPcm,
           '-ar', '44100', '-ab', '128k', '-ac', '1', '-f', 'mp3', tmpMp3,
