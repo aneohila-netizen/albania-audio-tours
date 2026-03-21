@@ -60,97 +60,139 @@ function WaypointMap({
   const markersRef = useRef<any[]>([]);
   const polylineRef = useRef<any>(null);
 
-  // Load Leaflet lazily (already bundled in the app via MiniMap)
+  // Keep refs up-to-date so the click handler always sees latest state
+  // (fixes stale closure — click handler is registered only once)
+  const waypointsRef = useRef<Waypoint[]>(waypoints);
+  const onChangeRef = useRef(onWaypointsChange);
+  useEffect(() => { waypointsRef.current = waypoints; }, [waypoints]);
+  useEffect(() => { onChangeRef.current = onWaypointsChange; }, [onWaypointsChange]);
+
+  // Initialise map once
   useEffect(() => {
     if (!mapDivRef.current) return;
     const L = (window as any).L;
     if (!L) return;
+    if (mapRef.current) return; // already initialised
 
-    if (!mapRef.current) {
-      mapRef.current = L.map(mapDivRef.current, { zoomControl: true }).setView([centerLat, centerLng], 15);
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-        attribution: "© CartoDB",
-        maxZoom: 19,
-      }).addTo(mapRef.current);
+    mapRef.current = L.map(mapDivRef.current, { zoomControl: true }).setView([centerLat, centerLng], 15);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+      attribution: "© CartoDB", maxZoom: 19,
+    }).addTo(mapRef.current);
 
-      // Click to add waypoint
-      mapRef.current.on("click", (e: any) => {
-        onWaypointsChange([
-          ...waypoints,
-          {
-            order: waypoints.length + 1,
-            lat: parseFloat(e.latlng.lat.toFixed(6)),
-            lng: parseFloat(e.latlng.lng.toFixed(6)),
-            title: waypoints.length === 0 ? "Start" : waypoints.length === 1 ? "End" : `Stop ${waypoints.length}`,
-            description: "",
-          },
-        ]);
-      });
-    }
+    // Click handler always reads from refs — never stale
+    mapRef.current.on("click", (e: any) => {
+      const current = waypointsRef.current;
+      const next = current.length; // 0-based: 0 = first stop
+      const autoTitle = next === 0 ? "Start" : `Stop ${next + 1}`;
+      onChangeRef.current([
+        ...current,
+        {
+          order: next + 1,
+          lat: parseFloat(e.latlng.lat.toFixed(6)),
+          lng: parseFloat(e.latlng.lng.toFixed(6)),
+          title: autoTitle,
+          description: "",
+        },
+      ]);
+    });
 
-    // Redraw markers
+    return () => {
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — map init runs once
+
+  // Redraw markers + polyline whenever waypoints change
+  useEffect(() => {
+    const L = (window as any).L;
+    if (!L || !mapRef.current) return;
+
+    // Remove old markers
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
+
+    // Remove old polyline
     if (polylineRef.current) { polylineRef.current.remove(); polylineRef.current = null; }
+
+    const total = waypoints.length;
 
     waypoints.forEach((wp, idx) => {
       const isStart = idx === 0;
-      const isEnd = idx === waypoints.length - 1 && waypoints.length > 1;
+      const isEnd = idx === total - 1 && total > 1;
       const color = isStart ? "#22c55e" : isEnd ? "#ef4444" : "#3b82f6";
-      // Build a combined icon: numbered circle + permanent label below
-      const label = wp.title || (idx === 0 ? "Start" : idx === waypoints.length - 1 ? "End" : `Stop ${idx + 1}`);
+      const label = wp.title || (isStart ? "Start" : `Stop ${idx + 1}`);
+
+      const circleHtml = [
+        '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">',
+          '<div style="background:', color, ';color:white;border-radius:50%;',
+            'width:28px;height:28px;display:flex;align-items:center;justify-content:center;',
+            'font-weight:700;font-size:12px;border:2px solid white;',
+            'box-shadow:0 2px 6px rgba(0,0,0,.35);flex-shrink:0">', String(idx + 1), '</div>',
+          '<div style="background:rgba(255,255,255,0.93);color:#111;font-size:10px;font-weight:600;',
+            'padding:1px 6px;border-radius:4px;white-space:nowrap;max-width:110px;overflow:hidden;',
+            'text-overflow:ellipsis;box-shadow:0 1px 3px rgba(0,0,0,.22);border:1px solid ', color, '44">', label, '</div>',
+        '</div>',
+      ].join("");
+
       const icon = L.divIcon({
         className: "",
-        html: `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
-          <div style="background:${color};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.35);flex-shrink:0">${idx + 1}</div>
-          <div style="background:rgba(255,255,255,0.92);color:#111;font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.25);max-width:100px;overflow:hidden;text-overflow:ellipsis;border:1px solid ${color}40">${label}</div>
-        </div>`,
-        iconSize: [28, 44],
+        html: circleHtml,
+        iconSize: [28, 46],
         iconAnchor: [14, 14],
-        popupAnchor: [0, -16],
+        popupAnchor: [0, -20],
       });
+
       const marker = L.marker([wp.lat, wp.lng], { icon, draggable: true })
-        .addTo(mapRef.current)
-        .bindTooltip(`${idx + 1}. ${label}`, { permanent: false });
+        .addTo(mapRef.current);
 
       marker.on("dragend", (e: any) => {
         const { lat, lng } = e.target.getLatLng();
-        const updated = waypoints.map((w, i) =>
+        const updated = waypointsRef.current.map((w, i) =>
           i === idx ? { ...w, lat: parseFloat(lat.toFixed(6)), lng: parseFloat(lng.toFixed(6)) } : w
         );
-        onWaypointsChange(updated);
+        onChangeRef.current(updated);
       });
 
       markersRef.current.push(marker);
     });
 
-    // Draw route polyline
-    if (waypoints.length > 1) {
-      polylineRef.current = L.polyline(waypoints.map(w => [w.lat, w.lng]), {
-        color: "#6366f1", weight: 3, opacity: 0.7, dashArray: "6 4",
-      }).addTo(mapRef.current);
+    // Always draw the connecting polyline (even for 2+ stops)
+    if (total > 1) {
+      polylineRef.current = L.polyline(
+        waypoints.map(w => [w.lat, w.lng]),
+        { color: "#6366f1", weight: 3, opacity: 0.8, dashArray: "7 5" }
+      ).addTo(mapRef.current);
     }
 
-    // Fit bounds
-    if (waypoints.length > 0) {
-      const bounds = L.latLngBounds(waypoints.map(w => [w.lat, w.lng]));
-      mapRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+    // Fit bounds only when first stop is added; afterwards let admin pan freely
+    if (total === 1) {
+      mapRef.current.setView([waypoints[0].lat, waypoints[0].lng], 16);
+    } else if (total === 2) {
+      mapRef.current.fitBounds(
+        L.latLngBounds(waypoints.map(w => [w.lat, w.lng])),
+        { padding: [50, 50], maxZoom: 16 }
+      );
     }
-  }, [waypoints, centerLat, centerLng]);
+    // 3+ stops: don't auto-zoom — let the admin keep their current view
+  }, [waypoints]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
-    };
-  }, []);
+  const count = waypoints.length;
 
   return (
     <div className="space-y-2">
-      <p className="text-xs text-muted-foreground">
-        Click the map to add waypoints in order. Drag markers to reposition. First = Start (green), Last = End (red).
-      </p>
-      <div ref={mapDivRef} style={{ height: 320, borderRadius: 8, border: "1px solid hsl(var(--border))", zIndex: 0 }} />
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          Click anywhere on the map to add stop #{count + 1}. Drag pins to reposition.
+          First pin = <span style={{ color: "#22c55e", fontWeight: 600 }}>Start</span>,
+          last pin = <span style={{ color: "#ef4444", fontWeight: 600 }}>End</span>.
+        </p>
+        {count > 0 && (
+          <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full ml-2 shrink-0">
+            {count} stop{count !== 1 ? "s" : ""}
+          </span>
+        )}
+      </div>
+      <div ref={mapDivRef} style={{ height: 400, borderRadius: 8, border: "1px solid hsl(var(--border))", zIndex: 0 }} />
     </div>
   );
 }
@@ -162,13 +204,13 @@ function WaypointList({ waypoints, onChange }: { waypoints: Waypoint[]; onChange
   );
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
       {waypoints.map((wp, idx) => (
         <div key={idx} className="flex gap-2 items-start rounded-lg border border-border bg-muted/30 p-2">
           <div className="flex items-center gap-1 pt-1">
             <GripVertical size={14} className="text-muted-foreground" />
             <span className="text-xs font-bold w-5 text-center"
-              style={{ color: idx === 0 ? "#22c55e" : idx === waypoints.length - 1 ? "#ef4444" : "#3b82f6" }}>
+              style={{ color: idx === 0 ? "#22c55e" : idx === waypoints.length - 1 && waypoints.length > 1 ? "#ef4444" : "#3b82f6" }}>
               {idx + 1}
             </span>
           </div>
@@ -176,7 +218,7 @@ function WaypointList({ waypoints, onChange }: { waypoints: Waypoint[]; onChange
             <Input
               value={wp.title}
               onChange={e => onChange(waypoints.map((w, i) => i === idx ? { ...w, title: e.target.value } : w))}
-              placeholder={idx === 0 ? "Start point name" : idx === waypoints.length - 1 ? "End point name" : `Stop ${idx + 1} name`}
+              placeholder={idx === 0 ? "Start point name" : `Stop ${idx + 1} name`}
               className="h-7 text-xs"
             />
             <Input
