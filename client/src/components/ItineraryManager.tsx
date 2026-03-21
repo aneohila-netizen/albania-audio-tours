@@ -67,22 +67,29 @@ function WaypointMap({
   useEffect(() => { waypointsRef.current = waypoints; }, [waypoints]);
   useEffect(() => { onChangeRef.current = onWaypointsChange; }, [onWaypointsChange]);
 
-  // Initialise map once
+  // Initialise map — re-runs when the div mounts or center changes.
+  // Always destroys any prior instance first to fix the blank-map bug
+  // that occurs when the editor is opened from a conditional render.
   useEffect(() => {
     if (!mapDivRef.current) return;
     const L = (window as any).L;
     if (!L) return;
-    if (mapRef.current) return; // already initialised
+
+    // Destroy any stale instance before creating a fresh one
+    if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
 
     mapRef.current = L.map(mapDivRef.current, { zoomControl: true }).setView([centerLat, centerLng], 15);
     L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
       attribution: "© CartoDB", maxZoom: 19,
     }).addTo(mapRef.current);
 
-    // Click handler always reads from refs — never stale
+    // invalidateSize ensures tiles load when the container was hidden on mount
+    setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 80);
+
+    // Click handler reads from refs — always sees current waypoints
     mapRef.current.on("click", (e: any) => {
       const current = waypointsRef.current;
-      const next = current.length; // 0-based: 0 = first stop
+      const next = current.length;
       const autoTitle = next === 0 ? "Start" : `Stop ${next + 1}`;
       onChangeRef.current([
         ...current,
@@ -99,8 +106,7 @@ function WaypointMap({
     return () => {
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally empty — map init runs once
+  }, [centerLat, centerLng]); // re-init if destination center changes
 
   // Redraw markers + polyline whenever waypoints change
   useEffect(() => {
