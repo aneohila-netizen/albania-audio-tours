@@ -3,6 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { useApp } from "@/App";
 import type { TourSite } from "@shared/schema";
 import AudioPlayer from "@/components/AudioPlayer";
+import ItineraryCard from "@/components/ItineraryCard";
 import VisitModal from "@/components/VisitModal";
 import MiniMap from "@/components/MiniMap";
 import { useState } from "react";
@@ -152,6 +153,9 @@ export default function SiteDetailPage() {
 
       {/* Audio player — primary focus: sits above description */}
       <AudioPlayer site={site} text={desc} onComplete={handleAudioComplete} />
+
+      {/* Tour Itineraries — below audio, above description */}
+      <ItineraryCard siteSlug={site.slug} centerLat={site.lat} centerLng={site.lng} />
 
       {/* Description */}
       <div className="prose prose-sm max-w-none">

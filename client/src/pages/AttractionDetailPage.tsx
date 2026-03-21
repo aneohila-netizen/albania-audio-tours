@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { TourSite, Attraction } from "@shared/schema";
 import { railwayFetch } from "@/lib/queryClient";
 import AudioPlayer from "@/components/AudioPlayer";
+import ItineraryCard from "@/components/ItineraryCard";
 import VisitModal from "@/components/VisitModal";
 import MiniMap from "@/components/MiniMap";
 import { useState } from "react";
@@ -185,6 +186,9 @@ export default function AttractionDetailPage() {
 
       {/* Audio player — primary focus: sits above description */}
       <AudioPlayer site={siteCompat} text={aDesc} onComplete={() => { if (!isVisited) handleMarkVisited(); }} />
+
+      {/* Tour Itineraries — below audio, above description */}
+      <ItineraryCard siteSlug={attraction.slug} centerLat={attraction.lat} centerLng={attraction.lng} />
 
       {/* Description */}
       <div className="prose prose-sm max-w-none">

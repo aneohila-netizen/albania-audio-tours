@@ -3,6 +3,7 @@ import path from "path";
 import type {
   TourSite, UserProgress, InsertUserProgress, InsertTourSite,
   Attraction, InsertAttraction,
+  Itinerary, InsertItinerary,
 } from "@shared/schema";
 
 // ─── Interface ────────────────────────────────────────────────────────────────
@@ -22,6 +23,12 @@ export interface IStorage {
   createAttraction(data: InsertAttraction): Promise<Attraction>;
   updateAttraction(id: number, data: Partial<InsertAttraction>): Promise<Attraction | undefined>;
   deleteAttraction(id: number): Promise<boolean>;
+  // Itineraries
+  getItinerariesBySite(siteSlug: string): Promise<Itinerary[]>;
+  getItineraryById(id: number): Promise<Itinerary | undefined>;
+  createItinerary(data: InsertItinerary): Promise<Itinerary>;
+  updateItinerary(id: number, data: Partial<InsertItinerary>): Promise<Itinerary | undefined>;
+  deleteItinerary(id: number): Promise<boolean>;
   // Progress
   getProgress(sessionId: string): Promise<UserProgress[]>;
   addProgress(data: InsertUserProgress): Promise<UserProgress>;
@@ -146,6 +153,21 @@ class PgStorage implements IStorage {
         site_id INTEGER NOT NULL,
         visited_at TIMESTAMP DEFAULT NOW(),
         points_earned INTEGER NOT NULL DEFAULT 0
+      );
+
+      CREATE TABLE IF NOT EXISTS itineraries (
+        id SERIAL PRIMARY KEY,
+        site_slug TEXT NOT NULL,
+        entity_type TEXT NOT NULL DEFAULT 'site',
+        name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        instructions TEXT NOT NULL DEFAULT '',
+        duration_minutes INTEGER NOT NULL DEFAULT 60,
+        distance_km REAL DEFAULT 0,
+        difficulty TEXT NOT NULL DEFAULT 'easy',
+        waypoints TEXT NOT NULL DEFAULT '[]',
+        is_published BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TEXT NOT NULL DEFAULT 'now'
       );
     `);
 
@@ -465,6 +487,84 @@ class PgStorage implements IStorage {
     `);
     return rows.map((r: any) => ({ sessionId: r.session_id, totalPoints: parseInt(r.total_points), visitCount: parseInt(r.visit_count) }));
   }
+
+  // ── Itineraries ────────────────────────────────────────────────────
+  private rowToItinerary(r: any): Itinerary {
+    return {
+      id: r.id,
+      siteSlug: r.site_slug,
+      entityType: r.entity_type || 'site',
+      name: r.name,
+      description: r.description || '',
+      instructions: r.instructions || '',
+      durationMinutes: r.duration_minutes || 60,
+      distanceKm: r.distance_km ? parseFloat(r.distance_km) : 0,
+      difficulty: r.difficulty || 'easy',
+      waypoints: r.waypoints || '[]',
+      isPublished: r.is_published ?? true,
+      createdAt: r.created_at || 'now',
+    };
+  }
+
+  async getItinerariesBySite(siteSlug: string): Promise<Itinerary[]> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      'SELECT * FROM itineraries WHERE site_slug = $1 ORDER BY id',
+      [siteSlug]
+    );
+    return rows.map(this.rowToItinerary);
+  }
+
+  async getItineraryById(id: number): Promise<Itinerary | undefined> {
+    await this.ready;
+    const { rows } = await this.pool.query('SELECT * FROM itineraries WHERE id = $1', [id]);
+    return rows[0] ? this.rowToItinerary(rows[0]) : undefined;
+  }
+
+  async createItinerary(data: InsertItinerary): Promise<Itinerary> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      `INSERT INTO itineraries (site_slug, entity_type, name, description, instructions,
+        duration_minutes, distance_km, difficulty, waypoints, is_published, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [
+        data.siteSlug, data.entityType || 'site', data.name,
+        data.description || '', data.instructions || '',
+        data.durationMinutes || 60, data.distanceKm || 0,
+        data.difficulty || 'easy', data.waypoints || '[]',
+        data.isPublished ?? true,
+        new Date().toISOString(),
+      ]
+    );
+    return this.rowToItinerary(rows[0]);
+  }
+
+  async updateItinerary(id: number, data: Partial<InsertItinerary>): Promise<Itinerary | undefined> {
+    await this.ready;
+    const fields: string[] = [];
+    const vals: any[] = [];
+    let i = 1;
+    if (data.name !== undefined) { fields.push(`name=$${i++}`); vals.push(data.name); }
+    if (data.description !== undefined) { fields.push(`description=$${i++}`); vals.push(data.description); }
+    if (data.instructions !== undefined) { fields.push(`instructions=$${i++}`); vals.push(data.instructions); }
+    if (data.durationMinutes !== undefined) { fields.push(`duration_minutes=$${i++}`); vals.push(data.durationMinutes); }
+    if (data.distanceKm !== undefined) { fields.push(`distance_km=$${i++}`); vals.push(data.distanceKm); }
+    if (data.difficulty !== undefined) { fields.push(`difficulty=$${i++}`); vals.push(data.difficulty); }
+    if (data.waypoints !== undefined) { fields.push(`waypoints=$${i++}`); vals.push(data.waypoints); }
+    if (data.isPublished !== undefined) { fields.push(`is_published=$${i++}`); vals.push(data.isPublished); }
+    if (!fields.length) return this.getItineraryById(id);
+    vals.push(id);
+    const { rows } = await this.pool.query(
+      `UPDATE itineraries SET ${fields.join(',')} WHERE id=$${i} RETURNING *`, vals
+    );
+    return rows[0] ? this.rowToItinerary(rows[0]) : undefined;
+  }
+
+  async deleteItinerary(id: number): Promise<boolean> {
+    await this.ready;
+    const { rowCount } = await this.pool.query('DELETE FROM itineraries WHERE id=$1', [id]);
+    return (rowCount ?? 0) > 0;
+  }
 }
 
 // ─── File-based / memory storage (local dev fallback) ─────────────────────────
@@ -574,6 +674,27 @@ export class MemStorage implements IStorage {
       results.push({ sessionId, totalPoints: records.reduce((s, r) => s + r.pointsEarned, 0), visitCount: records.length });
     }
     return results.sort((a, b) => b.totalPoints - a.totalPoints).slice(0, 10);
+  }
+
+  // MemStorage itineraries (in-memory only, resets on restart)
+  private itineraries: Itinerary[] = [];
+  async getItinerariesBySite(siteSlug: string) { return this.itineraries.filter(i => i.siteSlug === siteSlug); }
+  async getItineraryById(id: number) { return this.itineraries.find(i => i.id === id); }
+  async createItinerary(data: InsertItinerary): Promise<Itinerary> {
+    const item: Itinerary = { id: Date.now(), siteSlug: data.siteSlug, entityType: data.entityType || 'site', name: data.name, description: data.description || '', instructions: data.instructions || '', durationMinutes: data.durationMinutes || 60, distanceKm: data.distanceKm ?? 0, difficulty: data.difficulty || 'easy', waypoints: data.waypoints || '[]', isPublished: data.isPublished ?? true, createdAt: new Date().toISOString() };
+    this.itineraries.push(item);
+    return item;
+  }
+  async updateItinerary(id: number, data: Partial<InsertItinerary>): Promise<Itinerary | undefined> {
+    const idx = this.itineraries.findIndex(i => i.id === id);
+    if (idx === -1) return undefined;
+    this.itineraries[idx] = { ...this.itineraries[idx], ...data } as Itinerary;
+    return this.itineraries[idx];
+  }
+  async deleteItinerary(id: number): Promise<boolean> {
+    const before = this.itineraries.length;
+    this.itineraries = this.itineraries.filter(i => i.id !== id);
+    return this.itineraries.length < before;
   }
 }
 

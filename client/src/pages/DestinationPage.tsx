@@ -5,6 +5,7 @@ import type { TourSite, Attraction } from "@shared/schema";
 import { railwayFetch } from "@/lib/queryClient";
 import MiniMap from "@/components/MiniMap";
 import AudioPlayer from "@/components/AudioPlayer";
+import ItineraryCard from "@/components/ItineraryCard";
 import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb, Navigation } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLangText } from "@/lib/i18n";
@@ -130,6 +131,9 @@ export default function DestinationPage() {
 
       {/* Audio Guide — primary focus: sits above description */}
       <AudioPlayer site={dest} />
+
+      {/* Tour Itineraries — below audio, above description */}
+      <ItineraryCard siteSlug={dest.slug} centerLat={dest.lat} centerLng={dest.lng} />
 
       {/* Description */}
       <div className="prose prose-sm max-w-none">

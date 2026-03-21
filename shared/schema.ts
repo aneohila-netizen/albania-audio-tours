@@ -100,6 +100,29 @@ export const attractions = pgTable("attractions", {
   visitDuration: integer("visit_duration").notNull().default(30),
 });
 
+// ── Tour Itineraries ──────────────────────────────────────────────────────────
+// Each itinerary belongs to a site (destination, tour site, or attraction page)
+// via siteSlug. Multiple itineraries per page are supported.
+// Waypoints are stored as JSON array: [{lat, lng, title, description, order}]
+export const itineraries = pgTable("itineraries", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  siteSlug: text("site_slug").notNull(),     // matches tourSites.slug or attractions.slug
+  entityType: text("entity_type").notNull().default("site"), // "site" | "attraction"
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  instructions: text("instructions").notNull().default(""),  // visitor instructions
+  durationMinutes: integer("duration_minutes").notNull().default(60),
+  distanceKm: real("distance_km").default(0),
+  difficulty: text("difficulty").notNull().default("easy"),  // easy | moderate | hard
+  waypoints: text("waypoints").notNull().default("[]"), // JSON: [{lat,lng,title,description,order}]
+  isPublished: boolean("is_published").notNull().default(true),
+  createdAt: text("created_at").notNull().default("now"),
+});
+
+export const insertItinerarySchema = createInsertSchema(itineraries).omit({ id: true });
+export type Itinerary = typeof itineraries.$inferSelect;
+export type InsertItinerary = z.infer<typeof insertItinerarySchema>;
+
 export const userProgress = pgTable("user_progress", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   sessionId: text("session_id").notNull(),

@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, useParams } from "wouter";
 import {
   ArrowLeft, Save, Upload, Trash2, Play, Pause, Loader2,
-  MapPin, Globe, Music, Image, Info
+  MapPin, Globe, Music, Image, Info, Route
 } from "lucide-react";
+import ItineraryManager from "@/components/ItineraryManager";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -356,6 +357,10 @@ export default function AdminSiteEditorPage() {
             <TabsTrigger value="media" className="gap-1.5 text-xs">
               <Image className="w-3.5 h-3.5" /> Media
             </TabsTrigger>
+            <TabsTrigger value="itinerary" className="gap-1.5 text-xs" disabled={isNew}>
+              <Route className="w-3.5 h-3.5" /> Itinerary
+              {isNew && <span className="text-muted-foreground/60 ml-1">(save first)</span>}
+            </TabsTrigger>
           </TabsList>
 
           {/* ── Details tab ─────────────────────────────────────────── */}
@@ -578,6 +583,18 @@ export default function AdminSiteEditorPage() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* ── Itinerary tab ────────────────────────── */}
+          <TabsContent value="itinerary" className="space-y-5">
+            {!isNew && (
+              <ItineraryManager
+                siteSlug={form.slug}
+                entityType="site"
+                centerLat={isNaN(parseFloat(form.lat)) ? 41.3275 : parseFloat(form.lat)}
+                centerLng={isNaN(parseFloat(form.lng)) ? 19.8187 : parseFloat(form.lng)}
+              />
+            )}
           </TabsContent>
         </Tabs>
 

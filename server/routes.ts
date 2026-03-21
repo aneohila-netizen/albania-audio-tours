@@ -719,5 +719,47 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   );
 
+  // ── Itinerary routes (public GET + admin CUD) ───────────────────────────
+  // Public: GET /api/itineraries/:siteSlug  — returns published itineraries for a page
+  app.get("/api/itineraries/:siteSlug", async (req, res) => {
+    const { siteSlug } = req.params;
+    const all = await storage.getItinerariesBySite(siteSlug);
+    res.json(all.filter(i => i.isPublished));
+  });
+
+  // Admin: GET all (including unpublished)
+  app.get("/api/admin/itineraries/:siteSlug", requireAdmin, async (req, res) => {
+    const items = await storage.getItinerariesBySite(req.params.siteSlug);
+    res.json(items);
+  });
+
+  // Admin: Create
+  app.post("/api/admin/itineraries", requireAdmin, async (req, res) => {
+    try {
+      const item = await storage.createItinerary(req.body);
+      res.json(item);
+    } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // Admin: Update
+  app.put("/api/admin/itineraries/:id", requireAdmin, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const updated = await storage.updateItinerary(id, req.body);
+    if (!updated) return res.status(404).json({ error: "Not found" });
+    res.json(updated);
+  });
+
+  // Admin: Delete
+  app.delete("/api/admin/itineraries/:id", requireAdmin, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const ok = await storage.deleteItinerary(id);
+    if (!ok) return res.status(404).json({ error: "Not found" });
+    res.json({ success: true });
+  });
+
   return httpServer;
 }

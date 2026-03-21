@@ -16,7 +16,7 @@ import {
   Lock, Eye, EyeOff, Plus, Pencil, Trash2, LogOut,
   MapPin, Globe, Music, Image, Info, ArrowLeft, Save,
   Upload, Play, Pause, Loader2, X, Link, CheckCircle2,
-  LayoutList, Star,
+  LayoutList, Star, Route,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,7 @@ import { setAdminToken, getAdminToken, clearAdminToken } from "@/lib/adminAuth";
 import { STATIC_SITES, DESTINATIONS, ATTRACTIONS } from "@/lib/staticData";
 import type { Destination, Attraction } from "@/lib/staticData";
 import type { TourSite } from "@shared/schema";
+import ItineraryManager from "@/components/ItineraryManager";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 const ADMIN_PASSWORD = "AlbaTour2026!";
@@ -1383,6 +1384,10 @@ function EditorView({
               {isNew && <span className="text-muted-foreground/60 ml-1">(save first)</span>}
             </TabsTrigger>
             <TabsTrigger value="media" className="gap-1.5 text-xs"><Image className="w-3.5 h-3.5" /> Media</TabsTrigger>
+            <TabsTrigger value="itinerary" className="gap-1.5 text-xs" disabled={isNew}>
+              <Route className="w-3.5 h-3.5" /> Itinerary
+              {isNew && <span className="text-muted-foreground/60 ml-1">(save first)</span>}
+            </TabsTrigger>
             <TabsTrigger value="preview" className="gap-1.5 text-xs"><Eye className="w-3.5 h-3.5" /> Preview</TabsTrigger>
           </TabsList>
 
@@ -1546,6 +1551,18 @@ function EditorView({
           {/* Media */}
           <TabsContent value="media" className="space-y-5">
             <ImageUploadCard imageUrl={form.imageUrl} onUpdate={url => set("imageUrl", url)} />
+          </TabsContent>
+
+          {/* Itinerary */}
+          <TabsContent value="itinerary" className="space-y-5">
+            {!isNew && (
+              <ItineraryManager
+                siteSlug={form.slug}
+                entityType="site"
+                centerLat={isNaN(parseFloat(form.lat)) ? 41.3275 : parseFloat(form.lat)}
+                centerLng={isNaN(parseFloat(form.lng)) ? 19.8187 : parseFloat(form.lng)}
+              />
+            )}
           </TabsContent>
 
           {/* Preview */}
