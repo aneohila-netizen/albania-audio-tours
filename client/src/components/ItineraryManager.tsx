@@ -97,15 +97,21 @@ function WaypointMap({
       const isStart = idx === 0;
       const isEnd = idx === waypoints.length - 1 && waypoints.length > 1;
       const color = isStart ? "#22c55e" : isEnd ? "#ef4444" : "#3b82f6";
+      // Build a combined icon: numbered circle + permanent label below
+      const label = wp.title || (idx === 0 ? "Start" : idx === waypoints.length - 1 ? "End" : `Stop ${idx + 1}`);
       const icon = L.divIcon({
         className: "",
-        html: `<div style="background:${color};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.35)">${idx + 1}</div>`,
-        iconSize: [28, 28],
+        html: `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div style="background:${color};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.35);flex-shrink:0">${idx + 1}</div>
+          <div style="background:rgba(255,255,255,0.92);color:#111;font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.25);max-width:100px;overflow:hidden;text-overflow:ellipsis;border:1px solid ${color}40">${label}</div>
+        </div>`,
+        iconSize: [28, 44],
         iconAnchor: [14, 14],
+        popupAnchor: [0, -16],
       });
       const marker = L.marker([wp.lat, wp.lng], { icon, draggable: true })
         .addTo(mapRef.current)
-        .bindTooltip(`${idx + 1}. ${wp.title}`, { permanent: false });
+        .bindTooltip(`${idx + 1}. ${label}`, { permanent: false });
 
       marker.on("dragend", (e: any) => {
         const { lat, lng } = e.target.getLatLng();

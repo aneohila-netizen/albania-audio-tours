@@ -1,8 +1,9 @@
 /**
  * ItineraryCard — Frontend component displayed to visitors.
- * Shows one or more tour itineraries for a destination/site/attraction.
- * Each card is collapsible, shows a Leaflet route map and numbered waypoints.
- * Positioned below the Audio Guide and above the text description.
+ * Features:
+ * - Permanent label below each numbered pin on the map
+ * - Click any pin → popup with "Get directions from my location" link
+ * - Multiple itineraries per page (collapsible)
  */
 import { useState, useEffect, useRef } from "react";
 import { Map, ChevronDown, ChevronUp, Clock, Route, Navigation, Flag } from "lucide-react";
@@ -28,8 +29,12 @@ interface Itinerary {
   waypoints: string;
 }
 
-// ── Mini route map for a single itinerary ─────────────────────────────────────
-function RouteMap({ waypoints, centerLat, centerLng }: { waypoints: Waypoint[]; centerLat: number; centerLng: number }) {
+// ── Route map with permanent labels + per-pin directions popup ────────────────
+function RouteMap({ waypoints, centerLat, centerLng }: {
+  waypoints: Waypoint[];
+  centerLat: number;
+  centerLng: number;
+}) {
   const divRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
 
@@ -51,48 +56,112 @@ function RouteMap({ waypoints, centerLat, centerLng }: { waypoints: Waypoint[]; 
     }).setView(center, 15);
 
     L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-      attribution: "© CartoDB", maxZoom: 19,
+      attribution: "© CartoDB",
+      maxZoom: 19,
     }).addTo(mapRef.current);
 
     waypoints.forEach((wp, idx) => {
+      const total = waypoints.length;
       const isStart = idx === 0;
-      const isEnd = idx === waypoints.length - 1 && waypoints.length > 1;
+      const isEnd = idx === total - 1 && total > 1;
       const color = isStart ? "#22c55e" : isEnd ? "#ef4444" : "#3b82f6";
+      const label = wp.title || (isStart ? "Start" : isEnd ? "End" : ("Stop " + (idx + 1)));
+
+      // Icon = numbered circle + text label below (always visible)
+      const circleHtml = [
+        '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">',
+          '<div style="background:', color, ';color:white;border-radius:50%;',
+            'width:28px;height:28px;display:flex;align-items:center;justify-content:center;',
+            'font-weight:700;font-size:12px;border:2px solid white;',
+            'box-shadow:0 2px 6px rgba(0,0,0,.4);flex-shrink:0">',
+            String(idx + 1),
+          '</div>',
+          '<div style="background:rgba(255,255,255,0.95);color:#111;font-size:10px;font-weight:600;',
+            'padding:1px 6px;border-radius:4px;white-space:nowrap;',
+            'box-shadow:0 1px 3px rgba(0,0,0,.25);border:1px solid ', color, '55;',
+            'max-width:110px;overflow:hidden;text-overflow:ellipsis">',
+            label,
+          '</div>',
+        '</div>',
+      ].join('');
+
       const icon = L.divIcon({
         className: "",
-        html: `<div style="background:${color};color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid white;box-shadow:0 2px 5px rgba(0,0,0,.3)">${idx + 1}</div>`,
-        iconSize: [26, 26], iconAnchor: [13, 13],
+        html: circleHtml,
+        iconSize: [28, 46],
+        iconAnchor: [14, 14],
+        popupAnchor: [0, -20],
       });
+
+      // Popup with "Get directions from my location" — uses navigator.geolocation
+      const destUrl = "https://www.google.com/maps/dir/?api=1&destination=" + wp.lat + "," + wp.lng + "&travelmode=walking";
+      const myLocUrl = "https://www.google.com/maps/dir/My+Location/" + wp.lat + "," + wp.lng;
+      const popupHtml = [
+        '<div style="min-width:180px;font-family:sans-serif">',
+          '<div style="font-weight:700;font-size:13px;margin-bottom:4px">',
+            '<span style="display:inline-block;background:', color, ';color:white;',
+              'border-radius:50%;width:20px;height:20px;text-align:center;line-height:20px;',
+              'font-size:11px;margin-right:5px">', String(idx + 1), '</span>',
+            label,
+          '</div>',
+          wp.description
+            ? '<div style="font-size:11px;color:#666;margin-bottom:8px">' + wp.description + '</div>'
+            : '',
+          '<a href="', myLocUrl, '" target="_blank" rel="noopener noreferrer" ',
+            'style="display:flex;align-items:center;gap:5px;background:#C0392B;color:white;',
+            'padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;',
+            'text-decoration:none;margin-bottom:4px;justify-content:center">',
+            '&#x1F4CD; Get directions from my location',
+          '</a>',
+        '</div>',
+      ].join('');
+
       L.marker([wp.lat, wp.lng], { icon })
         .addTo(mapRef.current)
-        .bindTooltip(`${idx + 1}. ${wp.title}`, { permanent: false, direction: "top" });
+        .bindPopup(popupHtml, { maxWidth: 240 });
     });
 
+    // Dashed route polyline
     if (waypoints.length > 1) {
-      L.polyline(waypoints.map(w => [w.lat, w.lng]), {
-        color: "#6366f1", weight: 3, opacity: 0.7, dashArray: "6 4",
-      }).addTo(mapRef.current);
+      L.polyline(
+        waypoints.map(function(w) { return [w.lat, w.lng]; }),
+        { color: "#6366f1", weight: 3, opacity: 0.7, dashArray: "6 4" }
+      ).addTo(mapRef.current);
     }
 
     if (waypoints.length > 0) {
       mapRef.current.fitBounds(
-        L.latLngBounds(waypoints.map(w => [w.lat, w.lng])),
-        { padding: [30, 30], maxZoom: 16 }
+        L.latLngBounds(waypoints.map(function(w) { return [w.lat, w.lng]; })),
+        { padding: [40, 40], maxZoom: 16 }
       );
     }
 
-    return () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
+    return function() {
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+    };
   }, [waypoints]);
 
-  return <div ref={divRef} style={{ height: 240, borderRadius: 8, zIndex: 0 }} />;
+  return (
+    <div>
+      <p style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", marginBottom: 6 }}>
+        Tap any pin to get directions from your current location.
+      </p>
+      <div ref={divRef} style={{ height: 280, borderRadius: 8, border: "1px solid hsl(var(--border))", zIndex: 0 }} />
+    </div>
+  );
 }
 
 // ── Single itinerary card ─────────────────────────────────────────────────────
 function SingleItinerary({ it, centerLat, centerLng, defaultOpen }: {
-  it: Itinerary; centerLat: number; centerLng: number; defaultOpen?: boolean;
+  it: Itinerary;
+  centerLat: number;
+  centerLng: number;
+  defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
-  const waypoints: Waypoint[] = (() => { try { return JSON.parse(it.waypoints) || []; } catch { return []; } })();
+  const waypoints: Waypoint[] = (() => {
+    try { return JSON.parse(it.waypoints) || []; } catch { return []; }
+  })();
 
   const diffColor = it.difficulty === "easy"
     ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
@@ -100,16 +169,16 @@ function SingleItinerary({ it, centerLat, centerLng, defaultOpen }: {
     ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
     : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
 
-  // Google Maps directions URL using all waypoints
-  const mapsUrl = waypoints.length >= 2
-    ? `https://www.google.com/maps/dir/${waypoints.map(w => `${w.lat},${w.lng}`).join("/")}`
+  // Full route in Google Maps (all waypoints)
+  const fullRouteUrl = waypoints.length >= 2
+    ? "https://www.google.com/maps/dir/" + waypoints.map(function(w) { return w.lat + "," + w.lng; }).join("/")
     : null;
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
-      {/* Header — always visible */}
+      {/* Header */}
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setOpen(function(o) { return !o; })}
         className="w-full flex items-start gap-3 p-4 text-left hover:bg-muted/40 transition-colors"
         aria-expanded={open}
       >
@@ -119,7 +188,7 @@ function SingleItinerary({ it, centerLat, centerLng, defaultOpen }: {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-sm">{it.name}</span>
-            <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full ${diffColor}`}>
+            <span className={"text-[11px] font-medium px-1.5 py-0.5 rounded-full " + diffColor}>
               {it.difficulty}
             </span>
           </div>
@@ -128,14 +197,16 @@ function SingleItinerary({ it, centerLat, centerLng, defaultOpen }: {
             {it.distanceKm ? <span className="flex items-center gap-1"><Route size={11} /> {it.distanceKm} km</span> : null}
             <span className="flex items-center gap-1"><Flag size={11} /> {waypoints.length} stops</span>
           </div>
-          {it.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</p>}
+          {it.description && (
+            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</p>
+          )}
         </div>
         <div className="shrink-0 mt-1">
           {open ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
         </div>
       </button>
 
-      {/* Expanded content */}
+      {/* Expanded */}
       {open && (
         <div className="border-t border-border space-y-4 p-4">
           {/* Visitor instructions */}
@@ -148,36 +219,53 @@ function SingleItinerary({ it, centerLat, centerLng, defaultOpen }: {
             </div>
           )}
 
-          {/* Route map */}
+          {/* Route map with labeled pins + per-pin direction popups */}
           {waypoints.length > 0 && (
             <RouteMap waypoints={waypoints} centerLat={centerLat} centerLng={centerLng} />
           )}
 
-          {/* Waypoint list */}
+          {/* Waypoint list with per-stop directions link */}
           {waypoints.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-semibold text-foreground">Route stops</p>
-              <div className="space-y-1.5">
-                {waypoints.map((wp, i) => {
+              <div className="space-y-2">
+                {waypoints.map(function(wp, i) {
                   const isStart = i === 0;
                   const isEnd = i === waypoints.length - 1 && waypoints.length > 1;
                   const dotColor = isStart ? "#22c55e" : isEnd ? "#ef4444" : "#3b82f6";
+                  const dirUrl = "https://www.google.com/maps/dir/My+Location/" + wp.lat + "," + wp.lng;
                   return (
-                    <div key={i} className="flex items-start gap-2.5">
+                    <div key={i} className="flex items-start gap-2.5 rounded-lg border border-border/40 p-2.5 hover:bg-muted/30 transition-colors">
                       <span
                         className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0 mt-0.5"
                         style={{ background: dotColor }}
                       >
                         {i + 1}
                       </span>
-                      <div className="flex-1">
-                        <span className="text-sm font-medium">{wp.title}</span>
-                        {(isStart || isEnd) && (
-                          <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide"
-                            style={{ color: dotColor }}>
-                            {isStart ? "Start" : "End"}
-                          </span>
-                        )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div>
+                            <span className="text-sm font-medium">{wp.title}</span>
+                            {(isStart || isEnd) && (
+                              <span
+                                className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide"
+                                style={{ color: dotColor }}
+                              >
+                                {isStart ? "Start" : "End"}
+                              </span>
+                            )}
+                          </div>
+                          {/* Per-stop directions from my location */}
+                          <a
+                            href={dirUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline shrink-0"
+                          >
+                            <Navigation size={10} />
+                            Directions
+                          </a>
+                        </div>
                         {wp.description && (
                           <p className="text-xs text-muted-foreground mt-0.5">{wp.description}</p>
                         )}
@@ -189,16 +277,16 @@ function SingleItinerary({ it, centerLat, centerLng, defaultOpen }: {
             </div>
           )}
 
-          {/* Open in Maps */}
-          {mapsUrl && (
+          {/* Full route button */}
+          {fullRouteUrl && (
             <a
-              href={mapsUrl}
+              href={fullRouteUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg border border-border hover:bg-muted transition-colors text-sm font-medium text-foreground"
             >
               <Navigation size={14} />
-              Open route in Google Maps
+              Open full route in Google Maps
             </a>
           )}
         </div>
@@ -207,7 +295,7 @@ function SingleItinerary({ it, centerLat, centerLng, defaultOpen }: {
   );
 }
 
-// ── Main ItineraryCard — fetches all itineraries for a slug ───────────────────
+// ── Main ItineraryCard ────────────────────────────────────────────────────────
 interface Props {
   siteSlug: string;
   centerLat?: number;
@@ -218,15 +306,14 @@ export default function ItineraryCard({ siteSlug, centerLat = 41.3275, centerLng
   const [itineraries, setItineraries] = useState<Itinerary[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
+  useEffect(function() {
     if (!siteSlug) return;
-    fetch(`${RAILWAY_URL}/api/itineraries/${encodeURIComponent(siteSlug)}`)
-      .then(r => r.ok ? r.json() : [])
-      .then(data => { setItineraries(data || []); setLoaded(true); })
-      .catch(() => setLoaded(true));
+    fetch(RAILWAY_URL + "/api/itineraries/" + encodeURIComponent(siteSlug))
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .then(function(data) { setItineraries(data || []); setLoaded(true); })
+      .catch(function() { setLoaded(true); });
   }, [siteSlug]);
 
-  // Don't render anything until loaded (avoid flicker)
   if (!loaded || itineraries.length === 0) return null;
 
   return (
@@ -234,18 +321,20 @@ export default function ItineraryCard({ siteSlug, centerLat = 41.3275, centerLng
       <div className="flex items-center gap-2">
         <Map size={15} className="text-primary" />
         <h2 className="text-sm font-semibold">
-          {itineraries.length === 1 ? "Tour Itinerary" : `Tour Itineraries (${itineraries.length})`}
+          {itineraries.length === 1 ? "Tour Itinerary" : "Tour Itineraries (" + itineraries.length + ")"}
         </h2>
       </div>
-      {itineraries.map((it, idx) => (
-        <SingleItinerary
-          key={it.id}
-          it={it}
-          centerLat={centerLat}
-          centerLng={centerLng}
-          defaultOpen={idx === 0 && itineraries.length === 1}
-        />
-      ))}
+      {itineraries.map(function(it, idx) {
+        return (
+          <SingleItinerary
+            key={it.id}
+            it={it}
+            centerLat={centerLat}
+            centerLng={centerLng}
+            defaultOpen={idx === 0 && itineraries.length === 1}
+          />
+        );
+      })}
     </div>
   );
 }
