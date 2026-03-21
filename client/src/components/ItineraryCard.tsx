@@ -38,18 +38,19 @@ function RouteMap({ waypoints, centerLat, centerLng }: {
   const divRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
 
-  useEffect(() => {
-    if (!divRef.current) return;
+  const mapInitedRef = useRef(false);
+
+  function buildMap(div: HTMLDivElement) {
     const L = (window as any).L;
     if (!L) return;
-
     if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+    mapInitedRef.current = false;
 
     const center: [number, number] = waypoints.length > 0
       ? [waypoints[0].lat, waypoints[0].lng]
       : [centerLat, centerLng];
 
-    mapRef.current = L.map(divRef.current, {
+    mapRef.current = L.map(div, {
       zoomControl: true,
       dragging: true,
       scrollWheelZoom: false,
@@ -136,8 +137,32 @@ function RouteMap({ waypoints, centerLat, centerLng }: {
       );
     }
 
+    mapInitedRef.current = true;
+  }
+
+  useEffect(() => {
+    const div = divRef.current;
+    if (!div) return;
+    let observer: ResizeObserver | null = null;
+
+    const tryInit = () => {
+      // Only init when div has real dimensions (not hidden by display:none in tabs)
+      if (div.offsetWidth > 0 && div.offsetHeight > 0 && !mapInitedRef.current) {
+        buildMap(div); // builds map + draws markers + polyline + fitBounds
+        if (observer) { observer.disconnect(); observer = null; }
+      }
+    };
+
+    tryInit();
+    if (!mapInitedRef.current && typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(tryInit);
+      observer.observe(div);
+    }
+
     return function() {
+      if (observer) observer.disconnect();
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+      mapInitedRef.current = false;
     };
   }, [waypoints]);
 

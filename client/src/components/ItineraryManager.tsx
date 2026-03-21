@@ -67,26 +67,20 @@ function WaypointMap({
   useEffect(() => { waypointsRef.current = waypoints; }, [waypoints]);
   useEffect(() => { onChangeRef.current = onWaypointsChange; }, [onWaypointsChange]);
 
-  // Initialise map — re-runs when the div mounts or center changes.
-  // Always destroys any prior instance first to fix the blank-map bug
-  // that occurs when the editor is opened from a conditional render.
-  useEffect(() => {
-    if (!mapDivRef.current) return;
+  // Track whether map has been successfully initialised
+  const mapInitedRef = useRef(false);
+
+  function initMap(div: HTMLDivElement) {
     const L = (window as any).L;
     if (!L) return;
-
-    // Destroy any stale instance before creating a fresh one
     if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+    mapInitedRef.current = false;
 
-    mapRef.current = L.map(mapDivRef.current, { zoomControl: true }).setView([centerLat, centerLng], 15);
+    mapRef.current = L.map(div, { zoomControl: true }).setView([centerLat, centerLng], 15);
     L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
       attribution: "© CartoDB", maxZoom: 19,
     }).addTo(mapRef.current);
 
-    // invalidateSize ensures tiles load when the container was hidden on mount
-    setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 80);
-
-    // Click handler reads from refs — always sees current waypoints
     mapRef.current.on("click", (e: any) => {
       const current = waypointsRef.current;
       const next = current.length;
@@ -103,9 +97,39 @@ function WaypointMap({
       ]);
     });
 
-    return () => {
-      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+    mapInitedRef.current = true;
+  }
+
+  // Use ResizeObserver to init Leaflet only once the div has real dimensions.
+  // This reliably handles conditional renders, Shadcn tabs (display:none), etc.
+  useEffect(() => {
+    const div = mapDivRef.current;
+    if (!div) return;
+
+    let observer: ResizeObserver | null = null;
+
+    const tryInit = () => {
+      if (div.offsetWidth > 0 && div.offsetHeight > 0 && !mapInitedRef.current) {
+        initMap(div);
+        if (observer) { observer.disconnect(); observer = null; }
+      }
     };
+
+    // Try immediately (works if already visible)
+    tryInit();
+
+    // Also watch for when the container becomes visible (tab switch, conditional render)
+    if (!mapInitedRef.current && typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(tryInit);
+      observer.observe(div);
+    }
+
+    return () => {
+      if (observer) observer.disconnect();
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+      mapInitedRef.current = false;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [centerLat, centerLng]); // re-init if destination center changes
 
   // Redraw markers + polyline whenever waypoints change
