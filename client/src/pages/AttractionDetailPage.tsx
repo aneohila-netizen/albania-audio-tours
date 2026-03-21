@@ -35,6 +35,7 @@ export default function AttractionDetailPage() {
   const [, navigate] = useLocation();
   const { lang, visitedSiteIds, markVisited } = useApp();
   const [showModal, setShowModal] = useState(false);
+  const [showFullDesc, setShowFullDesc] = useState(false);
 
   // Fetch destination directly from Railway (bypasses Perplexity proxy)
   const { data: dest } = useQuery<TourSite>({
@@ -190,9 +191,17 @@ export default function AttractionDetailPage() {
       {/* Tour Itineraries — below audio, above description */}
       <ItineraryCard siteSlug={attraction.slug} centerLat={attraction.lat} centerLng={attraction.lng} />
 
-      {/* Description */}
-      <div className="prose prose-sm max-w-none">
-        <p className="text-base leading-relaxed text-foreground">{aDesc}</p>
+      {/* Description — collapsed by default */}
+      <div>
+        <p className={`text-base leading-relaxed text-foreground transition-all ${
+          showFullDesc ? "" : "line-clamp-4"
+        }`}>{aDesc}</p>
+        <button
+          onClick={() => setShowFullDesc(v => !v)}
+          className="mt-1.5 text-sm font-medium text-primary hover:underline"
+        >
+          {showFullDesc ? "Show less" : "Read more"}
+        </button>
       </div>
 
       {/* Fun fact */}

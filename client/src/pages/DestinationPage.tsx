@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useApp } from "@/App";
 import { useQuery } from "@tanstack/react-query";
@@ -30,6 +31,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
 export default function DestinationPage() {
   const [, params] = useRoute("/sites/:dest");
   const [, navigate] = useLocation();
+  const [showFullDesc, setShowFullDesc] = useState(false);
   const { lang, visitedSiteIds } = useApp();
 
   // Fetch destination directly from Railway (bypasses Perplexity proxy)
@@ -135,9 +137,17 @@ export default function DestinationPage() {
       {/* Tour Itineraries — below audio, above description */}
       <ItineraryCard siteSlug={dest.slug} centerLat={dest.lat} centerLng={dest.lng} />
 
-      {/* Description */}
-      <div className="prose prose-sm max-w-none">
-        <p className="text-base leading-relaxed text-foreground">{desc}</p>
+      {/* Description — collapsed by default */}
+      <div>
+        <p className={`text-base leading-relaxed text-foreground transition-all ${
+          showFullDesc ? "" : "line-clamp-4"
+        }`}>{desc}</p>
+        <button
+          onClick={() => setShowFullDesc(v => !v)}
+          className="mt-1.5 text-sm font-medium text-primary hover:underline"
+        >
+          {showFullDesc ? "Show less" : "Read more"}
+        </button>
       </div>
 
       {/* Attractions */}

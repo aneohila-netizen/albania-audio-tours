@@ -26,6 +26,7 @@ export default function SiteDetailPage() {
   const [, navigate] = useLocation();
   const { t, lang, visitedSiteIds, markVisited } = useApp();
   const [showModal, setShowModal] = useState(false);
+  const [showFullDesc, setShowFullDesc] = useState(false);
 
   const { data: site, isLoading } = useQuery<TourSite>({
     queryKey: ["/api/sites", params?.slug],
@@ -157,9 +158,17 @@ export default function SiteDetailPage() {
       {/* Tour Itineraries — below audio, above description */}
       <ItineraryCard siteSlug={site.slug} centerLat={site.lat} centerLng={site.lng} />
 
-      {/* Description */}
-      <div className="prose prose-sm max-w-none">
-        <p className="text-base leading-relaxed text-muted-foreground">{desc}</p>
+      {/* Description — collapsed by default, expand on request */}
+      <div>
+        <p className={`text-base leading-relaxed text-muted-foreground transition-all ${
+          showFullDesc ? "" : "line-clamp-4"
+        }`}>{desc}</p>
+        <button
+          onClick={() => setShowFullDesc(v => !v)}
+          className="mt-1.5 text-sm font-medium text-primary hover:underline"
+        >
+          {showFullDesc ? "Show less" : "Read more"}
+        </button>
       </div>
 
       {/* Fun fact */}
