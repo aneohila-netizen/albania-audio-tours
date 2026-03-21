@@ -3,7 +3,7 @@
  * Supports multiple itineraries per page. Each itinerary has named waypoints
  * placed interactively on a Leaflet map, with a start/end distinction.
  */
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Plus, Trash2, Edit2, Save, X, MapPin, ChevronDown, ChevronUp, Eye, EyeOff, GripVertical, Clock, Route } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,72 +56,84 @@ function WaypointMap({
   waypoints: Waypoint[]; onWaypointsChange: (wp: Waypoint[]) => void;
 }) {
   const mapRef = useRef<any>(null);
+  const mapDivRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<any[]>([]);
   const polylineRef = useRef<any>(null);
+  const initDoneRef = useRef(false);
 
-  // Always-current refs so click/drag handlers never see stale state
+  // Always-current refs so click/drag handlers never see stale closures
   const waypointsRef = useRef<Waypoint[]>(waypoints);
   const onChangeRef = useRef(onWaypointsChange);
   useEffect(() => { waypointsRef.current = waypoints; }, [waypoints]);
   useEffect(() => { onChangeRef.current = onWaypointsChange; }, [onWaypointsChange]);
 
-  // ── Ref callback: fires when the div is actually in the DOM ─────────────────
-  // This is more reliable than useEffect for Leaflet inside conditional/tabbed
-  // containers where the div may have 0 dimensions at useEffect time.
-  const mapDivRef = useCallback((div: HTMLDivElement | null) => {
-    if (!div) {
-      // Node removed — destroy map
-      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
-      return;
-    }
+  // ── Map init: poll until the div has real dimensions, then init Leaflet ───────
+  // This is the most reliable approach for Leaflet inside conditional renders
+  // and Shadcn tabs (display:none → block transition).
+  useEffect(() => {
+    initDoneRef.current = false;
+    if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
 
     const L = (window as any).L;
     if (!L) return;
-    if (mapRef.current) return; // already initialised for this div
 
-    // Use requestAnimationFrame so the browser has finished painting the div
-    // at its real size before Leaflet reads its dimensions
-    requestAnimationFrame(() => {
-      if (!div || mapRef.current) return;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 30; // 30 × 100ms = 3 seconds max
 
-      mapRef.current = L.map(div, { zoomControl: true }).setView([centerLat, centerLng], 15);
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-        attribution: "© CartoDB", maxZoom: 19,
-      }).addTo(mapRef.current);
+    const tryInit = () => {
+      const div = mapDivRef.current;
+      if (!div || initDoneRef.current) return;
 
-      // Extra invalidateSize for tabs that animate open (CSS transition delay)
-      setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 300);
+      const w = div.offsetWidth;
+      const h = div.offsetHeight;
 
-      // Click handler — always reads latest state via refs
-      mapRef.current.on("click", (e: any) => {
-        const current = waypointsRef.current;
-        const next = current.length;
-        const autoTitle = next === 0 ? "Start" : `Stop ${next + 1}`;
-        onChangeRef.current([
-          ...current,
-          {
-            order: next + 1,
-            lat: parseFloat(e.latlng.lat.toFixed(6)),
-            lng: parseFloat(e.latlng.lng.toFixed(6)),
-            title: autoTitle,
-            description: "",
-          },
-        ]);
-      });
-    });
+      if (w > 0 && h > 0) {
+        // Div has real dimensions — safe to initialise Leaflet
+        mapRef.current = L.map(div, { zoomControl: true }).setView([centerLat, centerLng], 15);
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+          attribution: "© CartoDB", maxZoom: 19,
+        }).addTo(mapRef.current);
+
+        mapRef.current.on("click", (e: any) => {
+          const current = waypointsRef.current;
+          const next = current.length;
+          const autoTitle = next === 0 ? "Start" : `Stop ${next + 1}`;
+          onChangeRef.current([
+            ...current,
+            {
+              order: next + 1,
+              lat: parseFloat(e.latlng.lat.toFixed(6)),
+              lng: parseFloat(e.latlng.lng.toFixed(6)),
+              title: autoTitle,
+              description: "",
+            },
+          ]);
+        });
+
+        initDoneRef.current = true;
+      } else if (attempts < MAX_ATTEMPTS) {
+        attempts++;
+        setTimeout(tryInit, 100);
+      }
+    };
+
+    // Start polling after a short delay to let React finish painting
+    setTimeout(tryInit, 50);
+
+    return () => {
+      initDoneRef.current = false;
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // stable ref callback — deps intentionally empty
+  }, [centerLat, centerLng]);
 
-  // Redraw markers + polyline whenever waypoints change
+  // ── Redraw markers + polyline whenever waypoints change ─────────────────
   useEffect(() => {
     const L = (window as any).L;
     if (!L || !mapRef.current) return;
 
-    // Remove old markers
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
-
-    // Remove old polyline
     if (polylineRef.current) { polylineRef.current.remove(); polylineRef.current = null; }
 
     const total = waypoints.length;
@@ -144,16 +156,9 @@ function WaypointMap({
         '</div>',
       ].join("");
 
-      const icon = L.divIcon({
-        className: "",
-        html: circleHtml,
-        iconSize: [28, 46],
-        iconAnchor: [14, 14],
-        popupAnchor: [0, -20],
-      });
+      const icon = L.divIcon({ className: "", html: circleHtml, iconSize: [28, 46], iconAnchor: [14, 14], popupAnchor: [0, -20] });
 
-      const marker = L.marker([wp.lat, wp.lng], { icon, draggable: true })
-        .addTo(mapRef.current);
+      const marker = L.marker([wp.lat, wp.lng], { icon, draggable: true }).addTo(mapRef.current);
 
       marker.on("dragend", (e: any) => {
         const { lat, lng } = e.target.getLatLng();
@@ -166,7 +171,6 @@ function WaypointMap({
       markersRef.current.push(marker);
     });
 
-    // Always draw the connecting polyline (even for 2+ stops)
     if (total > 1) {
       polylineRef.current = L.polyline(
         waypoints.map(w => [w.lat, w.lng]),
@@ -174,7 +178,6 @@ function WaypointMap({
       ).addTo(mapRef.current);
     }
 
-    // Fit bounds only when first stop is added; afterwards let admin pan freely
     if (total === 1) {
       mapRef.current.setView([waypoints[0].lat, waypoints[0].lng], 16);
     } else if (total === 2) {
@@ -183,7 +186,6 @@ function WaypointMap({
         { padding: [50, 50], maxZoom: 16 }
       );
     }
-    // 3+ stops: don't auto-zoom — let the admin keep their current view
   }, [waypoints]);
 
   const count = waypoints.length;
@@ -206,7 +208,6 @@ function WaypointMap({
     </div>
   );
 }
-
 // ── Waypoint list editor ──────────────────────────────────────────────────────
 function WaypointList({ waypoints, onChange }: { waypoints: Waypoint[]; onChange: (wp: Waypoint[]) => void }) {
   if (waypoints.length === 0) return (
