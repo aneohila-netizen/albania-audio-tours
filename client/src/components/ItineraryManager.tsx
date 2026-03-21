@@ -56,57 +56,61 @@ function WaypointMap({
   waypoints: Waypoint[]; onWaypointsChange: (wp: Waypoint[]) => void;
 }) {
   const mapRef = useRef<any>(null);
-  const mapDivRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<any[]>([]);
   const polylineRef = useRef<any>(null);
 
-  // Keep refs up-to-date so the click handler always sees latest state
-  // (fixes stale closure — click handler is registered only once)
+  // Always-current refs so click/drag handlers never see stale state
   const waypointsRef = useRef<Waypoint[]>(waypoints);
   const onChangeRef = useRef(onWaypointsChange);
   useEffect(() => { waypointsRef.current = waypoints; }, [waypoints]);
   useEffect(() => { onChangeRef.current = onWaypointsChange; }, [onWaypointsChange]);
 
-  // Initialise map once
-  useEffect(() => {
-    if (!mapDivRef.current) return;
+  // ── Ref callback: fires when the div is actually in the DOM ─────────────────
+  // This is more reliable than useEffect for Leaflet inside conditional/tabbed
+  // containers where the div may have 0 dimensions at useEffect time.
+  const mapDivRef = useCallback((div: HTMLDivElement | null) => {
+    if (!div) {
+      // Node removed — destroy map
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+      return;
+    }
+
     const L = (window as any).L;
     if (!L) return;
-    if (mapRef.current) return; // already initialised
+    if (mapRef.current) return; // already initialised for this div
 
-    mapRef.current = L.map(mapDivRef.current, { zoomControl: true }).setView([centerLat, centerLng], 15);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-      attribution: "© CartoDB", maxZoom: 19,
-    }).addTo(mapRef.current);
+    // Use requestAnimationFrame so the browser has finished painting the div
+    // at its real size before Leaflet reads its dimensions
+    requestAnimationFrame(() => {
+      if (!div || mapRef.current) return;
 
-    // Click handler always reads from refs — never stale
-    mapRef.current.on("click", (e: any) => {
-      const current = waypointsRef.current;
-      const next = current.length; // 0-based: 0 = first stop
-      const autoTitle = next === 0 ? "Start" : `Stop ${next + 1}`;
-      onChangeRef.current([
-        ...current,
-        {
-          order: next + 1,
-          lat: parseFloat(e.latlng.lat.toFixed(6)),
-          lng: parseFloat(e.latlng.lng.toFixed(6)),
-          title: autoTitle,
-          description: "",
-        },
-      ]);
+      mapRef.current = L.map(div, { zoomControl: true }).setView([centerLat, centerLng], 15);
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+        attribution: "© CartoDB", maxZoom: 19,
+      }).addTo(mapRef.current);
+
+      // Extra invalidateSize for tabs that animate open (CSS transition delay)
+      setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 300);
+
+      // Click handler — always reads latest state via refs
+      mapRef.current.on("click", (e: any) => {
+        const current = waypointsRef.current;
+        const next = current.length;
+        const autoTitle = next === 0 ? "Start" : `Stop ${next + 1}`;
+        onChangeRef.current([
+          ...current,
+          {
+            order: next + 1,
+            lat: parseFloat(e.latlng.lat.toFixed(6)),
+            lng: parseFloat(e.latlng.lng.toFixed(6)),
+            title: autoTitle,
+            description: "",
+          },
+        ]);
+      });
     });
-
-    // Fire invalidateSize at multiple intervals to handle Shadcn tab transitions
-    // (the tab starts with display:none, so Leaflet needs size recalculation)
-    [50, 200, 500].forEach(ms =>
-      setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, ms)
-    );
-
-    return () => {
-      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
-    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally empty — map init runs once
+  }, []); // stable ref callback — deps intentionally empty
 
   // Redraw markers + polyline whenever waypoints change
   useEffect(() => {
