@@ -128,13 +128,13 @@ export default function DestinationPage() {
         </div>
       )}
 
+      {/* Audio Guide — primary focus: sits above description */}
+      <AudioPlayer site={dest} />
+
       {/* Description */}
       <div className="prose prose-sm max-w-none">
         <p className="text-base leading-relaxed text-foreground">{desc}</p>
       </div>
-
-      {/* Audio Guide */}
-      <AudioPlayer site={dest} />
 
       {/* Attractions */}
       {attractions.length > 0 && (

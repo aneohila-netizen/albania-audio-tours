@@ -183,13 +183,13 @@ export default function AttractionDetailPage() {
         </div>
       </div>
 
+      {/* Audio player — primary focus: sits above description */}
+      <AudioPlayer site={siteCompat} text={aDesc} onComplete={() => { if (!isVisited) handleMarkVisited(); }} />
+
       {/* Description */}
       <div className="prose prose-sm max-w-none">
         <p className="text-base leading-relaxed text-foreground">{aDesc}</p>
       </div>
-
-      {/* Audio player */}
-      <AudioPlayer site={siteCompat} text={aDesc} onComplete={() => { if (!isVisited) handleMarkVisited(); }} />
 
       {/* Fun fact */}
       {aFunFact && (

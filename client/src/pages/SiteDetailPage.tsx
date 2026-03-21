@@ -150,13 +150,13 @@ export default function SiteDetailPage() {
         </div>
       </div>
 
+      {/* Audio player — primary focus: sits above description */}
+      <AudioPlayer site={site} text={desc} onComplete={handleAudioComplete} />
+
       {/* Description */}
       <div className="prose prose-sm max-w-none">
         <p className="text-base leading-relaxed text-muted-foreground">{desc}</p>
       </div>
-
-      {/* Audio player — reads the description text already shown on this page */}
-      <AudioPlayer site={site} text={desc} onComplete={handleAudioComplete} />
 
       {/* Fun fact */}
       {funFact && (
