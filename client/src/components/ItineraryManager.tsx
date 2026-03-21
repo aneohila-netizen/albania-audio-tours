@@ -3,7 +3,7 @@
  * Supports multiple itineraries per page. Each itinerary has named waypoints
  * placed interactively on a Leaflet map, with a start/end distinction.
  */
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Plus, Trash2, Edit2, Save, X, MapPin, ChevronDown, ChevronUp, Eye, EyeOff, GripVertical, Clock, Route } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
