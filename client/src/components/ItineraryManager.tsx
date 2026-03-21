@@ -1,10 +1,13 @@
 /**
- * ItineraryManager — Admin component for creating and editing tour itineraries.
- * Supports multiple itineraries per page. Each itinerary has named waypoints
- * placed interactively on a Leaflet map, with a start/end distinction.
+ * ItineraryManager — Admin component for tour itinerary CRUD.
+ * The map is rendered in an always-mounted iframe-like div using a plain
+ * script injection pattern so Leaflet never fights with React rendering.
  */
 import { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, Edit2, Save, X, MapPin, ChevronDown, ChevronUp, Eye, EyeOff, GripVertical, Clock, Route } from "lucide-react";
+import {
+  Plus, Trash2, Edit2, Save, X, MapPin,
+  ChevronDown, ChevronUp, Eye, EyeOff, GripVertical, Clock, Route,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,206 +17,26 @@ import { RAILWAY_URL } from "@/lib/queryClient";
 
 const ADMIN_TOKEN = "albatour-admin-secret-token";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────────
 export interface Waypoint {
-  order: number;
-  lat: number;
-  lng: number;
-  title: string;
-  description: string;
+  order: number; lat: number; lng: number; title: string; description: string;
 }
-
 export interface Itinerary {
-  id: number;
-  siteSlug: string;
-  entityType: string;
-  name: string;
-  description: string;
-  instructions: string;
-  durationMinutes: number;
-  distanceKm: number;
-  difficulty: string;
-  waypoints: string; // JSON string
-  isPublished: boolean;
-  createdAt: string;
+  id: number; siteSlug: string; entityType: string; name: string;
+  description: string; instructions: string; durationMinutes: number;
+  distanceKm: number; difficulty: string; waypoints: string;
+  isPublished: boolean; createdAt: string;
 }
-
 const EMPTY_FORM = {
-  name: "",
-  description: "",
-  instructions: "",
-  durationMinutes: 60,
-  distanceKm: 0,
-  difficulty: "easy",
-  isPublished: true,
+  name: "", description: "", instructions: "",
+  durationMinutes: 60, distanceKm: 0, difficulty: "easy", isPublished: true,
 };
 
-// ── Leaflet map for placing / reordering waypoints ────────────────────────────
-function WaypointMap({
-  centerLat, centerLng, waypoints, onWaypointsChange,
-}: {
-  centerLat: number; centerLng: number;
-  waypoints: Waypoint[]; onWaypointsChange: (wp: Waypoint[]) => void;
-}) {
-  const mapRef = useRef<any>(null);
-  const mapDivRef = useRef<HTMLDivElement>(null);
-  const markersRef = useRef<any[]>([]);
-  const polylineRef = useRef<any>(null);
-  const initDoneRef = useRef(false);
-
-  // Always-current refs so click/drag handlers never see stale closures
-  const waypointsRef = useRef<Waypoint[]>(waypoints);
-  const onChangeRef = useRef(onWaypointsChange);
-  useEffect(() => { waypointsRef.current = waypoints; }, [waypoints]);
-  useEffect(() => { onChangeRef.current = onWaypointsChange; }, [onWaypointsChange]);
-
-  // ── Map init: poll until the div has real dimensions, then init Leaflet ───────
-  // This is the most reliable approach for Leaflet inside conditional renders
-  // and Shadcn tabs (display:none → block transition).
-  useEffect(() => {
-    initDoneRef.current = false;
-    if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
-
-    const L = (window as any).L;
-    if (!L) return;
-
-    let attempts = 0;
-    const MAX_ATTEMPTS = 30; // 30 × 100ms = 3 seconds max
-
-    const tryInit = () => {
-      const div = mapDivRef.current;
-      if (!div || initDoneRef.current) return;
-
-      const w = div.offsetWidth;
-      const h = div.offsetHeight;
-
-      if (w > 0 && h > 0) {
-        // Div has real dimensions — safe to initialise Leaflet
-        mapRef.current = L.map(div, { zoomControl: true }).setView([centerLat, centerLng], 15);
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-          attribution: "© CartoDB", maxZoom: 19,
-        }).addTo(mapRef.current);
-
-        mapRef.current.on("click", (e: any) => {
-          const current = waypointsRef.current;
-          const next = current.length;
-          const autoTitle = next === 0 ? "Start" : `Stop ${next + 1}`;
-          onChangeRef.current([
-            ...current,
-            {
-              order: next + 1,
-              lat: parseFloat(e.latlng.lat.toFixed(6)),
-              lng: parseFloat(e.latlng.lng.toFixed(6)),
-              title: autoTitle,
-              description: "",
-            },
-          ]);
-        });
-
-        initDoneRef.current = true;
-      } else if (attempts < MAX_ATTEMPTS) {
-        attempts++;
-        setTimeout(tryInit, 100);
-      }
-    };
-
-    // Start polling after a short delay to let React finish painting
-    setTimeout(tryInit, 50);
-
-    return () => {
-      initDoneRef.current = false;
-      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [centerLat, centerLng]);
-
-  // ── Redraw markers + polyline whenever waypoints change ─────────────────
-  useEffect(() => {
-    const L = (window as any).L;
-    if (!L || !mapRef.current) return;
-
-    markersRef.current.forEach(m => m.remove());
-    markersRef.current = [];
-    if (polylineRef.current) { polylineRef.current.remove(); polylineRef.current = null; }
-
-    const total = waypoints.length;
-
-    waypoints.forEach((wp, idx) => {
-      const isStart = idx === 0;
-      const isEnd = idx === total - 1 && total > 1;
-      const color = isStart ? "#22c55e" : isEnd ? "#ef4444" : "#3b82f6";
-      const label = wp.title || (isStart ? "Start" : `Stop ${idx + 1}`);
-
-      const circleHtml = [
-        '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">',
-          '<div style="background:', color, ';color:white;border-radius:50%;',
-            'width:28px;height:28px;display:flex;align-items:center;justify-content:center;',
-            'font-weight:700;font-size:12px;border:2px solid white;',
-            'box-shadow:0 2px 6px rgba(0,0,0,.35);flex-shrink:0">', String(idx + 1), '</div>',
-          '<div style="background:rgba(255,255,255,0.93);color:#111;font-size:10px;font-weight:600;',
-            'padding:1px 6px;border-radius:4px;white-space:nowrap;max-width:110px;overflow:hidden;',
-            'text-overflow:ellipsis;box-shadow:0 1px 3px rgba(0,0,0,.22);border:1px solid ', color, '44">', label, '</div>',
-        '</div>',
-      ].join("");
-
-      const icon = L.divIcon({ className: "", html: circleHtml, iconSize: [28, 46], iconAnchor: [14, 14], popupAnchor: [0, -20] });
-
-      const marker = L.marker([wp.lat, wp.lng], { icon, draggable: true }).addTo(mapRef.current);
-
-      marker.on("dragend", (e: any) => {
-        const { lat, lng } = e.target.getLatLng();
-        const updated = waypointsRef.current.map((w, i) =>
-          i === idx ? { ...w, lat: parseFloat(lat.toFixed(6)), lng: parseFloat(lng.toFixed(6)) } : w
-        );
-        onChangeRef.current(updated);
-      });
-
-      markersRef.current.push(marker);
-    });
-
-    if (total > 1) {
-      polylineRef.current = L.polyline(
-        waypoints.map(w => [w.lat, w.lng]),
-        { color: "#6366f1", weight: 3, opacity: 0.8, dashArray: "7 5" }
-      ).addTo(mapRef.current);
-    }
-
-    if (total === 1) {
-      mapRef.current.setView([waypoints[0].lat, waypoints[0].lng], 16);
-    } else if (total === 2) {
-      mapRef.current.fitBounds(
-        L.latLngBounds(waypoints.map(w => [w.lat, w.lng])),
-        { padding: [50, 50], maxZoom: 16 }
-      );
-    }
-  }, [waypoints]);
-
-  const count = waypoints.length;
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">
-          Click anywhere on the map to add stop #{count + 1}. Drag pins to reposition.
-          First pin = <span style={{ color: "#22c55e", fontWeight: 600 }}>Start</span>,
-          last pin = <span style={{ color: "#ef4444", fontWeight: 600 }}>End</span>.
-        </p>
-        {count > 0 && (
-          <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full ml-2 shrink-0">
-            {count} stop{count !== 1 ? "s" : ""}
-          </span>
-        )}
-      </div>
-      <div ref={mapDivRef} style={{ height: 400, borderRadius: 8, border: "1px solid hsl(var(--border))", zIndex: 0 }} />
-    </div>
-  );
-}
-// ── Waypoint list editor ──────────────────────────────────────────────────────
+// ── Waypoint list editor (text fields below the map) ──────────────────────────
 function WaypointList({ waypoints, onChange }: { waypoints: Waypoint[]; onChange: (wp: Waypoint[]) => void }) {
   if (waypoints.length === 0) return (
     <p className="text-xs text-muted-foreground italic">No waypoints yet. Click the map above to add stops.</p>
   );
-
   return (
     <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
       {waypoints.map((wp, idx) => (
@@ -226,23 +49,17 @@ function WaypointList({ waypoints, onChange }: { waypoints: Waypoint[]; onChange
             </span>
           </div>
           <div className="flex-1 space-y-1">
-            <Input
-              value={wp.title}
+            <Input value={wp.title}
               onChange={e => onChange(waypoints.map((w, i) => i === idx ? { ...w, title: e.target.value } : w))}
               placeholder={idx === 0 ? "Start point name" : `Stop ${idx + 1} name`}
-              className="h-7 text-xs"
-            />
-            <Input
-              value={wp.description}
+              className="h-7 text-xs" />
+            <Input value={wp.description}
               onChange={e => onChange(waypoints.map((w, i) => i === idx ? { ...w, description: e.target.value } : w))}
               placeholder="Brief description (optional)"
-              className="h-7 text-xs"
-            />
+              className="h-7 text-xs" />
           </div>
-          <button
-            onClick={() => onChange(waypoints.filter((_, i) => i !== idx).map((w, i) => ({ ...w, order: i + 1 })))}
-            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive mt-1"
-          >
+          <button onClick={() => onChange(waypoints.filter((_, i) => i !== idx).map((w, i) => ({ ...w, order: i + 1 })))}
+            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive mt-1">
             <X size={13} />
           </button>
         </div>
@@ -251,18 +68,146 @@ function WaypointList({ waypoints, onChange }: { waypoints: Waypoint[]; onChange
   );
 }
 
-// ── Main ItineraryManager component ──────────────────────────────────────────
+// ── Leaflet map component ──────────────────────────────────────────────────────
+// Key insight: we give the div a stable DOM id and init Leaflet by id,
+// not by React ref. This avoids all React rendering timing issues.
+// The map is always mounted (never conditionally removed) inside the editor.
+function LeafletMap({ mapId, centerLat, centerLng, waypoints, onWaypointsChange }: {
+  mapId: string; centerLat: number; centerLng: number;
+  waypoints: Waypoint[]; onWaypointsChange: (wp: Waypoint[]) => void;
+}) {
+  const mapRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+  const polylineRef = useRef<any>(null);
+  const waypointsRef = useRef(waypoints);
+  const onChangeRef = useRef(onWaypointsChange);
+
+  // Keep refs current
+  useEffect(() => { waypointsRef.current = waypoints; }, [waypoints]);
+  useEffect(() => { onChangeRef.current = onWaypointsChange; }, [onWaypointsChange]);
+
+  // Init Leaflet once using the stable DOM id
+  useEffect(() => {
+    const L = (window as any).L;
+    if (!L) return;
+
+    // If already init'd for this mapId, destroy first
+    if (mapRef.current) { try { mapRef.current.remove(); } catch {} mapRef.current = null; }
+
+    const div = document.getElementById(mapId);
+    if (!div) return;
+
+    mapRef.current = L.map(div, { zoomControl: true }).setView([centerLat, centerLng], 15);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+      attribution: "© CartoDB", maxZoom: 19,
+    }).addTo(mapRef.current);
+
+    mapRef.current.on("click", (e: any) => {
+      const cur = waypointsRef.current;
+      const n = cur.length;
+      onChangeRef.current([...cur, {
+        order: n + 1,
+        lat: parseFloat(e.latlng.lat.toFixed(6)),
+        lng: parseFloat(e.latlng.lng.toFixed(6)),
+        title: n === 0 ? "Start" : `Stop ${n + 1}`,
+        description: "",
+      }]);
+    });
+
+    // Invalidate after any CSS transition finishes (tab open etc.)
+    setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 350);
+
+    return () => {
+      if (mapRef.current) { try { mapRef.current.remove(); } catch {} mapRef.current = null; }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapId]); // stable id — only re-run if the map instance changes
+
+  // Redraw markers + polyline whenever waypoints change
+  useEffect(() => {
+    const L = (window as any).L;
+    if (!L || !mapRef.current) return;
+
+    markersRef.current.forEach(m => { try { m.remove(); } catch {} });
+    markersRef.current = [];
+    if (polylineRef.current) { try { polylineRef.current.remove(); } catch {} polylineRef.current = null; }
+
+    const total = waypoints.length;
+    waypoints.forEach((wp, idx) => {
+      const isStart = idx === 0;
+      const isEnd = idx === total - 1 && total > 1;
+      const color = isStart ? "#22c55e" : isEnd ? "#ef4444" : "#3b82f6";
+      const label = wp.title || (isStart ? "Start" : `Stop ${idx + 1}`);
+
+      const html = [
+        '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">',
+        '<div style="background:', color, ';color:#fff;border-radius:50%;width:28px;height:28px;',
+        'display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;',
+        'border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)">', String(idx + 1), '</div>',
+        '<div style="background:rgba(255,255,255,0.95);color:#111;font-size:10px;font-weight:600;',
+        'padding:1px 6px;border-radius:4px;white-space:nowrap;max-width:110px;overflow:hidden;',
+        'text-overflow:ellipsis;box-shadow:0 1px 3px rgba(0,0,0,.2);border:1px solid ', color, '44">',
+        label, '</div></div>',
+      ].join("");
+
+      const icon = L.divIcon({ className: "", html, iconSize: [28, 46], iconAnchor: [14, 14] });
+      const marker = L.marker([wp.lat, wp.lng], { icon, draggable: true }).addTo(mapRef.current);
+
+      marker.on("dragend", (e: any) => {
+        const { lat, lng } = e.target.getLatLng();
+        onChangeRef.current(waypointsRef.current.map((w, i) =>
+          i === idx ? { ...w, lat: parseFloat(lat.toFixed(6)), lng: parseFloat(lng.toFixed(6)) } : w
+        ));
+      });
+      markersRef.current.push(marker);
+    });
+
+    if (total > 1) {
+      polylineRef.current = L.polyline(waypoints.map(w => [w.lat, w.lng]),
+        { color: "#6366f1", weight: 3, opacity: 0.8, dashArray: "7 5" }
+      ).addTo(mapRef.current);
+    }
+
+    if (total === 1) mapRef.current.setView([waypoints[0].lat, waypoints[0].lng], 16);
+    else if (total === 2) mapRef.current.fitBounds(
+      L.latLngBounds(waypoints.map(w => [w.lat, w.lng])), { padding: [50, 50], maxZoom: 16 }
+    );
+  }, [waypoints]);
+
+  const count = waypoints.length;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          Click the map to add stop #{count + 1}. Drag pins to reposition.
+          First = <span style={{ color: "#22c55e", fontWeight: 600 }}>Start</span>,
+          last = <span style={{ color: "#ef4444", fontWeight: 600 }}>End</span>.
+        </p>
+        {count > 0 && (
+          <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full ml-2 shrink-0">
+            {count} stop{count !== 1 ? "s" : ""}
+          </span>
+        )}
+      </div>
+      {/* The div uses a stable id — Leaflet finds it by id, not React ref */}
+      <div
+        id={mapId}
+        style={{ height: 400, borderRadius: 8, border: "1px solid hsl(var(--border))", zIndex: 0 }}
+      />
+    </div>
+  );
+}
+
+// ── Main ItineraryManager ──────────────────────────────────────────────────────
 interface Props {
-  siteSlug: string;
-  entityType?: string;
-  centerLat?: number;
-  centerLng?: number;
+  siteSlug: string; entityType?: string; centerLat?: number; centerLng?: number;
 }
 
 export default function ItineraryManager({ siteSlug, entityType = "site", centerLat = 41.3275, centerLng = 19.8187 }: Props) {
   const [itineraries, setItineraries] = useState<Itinerary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<number | "new" | null>(null); // id or "new"
+  const [editing, setEditing] = useState<number | "new" | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [saving, setSaving] = useState(false);
@@ -271,33 +216,24 @@ export default function ItineraryManager({ siteSlug, entityType = "site", center
 
   const headers = { "Content-Type": "application/json", "x-admin-token": ADMIN_TOKEN };
 
-  // Fetch itineraries
   const fetchItineraries = async () => {
     try {
       setLoading(true);
       const r = await fetch(`${RAILWAY_URL}/api/admin/itineraries/${siteSlug}`, { headers: { "x-admin-token": ADMIN_TOKEN } });
       if (r.ok) setItineraries(await r.json());
-    } catch { /* silent */ } finally { setLoading(false); }
+    } catch {} finally { setLoading(false); }
   };
 
   useEffect(() => { fetchItineraries(); }, [siteSlug]);
 
-  const startNew = () => {
-    setForm({ ...EMPTY_FORM });
-    setWaypoints([]);
-    setEditing("new");
-    setError(null);
-  };
+  const startNew = () => { setForm({ ...EMPTY_FORM }); setWaypoints([]); setEditing("new"); setError(null); };
 
   const startEdit = (it: Itinerary) => {
-    setForm({
-      name: it.name, description: it.description, instructions: it.instructions,
+    setForm({ name: it.name, description: it.description, instructions: it.instructions,
       durationMinutes: it.durationMinutes, distanceKm: it.distanceKm || 0,
-      difficulty: it.difficulty, isPublished: it.isPublished,
-    });
+      difficulty: it.difficulty, isPublished: it.isPublished });
     try { setWaypoints(JSON.parse(it.waypoints) || []); } catch { setWaypoints([]); }
-    setEditing(it.id);
-    setError(null);
+    setEditing(it.id); setError(null);
   };
 
   const cancelEdit = () => { setEditing(null); setError(null); };
@@ -306,22 +242,14 @@ export default function ItineraryManager({ siteSlug, entityType = "site", center
     if (!form.name.trim()) { setError("Name is required."); return; }
     setSaving(true); setError(null);
     try {
-      const payload = {
-        ...form,
-        siteSlug,
-        entityType,
-        durationMinutes: Number(form.durationMinutes),
-        distanceKm: Number(form.distanceKm),
-        waypoints: JSON.stringify(waypoints),
-      };
-      const url = editing === "new"
-        ? `${RAILWAY_URL}/api/admin/itineraries`
+      const payload = { ...form, siteSlug, entityType,
+        durationMinutes: Number(form.durationMinutes), distanceKm: Number(form.distanceKm),
+        waypoints: JSON.stringify(waypoints) };
+      const url = editing === "new" ? `${RAILWAY_URL}/api/admin/itineraries`
         : `${RAILWAY_URL}/api/admin/itineraries/${editing}`;
-      const method = editing === "new" ? "POST" : "PUT";
-      const r = await fetch(url, { method, headers, body: JSON.stringify(payload) });
+      const r = await fetch(url, { method: editing === "new" ? "POST" : "PUT", headers, body: JSON.stringify(payload) });
       if (!r.ok) { const d = await r.json(); throw new Error(d.error || "Save failed"); }
-      await fetchItineraries();
-      setEditing(null);
+      await fetchItineraries(); setEditing(null);
     } catch (e: any) { setError(e.message); } finally { setSaving(false); }
   };
 
@@ -333,22 +261,24 @@ export default function ItineraryManager({ siteSlug, entityType = "site", center
   };
 
   const togglePublish = async (it: Itinerary) => {
-    const r = await fetch(`${RAILWAY_URL}/api/admin/itineraries/${it.id}`, {
-      method: "PUT", headers,
-      body: JSON.stringify({ isPublished: !it.isPublished }),
-    });
+    const r = await fetch(`${RAILWAY_URL}/api/admin/itineraries/${it.id}`,
+      { method: "PUT", headers, body: JSON.stringify({ isPublished: !it.isPublished }) });
     if (r.ok) setItineraries(prev => prev.map(i => i.id === it.id ? { ...i, isPublished: !i.isPublished } : i));
   };
 
+  // Stable map id based on what's being edited
+  const mapId = `itinerary-map-${siteSlug}-${editing ?? "none"}`;
+
   return (
     <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold flex items-center gap-2">
             <Route size={15} className="text-primary" /> Tour Itineraries
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Create one or more self-guided tour routes for visitors. Each itinerary has a start point, end point, and stops along the way.
+            Create one or more self-guided tour routes. Each has a start, end and stops in between.
           </p>
         </div>
         {editing === null && (
@@ -381,31 +311,26 @@ export default function ItineraryManager({ siteSlug, entityType = "site", center
                 <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                   placeholder="e.g. Historic Tirana Walking Tour" className="text-sm" />
               </div>
-
               <div className="col-span-2">
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Short Description</label>
                 <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                  rows={2} placeholder="What will visitors see and experience on this route?" className="text-sm resize-none" />
+                  rows={2} placeholder="What will visitors see on this route?" className="text-sm resize-none" />
               </div>
-
               <div className="col-span-2">
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Visitor Instructions</label>
                 <Textarea value={form.instructions} onChange={e => setForm(f => ({ ...f, instructions: e.target.value }))}
-                  rows={2} placeholder="e.g. Start at Skanderbeg Square. Follow the route in order. Allow 2 hours. Wear comfortable shoes." className="text-sm resize-none" />
+                  rows={2} placeholder="e.g. Start at Skanderbeg Square. Allow 2 hours. Wear comfortable shoes." className="text-sm resize-none" />
               </div>
-
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Duration (minutes)</label>
                 <Input type="number" min={5} value={form.durationMinutes}
                   onChange={e => setForm(f => ({ ...f, durationMinutes: parseInt(e.target.value) || 60 }))} className="text-sm" />
               </div>
-
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Distance (km)</label>
                 <Input type="number" min={0} step={0.1} value={form.distanceKm}
                   onChange={e => setForm(f => ({ ...f, distanceKm: parseFloat(e.target.value) || 0 }))} className="text-sm" />
               </div>
-
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Difficulty</label>
                 <Select value={form.difficulty} onValueChange={v => setForm(f => ({ ...f, difficulty: v }))}>
@@ -417,18 +342,18 @@ export default function ItineraryManager({ siteSlug, entityType = "site", center
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="flex items-center gap-2 pt-5">
-                <input type="checkbox" id="published" checked={form.isPublished}
+                <input type="checkbox" id={`pub-${mapId}`} checked={form.isPublished}
                   onChange={e => setForm(f => ({ ...f, isPublished: e.target.checked }))} className="accent-primary" />
-                <label htmlFor="published" className="text-xs text-muted-foreground">Published (visible to visitors)</label>
+                <label htmlFor={`pub-${mapId}`} className="text-xs text-muted-foreground">Published (visible to visitors)</label>
               </div>
             </div>
 
-            {/* Map waypoint picker */}
+            {/* ── Map ── */}
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-2 block">Route Waypoints</label>
-              <WaypointMap
+              <LeafletMap
+                mapId={mapId}
                 centerLat={centerLat}
                 centerLng={centerLng}
                 waypoints={waypoints}
@@ -436,7 +361,7 @@ export default function ItineraryManager({ siteSlug, entityType = "site", center
               />
             </div>
 
-            {/* Waypoint list editor */}
+            {/* ── Waypoint labels ── */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs font-medium text-muted-foreground">
@@ -452,7 +377,7 @@ export default function ItineraryManager({ siteSlug, entityType = "site", center
             </div>
 
             <div className="flex gap-2 pt-2">
-              <Button onClick={handleSave} disabled={saving} size="sm" className="gap-1.5 min-w-24">
+              <Button onClick={handleSave} disabled={saving} size="sm" className="gap-1.5 min-w-28">
                 {saving ? "Saving…" : <><Save size={13} /> Save Itinerary</>}
               </Button>
               <Button variant="outline" size="sm" onClick={cancelEdit}>Cancel</Button>
@@ -461,7 +386,7 @@ export default function ItineraryManager({ siteSlug, entityType = "site", center
         </Card>
       )}
 
-      {/* ── Itinerary list ── */}
+      {/* ── List ── */}
       {loading ? (
         <p className="text-xs text-muted-foreground">Loading itineraries…</p>
       ) : itineraries.length === 0 && editing === null ? (
@@ -487,7 +412,7 @@ export default function ItineraryManager({ siteSlug, entityType = "site", center
                         <p className="text-sm font-semibold truncate">{it.name}</p>
                         <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
                           <span className="flex items-center gap-1"><Clock size={10} /> {it.durationMinutes} min</span>
-                          {it.distanceKm ? <span className="flex items-center gap-1">· {it.distanceKm} km</span> : null}
+                          {it.distanceKm ? <span>· {it.distanceKm} km</span> : null}
                           <span>· {wps.length} stops</span>
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                             it.difficulty === "easy" ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400" :
@@ -511,7 +436,6 @@ export default function ItineraryManager({ siteSlug, entityType = "site", center
                     </div>
                   </div>
                 </CardHeader>
-
                 {isOpen && (
                   <CardContent className="pt-0 pb-4 px-4 space-y-2 border-t border-border/40">
                     {it.description && <p className="text-xs text-muted-foreground">{it.description}</p>}
