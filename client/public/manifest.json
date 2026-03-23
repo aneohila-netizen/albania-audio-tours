@@ -1,0 +1,27 @@
+{
+  "name": "AlbaTour — Albania Audio Tours",
+  "short_name": "AlbaTour",
+  "description": "Self-guided audio tours of Albania. Explore Tirana, Berat, Butrint and more.",
+  "start_url": "/#/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#C0392B",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["travel", "entertainment", "navigation"],
+  "lang": "en",
+  "scope": "/"
+}

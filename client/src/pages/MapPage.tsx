@@ -7,7 +7,8 @@ import type { Destination, Attraction } from "@/lib/staticData";
 import VisitModal from "@/components/VisitModal";
 import { apiRequest } from "@/lib/queryClient";
 import { getSessionId } from "@/lib/session";
-import { MapPin, X, Layers, Locate, LocateFixed } from "lucide-react";
+import { MapPin, X, Layers, Locate, LocateFixed, Headphones } from "lucide-react";
+import { useAudioPlayer } from "@/components/StickyAudioPlayer";
 import { getLangText } from "@/lib/i18n";
 
 type LeafletLib = any;
@@ -84,7 +85,14 @@ export default function MapPage() {
   const [gpsError, setGpsError] = useState<string | null>(null);
   const blueDotRef = useRef<any>(null); // Leaflet circle marker for user location
   const watchIdRef = useRef<number | null>(null);
+
+  // ── Geofencing state ───────────────────────────────────────
+  const [geofenceToast, setGeofenceToast] = useState<{
+    name: string; slug: string; destSlug: string; type: "attraction" | "destination";
+  } | null>(null);
+  const triggeredPoiRef = useRef<Set<string>>(new Set()); // avoid re-triggering same POI
   const { t, lang, visitedSiteIds, markVisited } = useApp();
+  const { loadTrack } = useAudioPlayer();
   const DESTINATIONS = useDestinations();
   const ATTRACTIONS = useAttractions();
 
@@ -152,6 +160,16 @@ export default function MapPage() {
       popupAnchor: [0, -46],
     });
     const marker = L.marker([dest.lat, dest.lng], { icon }).addTo(map);
+    // aria-label for screen readers and WCAG 2.1
+    const destEl = marker.getElement();
+    if (destEl) {
+      destEl.setAttribute("role", "button");
+      destEl.setAttribute("aria-label", `${destName(dest)} — ${dest.category} destination. Tap to explore.`);
+      destEl.setAttribute("tabindex", "0");
+      destEl.addEventListener("keydown", (e: any) => {
+        if (e.key === "Enter" || e.key === " ") setSelectedPin({ type: "destination", data: dest });
+      });
+    }
     marker.on("click", () => setSelectedPin({ type: "destination", data: dest }));
     markersRef.current.push(marker);
   }
@@ -169,6 +187,18 @@ export default function MapPage() {
       popupAnchor: [0, -38],
     });
     const marker = L.marker([attr.lat, attr.lng], { icon }).addTo(map);
+    // aria-label for screen readers and WCAG 2.1
+    const attrEl = marker.getElement();
+    if (attrEl) {
+      attrEl.setAttribute("role", "button");
+      attrEl.setAttribute("aria-label",
+        `${attrName(attr)} — ${attr.category}${isVisited ? ", already visited" : ""}. Tap for details.`
+      );
+      attrEl.setAttribute("tabindex", "0");
+      attrEl.addEventListener("keydown", (e: any) => {
+        if (e.key === "Enter" || e.key === " ") setSelectedPin({ type: "attraction", data: attr, dest });
+      });
+    }
     marker.on("click", () => setSelectedPin({ type: "attraction", data: attr, dest }));
     markersRef.current.push(marker);
   }
@@ -238,6 +268,19 @@ export default function MapPage() {
     }
     setGpsError(null);
 
+    // Haversine distance in metres between two lat/lng points
+    const haversineM = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+      const R = 6371000; // Earth radius in metres
+      const toRad = (x: number) => (x * Math.PI) / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLng = toRad(lng2 - lng1);
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    const GEOFENCE_RADIUS_M = 60; // metres — ~60m radius trigger zone
+
     const updateDot = (pos: GeolocationPosition) => {
       const L = LeafletRef.current;
       const map = mapInstanceRef.current;
@@ -258,6 +301,30 @@ export default function MapPage() {
         blueDotRef.current = L.marker([lat, lng], { icon: blueDotIcon, zIndexOffset: 1000 }).addTo(map);
       }
       map.setView([lat, lng], Math.max(map.getZoom(), 14), { animate: true });
+
+      // ── Geofence check ────────────────────────────
+      // Only check if GPS accuracy is good enough (<= 50m)
+      if ((pos.coords.accuracy || 999) <= 80) {
+        // Check attractions first (more specific)
+        for (const attr of ATTRACTIONS) {
+          if (attr.lat === 0 && attr.lng === 0) continue;
+          const dist = haversineM(lat, lng, attr.lat, attr.lng);
+          const key = `attr-${attr.id}`;
+          if (dist <= GEOFENCE_RADIUS_M && !triggeredPoiRef.current.has(key)) {
+            triggeredPoiRef.current.add(key);
+            const dest = DESTINATIONS.find(d => d.slug === attr.destinationSlug);
+            setGeofenceToast({
+              name: attrName(attr),
+              slug: attr.slug,
+              destSlug: attr.destinationSlug,
+              type: "attraction",
+            });
+            // Auto-dismiss after 12 seconds
+            setTimeout(() => setGeofenceToast(t => t?.slug === attr.slug ? null : t), 12000);
+            break; // show one toast at a time
+          }
+        }
+      }
     };
 
     const onGpsError = (err: GeolocationPositionError) => {
@@ -407,6 +474,49 @@ export default function MapPage() {
         <div className="absolute top-3 left-3 z-[1001] bg-destructive text-destructive-foreground text-xs rounded-lg px-3 py-2 shadow-md flex items-center gap-2">
           <span>{gpsError}</span>
           <button onClick={() => setGpsError(null)} aria-label="Dismiss" className="ml-1 font-bold">✕</button>
+        </div>
+      )}
+
+      {/* Geofence arrival toast */}
+      {geofenceToast && (
+        <div className="absolute bottom-6 left-3 right-3 z-[1002] animate-in slide-in-from-bottom-4">
+          <div className="bg-card border border-primary/30 rounded-2xl shadow-2xl p-4 flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <MapPin size={18} className="text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-primary mb-0.5">📍 You’ve arrived!</p>
+              <p className="text-sm font-semibold truncate">{geofenceToast.name}</p>
+              <p className="text-xs text-muted-foreground mb-2">Start your audio guide?</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    navigate(`/sites/${geofenceToast.destSlug}/${geofenceToast.slug}`);
+                    setGeofenceToast(null);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                  style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                  aria-label={`Start audio guide for ${geofenceToast.name}`}
+                >
+                  <Headphones size={13} /> Start Listening
+                </button>
+                <button
+                  onClick={() => setGeofenceToast(null)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-muted transition-colors"
+                  aria-label="Dismiss arrival notification"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={() => setGeofenceToast(null)}
+              className="p-1 rounded hover:bg-muted shrink-0 -mt-1 -mr-1"
+              aria-label="Close"
+            >
+              <X size={14} />
+            </button>
+          </div>
         </div>
       )}
 

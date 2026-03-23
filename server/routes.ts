@@ -110,6 +110,13 @@ ${text}`;
   return translated.trim();
 }
 
+// ─── Listen counter (in-memory, resets on redeploy — future: persist to DB) ───────────
+// Key: siteId (number) | Value: total listens this deployment
+const listenCounts = new Map<number, number>();
+function incrementListenCount(siteId: number) {
+  listenCounts.set(siteId, (listenCounts.get(siteId) || 0) + 1);
+}
+
 // ─── Config ───────────────────────────────────────────────────────────────────
 // Absolute base URL used to form persistent media URLs stored in the DB.
 // On Railway this resolves to the public domain; locally it falls back to localhost.
@@ -577,6 +584,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         'Cache-Control': 'public, max-age=3600',
       });
       res.send(mp3Buffer);
+
+      // Increment listen counter (fire-and-forget)
+      if (req.body.siteId) incrementListenCount(Number(req.body.siteId));
     } catch (e: any) {
       console.error('[TTS on-demand error]', e.message);
       res.status(500).json({ error: e.message || "TTS generation failed" });
@@ -759,6 +769,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const ok = await storage.deleteItinerary(id);
     if (!ok) return res.status(404).json({ error: "Not found" });
     res.json({ success: true });
+  });
+
+  // ── Public listen counts endpoint ─────────────────────────────────
+  // GET /api/listen-counts — returns { siteId: count, ... }
+  app.get("/api/listen-counts", (_req, res) => {
+    const obj: Record<number, number> = {};
+    listenCounts.forEach((count, id) => { obj[id] = count; });
+    res.json(obj);
   });
 
   return httpServer;

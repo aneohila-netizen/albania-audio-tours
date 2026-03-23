@@ -177,7 +177,7 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
       const r = await fetch(`${RAILWAY_URL}/api/tts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: newTrack.text, lang: newTrack.lang }),
+        body: JSON.stringify({ text: newTrack.text, lang: newTrack.lang, siteId: newTrack.siteId }),
       });
       if (!r.ok) throw new Error(`TTS error ${r.status}`);
       const blob = await r.blob();
