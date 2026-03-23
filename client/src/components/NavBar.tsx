@@ -151,20 +151,35 @@ export default function NavBar() {
         </div>
       </div>
 
-      {/* Mobile bottom nav */}
-      <nav className="md:hidden flex border-t border-border">
+      {/* Mobile bottom nav — full-width, 44px touch targets, full labels */}
+      <nav className="md:hidden flex border-t border-border bg-background">
         {navItems.map(({ href, icon: Icon, label }) => {
           const active = location === href || (href !== "/" && location.startsWith(href));
           return (
             <Link key={href} href={href}>
               <a
                 data-testid={`mobile-nav-${href.replace("/", "") || "map"}`}
-                className={`flex-1 flex flex-col items-center gap-0.5 py-2 text-xs font-medium transition-colors ${
-                  active ? "text-primary" : "text-muted-foreground"
+                className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 transition-colors relative ${
+                  active ? "text-primary" : "text-muted-foreground hover:text-foreground"
                 }`}
+                style={{ minHeight: 52 }}
               >
-                <Icon size={18} />
-                <span className="leading-none" style={{ fontSize: "10px" }}>{label.split(" ")[0]}</span>
+                {/* Active indicator bar at top */}
+                {active && (
+                  <span
+                    className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-primary"
+                    aria-hidden="true"
+                  />
+                )}
+                <Icon size={22} strokeWidth={active ? 2.2 : 1.8} />
+                <span
+                  className={`leading-none text-center font-medium ${
+                    active ? "font-semibold" : ""
+                  }`}
+                  style={{ fontSize: "11px" }}
+                >
+                  {label}
+                </span>
               </a>
             </Link>
           );

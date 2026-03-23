@@ -364,3 +364,9 @@
   70%  { transform: scale(2.5); opacity: 0; }
   100% { transform: scale(2.5); opacity: 0; }
 }
+
+/* Push Leaflet zoom control above sticky audio player (approx 7rem) */
+.leaflet-bottom.leaflet-right .leaflet-control-zoom {
+  margin-bottom: 7rem;
+  margin-right: 0.75rem;
+}

@@ -215,8 +215,10 @@ export default function MapPage() {
       const map = L.map(mapRef.current, {
         center: [41.0, 20.2],
         zoom: 7,
-        zoomControl: true,
+        zoomControl: false, // we add it manually at bottomright
       });
+      // Industry standard: zoom controls bottom-right on mobile maps
+      L.control.zoom({ position: "bottomright" }).addTo(map);
 
       L.tileLayer(
         "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
