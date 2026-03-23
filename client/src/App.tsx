@@ -1,4 +1,4 @@
-import { Switch, Route, Router } from "wouter";
+import { Switch, Route, Router, useLocation } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -7,6 +7,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { PerplexityAttribution } from "@/components/PerplexityAttribution";
 import type { Lang, Translations } from "@/lib/i18n";
 import { TRANSLATIONS } from "@/lib/i18n";
+import { AudioPlayerProvider } from "@/components/StickyAudioPlayer";
+import RatingSheet from "@/components/RatingSheet";
+import type { AudioTrack } from "@/components/StickyAudioPlayer";
 import MapPage from "@/pages/MapPage";
 import SitesPage from "@/pages/SitesPage";
 import SiteDetailPage from "@/pages/SiteDetailPage";
@@ -77,37 +80,63 @@ function AppProviders({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
+  const [, navigate] = useLocation();
+  const [ratingState, setRatingState] = useState<{
+    siteId: number; siteName: string; trigger: "completion" | "exit"; listenedSeconds: number;
+  } | null>(null);
+
+  const handleAudioComplete = (track: AudioTrack, listenedSec: number) => {
+    setRatingState({ siteId: track.siteId, siteName: track.siteName, trigger: "completion", listenedSeconds: listenedSec });
+  };
+
+  const handleNavigate = (path: string) => {
+    navigate(path);
+  };
+
   return (
     <Router hook={useHashLocation}>
-      <Switch>
-        {/* Admin — single component with internal state, no navigation/remount */}
-        <Route path="/admin" component={AdminPanel} />
+      <AudioPlayerProvider onComplete={handleAudioComplete} onNavigate={handleNavigate}>
+        <Switch>
+          {/* Admin */}
+          <Route path="/admin" component={AdminPanel} />
 
-        {/* Public routes — with NavBar */}
-        <Route>
-          <div className="flex flex-col min-h-screen bg-background text-foreground">
-            <NavBar />
-            <main className="flex-1">
-              <Switch>
-                <Route path="/" component={MapPage} />
-                <Route path="/sites" component={SitesPage} />
-                <Route path="/sites/:dest/:attr" component={AttractionDetailPage} />
-                <Route path="/sites/:dest" component={DestinationPage} />
-                <Route path="/passport" component={PassportPage} />
-                <Route path="/leaderboard" component={LeaderboardPage} />
-              </Switch>
-            </main>
-            <footer className="border-t border-border px-4 py-3 text-center" style={{ fontSize: "var(--text-xs)", color: "hsl(var(--muted-foreground))" }}>
-              <a href="https://www.perplexity.ai/computer" target="_blank" rel="noopener noreferrer" className="hover:underline">
-                Created with Perplexity Computer
-              </a>
-              {" · "}
-              <span>Albanian Eagle Tours prototype</span>
-            </footer>
-            <PerplexityAttribution />
-          </div>
-        </Route>
-      </Switch>
+          {/* Public routes */}
+          <Route>
+            <div className="flex flex-col min-h-screen bg-background text-foreground">
+              <NavBar />
+              <main className="flex-1 pb-28"> {/* pb-28 = space for sticky player */}
+                <Switch>
+                  <Route path="/" component={MapPage} />
+                  <Route path="/sites" component={SitesPage} />
+                  <Route path="/sites/:dest/:attr" component={AttractionDetailPage} />
+                  <Route path="/sites/:dest" component={DestinationPage} />
+                  <Route path="/passport" component={PassportPage} />
+                  <Route path="/leaderboard" component={LeaderboardPage} />
+                </Switch>
+              </main>
+              <footer className="border-t border-border px-4 py-3 text-center" style={{ fontSize: "var(--text-xs)", color: "hsl(var(--muted-foreground))" }}>
+                <a href="https://www.perplexity.ai/computer" target="_blank" rel="noopener noreferrer" className="hover:underline">
+                  Created with Perplexity Computer
+                </a>
+                {" · "}
+                <span>Albanian Eagle Tours prototype</span>
+              </footer>
+              <PerplexityAttribution />
+            </div>
+          </Route>
+        </Switch>
+
+        {/* Rating sheet */}
+        {ratingState && (
+          <RatingSheet
+            siteId={ratingState.siteId}
+            siteName={ratingState.siteName}
+            trigger={ratingState.trigger}
+            listenedSeconds={ratingState.listenedSeconds}
+            onClose={() => setRatingState(null)}
+          />
+        )}
+      </AudioPlayerProvider>
     </Router>
   );
 }

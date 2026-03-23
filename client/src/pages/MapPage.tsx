@@ -7,7 +7,7 @@ import type { Destination, Attraction } from "@/lib/staticData";
 import VisitModal from "@/components/VisitModal";
 import { apiRequest } from "@/lib/queryClient";
 import { getSessionId } from "@/lib/session";
-import { MapPin, X, Layers } from "lucide-react";
+import { MapPin, X, Layers, Locate, LocateFixed } from "lucide-react";
 import { getLangText } from "@/lib/i18n";
 
 type LeafletLib = any;
@@ -78,6 +78,12 @@ export default function MapPage() {
   const [showVisitModal, setShowVisitModal] = useState(false);
   const [layerMode, setLayerMode] = useState<LayerMode>("attractions");
   const [, navigate] = useLocation();
+
+  // ── GPS blue dot state ────────────────────────────────────────────
+  const [autoCenter, setAutoCenter] = useState(false);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const blueDotRef = useRef<any>(null); // Leaflet circle marker for user location
+  const watchIdRef = useRef<number | null>(null);
   const { t, lang, visitedSiteIds, markVisited } = useApp();
   const DESTINATIONS = useDestinations();
   const ATTRACTIONS = useAttractions();
@@ -216,6 +222,64 @@ export default function MapPage() {
     if (mapReadyRef.current) buildMarkers();
   }, [layerMode, visitedSiteIds]);
 
+  // ── GPS blue dot ────────────────────────────────────────────
+  useEffect(() => {
+    if (!autoCenter) {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      return;
+    }
+    if (!navigator.geolocation) {
+      setGpsError("GPS not available on this device.");
+      setAutoCenter(false);
+      return;
+    }
+    setGpsError(null);
+
+    const updateDot = (pos: GeolocationPosition) => {
+      const L = LeafletRef.current;
+      const map = mapInstanceRef.current;
+      if (!L || !map) return;
+      const { latitude: lat, longitude: lng } = pos.coords;
+      if (blueDotRef.current) {
+        blueDotRef.current.setLatLng([lat, lng]);
+      } else {
+        const blueDotIcon = L.divIcon({
+          className: "",
+          html: `<div style="position:relative;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">
+            <div style="position:absolute;width:20px;height:20px;border-radius:50%;background:rgba(37,99,235,0.2);animation:gps-pulse 2s ease-out infinite;"></div>
+            <div style="width:12px;height:12px;border-radius:50%;background:#2563eb;border:2px solid white;box-shadow:0 0 0 2px rgba(37,99,235,0.4);"></div>
+          </div>`,
+          iconSize: [20, 20],
+          iconAnchor: [10, 10],
+        });
+        blueDotRef.current = L.marker([lat, lng], { icon: blueDotIcon, zIndexOffset: 1000 }).addTo(map);
+      }
+      map.setView([lat, lng], Math.max(map.getZoom(), 14), { animate: true });
+    };
+
+    const onGpsError = (err: GeolocationPositionError) => {
+      setGpsError(err.code === 1 ? "Location permission denied." : "Unable to get your location.");
+      setAutoCenter(false);
+    };
+
+    watchIdRef.current = navigator.geolocation.watchPosition(updateDot, onGpsError, {
+      enableHighAccuracy: true, maximumAge: 5000, timeout: 10000,
+    });
+
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      if (blueDotRef.current) { blueDotRef.current.remove(); blueDotRef.current = null; }
+    };
+  }, [autoCenter]);
+
+  const toggleAutoCenter = () => setAutoCenter(v => !v);
+
   // ── Handle mark visited ───────────────────────────────────────────────────
   const handleMarkVisited = async () => {
     if (!selectedPin) return;
@@ -337,6 +401,31 @@ export default function MapPage() {
     <div className="relative" style={{ height: "calc(100vh - 114px)" }}>
       {/* Map */}
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} data-testid="map-container" />
+
+      {/* GPS error toast */}
+      {gpsError && (
+        <div className="absolute top-3 left-3 z-[1001] bg-destructive text-destructive-foreground text-xs rounded-lg px-3 py-2 shadow-md flex items-center gap-2">
+          <span>{gpsError}</span>
+          <button onClick={() => setGpsError(null)} aria-label="Dismiss" className="ml-1 font-bold">✕</button>
+        </div>
+      )}
+
+      {/* GPS locate button */}
+      <div className="absolute top-3 left-3 z-[1000]">
+        <button
+          onClick={toggleAutoCenter}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border shadow-md text-xs font-semibold transition-colors ${
+            autoCenter
+              ? "bg-blue-600 text-white border-blue-700"
+              : "bg-card/95 backdrop-blur border-border text-muted-foreground hover:text-foreground"
+          }`}
+          aria-label={autoCenter ? "Stop following my location" : "Find my location"}
+          title={autoCenter ? "Auto-center ON — tap to stop" : "Show my location"}
+        >
+          {autoCenter ? <LocateFixed size={14} /> : <Locate size={14} />}
+          {autoCenter ? "Following" : "My Location"}
+        </button>
+      </div>
 
       {/* Layer toggle */}
       <div className="absolute top-3 right-3 z-[1000]">
