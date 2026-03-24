@@ -1,4 +1,4 @@
-export type Lang = "en" | "al" | "gr" | "it" | "es" | "de" | "fr" | "ar" | "sl";
+export type Lang = "en" | "al" | "gr" | "it" | "es" | "de" | "fr" | "ar" | "sl" | "pt" | "cn";
 
 export const LANG_LABELS: Record<Lang, string> = {
   en: "EN",
@@ -10,6 +10,8 @@ export const LANG_LABELS: Record<Lang, string> = {
   fr: "FR",
   ar: "AR",
   sl: "SL",
+  pt: "PT",
+  cn: "中文",
 };
 
 export const LANG_NAMES: Record<Lang, string> = {
@@ -22,6 +24,8 @@ export const LANG_NAMES: Record<Lang, string> = {
   fr: "Français",
   ar: "العربية",
   sl: "Slovenščina",
+  pt: "Português",
+  cn: "中文 (简体)",
 };
 
 export interface Translations {
@@ -217,6 +221,104 @@ const GR: Translations = {
 };
 
 // New languages fall back to English UI strings (content is translated separately)
+const PT: Translations = {
+  appName: "AlbaniaAudioTours",
+  tagline: "Descubra a Albânia — Uma História de Cada Vez",
+  exploreMap: "Explorar Mapa",
+  tourSites: "Locais do Tour",
+  myPassport: "Meu Passaporte",
+  leaderboard: "Classificação",
+  startAudioTour: "Start Audio Tour",
+  pauseAudio: "Pausar",
+  resumeAudio: "Retomar",
+  visitedSites: "Sites Visited",
+  totalPoints: "Total Points",
+  rank: "Rank",
+  markVisited: "Marcar como Visitado",
+  alreadyVisited: "Visited ✓",
+  difficulty: { easy: "Easy", moderate: "Moderate", hard: "Challenging" },
+  categories: {
+    archaeology: "Archaeology",
+    castle: "Castle",
+    beach: "Beach",
+    nature: "Nature",
+    "historic-town": "Historic Town",
+  },
+  duration: "Duration",
+  points: "Points",
+  region: "Region",
+  funFact: "Você Sabia?",
+  audioTourTitle: "Guia de Áudio",
+  noAudio: "Guia de áudio em breve.",
+  filterAll: "All",
+  searchPlaceholder: "Search sites...",
+  passportTitle: "Your Travel Passport",
+  passportSubtitle: "Collect stamps by visiting Albania's treasures",
+  stampsEarned: "Stamps Earned",
+  nextBadge: "Next badge at",
+  lbTitle: "Top Explorers",
+  lbYou: "You",
+  lbEmpty: "No explorers yet — be the first!",
+  loading: "Loading...",
+  congratulations: "Congratulations!",
+  youEarned: "You earned",
+  close: "Fechar",
+  xpProgress: "Explorer Progress",
+  minuteRead: "min visit",
+  backToMap: "Voltar ao Mapa",
+  allRegions: "All Regions",
+};
+
+
+const CN: Translations = {
+  appName: "AlbaniaAudioTours",
+  tagline: "探索阿尔巴尼亚——每次一个故事",
+  exploreMap: "探索地图",
+  tourSites: "景点",
+  myPassport: "我的护照",
+  leaderboard: "排行榜",
+  startAudioTour: "Start Audio Tour",
+  pauseAudio: "暂停",
+  resumeAudio: "继续",
+  visitedSites: "Sites Visited",
+  totalPoints: "Total Points",
+  rank: "Rank",
+  markVisited: "标记为已访问",
+  alreadyVisited: "Visited ✓",
+  difficulty: { easy: "Easy", moderate: "Moderate", hard: "Challenging" },
+  categories: {
+    archaeology: "Archaeology",
+    castle: "Castle",
+    beach: "Beach",
+    nature: "Nature",
+    "historic-town": "Historic Town",
+  },
+  duration: "Duration",
+  points: "Points",
+  region: "Region",
+  funFact: "你知道吗？",
+  audioTourTitle: "语音导览",
+  noAudio: "语音导览即将推出。",
+  filterAll: "All",
+  searchPlaceholder: "Search sites...",
+  passportTitle: "Your Travel Passport",
+  passportSubtitle: "Collect stamps by visiting Albania's treasures",
+  stampsEarned: "Stamps Earned",
+  nextBadge: "Next badge at",
+  lbTitle: "Top Explorers",
+  lbYou: "You",
+  lbEmpty: "No explorers yet — be the first!",
+  loading: "Loading...",
+  congratulations: "Congratulations!",
+  youEarned: "You earned",
+  close: "关闭",
+  xpProgress: "Explorer Progress",
+  minuteRead: "min visit",
+  backToMap: "返回地图",
+  allRegions: "All Regions",
+};
+
+
 export const TRANSLATIONS: Record<Lang, Translations> = {
   en: EN, al: AL, gr: GR,
   it: EN, es: EN, de: EN, fr: EN, ar: EN, sl: EN,

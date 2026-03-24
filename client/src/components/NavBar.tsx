@@ -15,7 +15,7 @@ export default function NavBar() {
     { href: "/leaderboard", icon: Trophy, label: t.leaderboard },
   ];
 
-  const allLangs: Lang[] = ["en", "al", "gr", "it", "es", "de", "fr", "ar", "sl"];
+  const allLangs: Lang[] = ["en", "al", "gr", "it", "es", "de", "fr", "ar", "sl", "pt", "cn"];
   const FLAG: Record<Lang, string> = {
     en: "🇬🇧", al: "🇦🇱", gr: "🇬🇷", it: "🇮🇹",
     es: "🇪🇸", de: "🇩🇪", fr: "🇫🇷", ar: "🇸🇦", sl: "🇸🇮",

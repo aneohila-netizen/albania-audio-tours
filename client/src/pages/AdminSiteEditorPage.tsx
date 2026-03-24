@@ -18,10 +18,18 @@ import { getAdminToken } from "@/lib/adminAuth";
 const CATEGORIES = ["archaeology", "castle", "beach", "historic-town", "nature"];
 const DIFFICULTIES = ["easy", "moderate", "hard"];
 const REGIONS = ["Sarandë", "Gjirokastër", "Fier", "Berat", "Shkodër", "Tirana", "Durrës", "Vlorë", "Korçë", "Other"];
-const LANGS: { key: "en" | "al" | "gr"; label: string; flag: string }[] = [
+const LANGS: { key: "en" | "al" | "gr" | "it" | "es" | "de" | "fr" | "ar" | "sl" | "pt" | "cn"; label: string; flag: string }[] = [
   { key: "en", label: "English", flag: "🇬🇧" },
   { key: "al", label: "Albanian", flag: "🇦🇱" },
   { key: "gr", label: "Greek", flag: "🇬🇷" },
+  { key: "it", label: "Italian", flag: "🇮🇹" },
+  { key: "es", label: "Spanish", flag: "🇪🇸" },
+  { key: "de", label: "German", flag: "🇩🇪" },
+  { key: "fr", label: "French", flag: "🇫🇷" },
+  { key: "ar", label: "Arabic", flag: "🇸🇦" },
+  { key: "sl", label: "Slovenian", flag: "🇸🇮" },
+  { key: "pt", label: "Portuguese", flag: "🇵🇹" },
+  { key: "cn", label: "Chinese", flag: "🇨🇳" },
 ];
 
 function adminFetch(url: string, options?: RequestInit) {

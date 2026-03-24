@@ -63,7 +63,7 @@ const ATTR_CATEGORIES = [
 ];
 const DIFFICULTIES = ["easy", "moderate", "hard"];
 const REGIONS = ["Tirana", "Durrës", "Shkodër", "Lezha", "Berat", "Elbasan", "Korçë", "Vlorë", "Gjirokastër", "Sarandë", "Fier", "Other"];
-const LANGS: { key: "en" | "al" | "gr" | "it" | "es" | "de" | "fr" | "ar" | "sl"; label: string; flag: string }[] = [
+const LANGS: { key: "en" | "al" | "gr" | "it" | "es" | "de" | "fr" | "ar" | "sl" | "pt" | "cn"; label: string; flag: string }[] = [
   { key: "en", label: "English", flag: "🇬🇧" },
   { key: "al", label: "Albanian", flag: "🇦🇱" },
   { key: "gr", label: "Greek", flag: "🇬🇷" },
@@ -73,6 +73,8 @@ const LANGS: { key: "en" | "al" | "gr" | "it" | "es" | "de" | "fr" | "ar" | "sl"
   { key: "fr", label: "French", flag: "🇫🇷" },
   { key: "ar", label: "Arabic", flag: "🇸🇦" },
   { key: "sl", label: "Slovenian", flag: "🇸🇮" },
+  { key: "pt", label: "Portuguese", flag: "🇵🇹" },
+  { key: "cn", label: "Chinese", flag: "🇨🇳" },
 ];
 
 // ─── In-memory session persistence (survives component remounts, not page reload)

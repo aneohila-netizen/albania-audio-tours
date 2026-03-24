@@ -23,6 +23,8 @@ function getStoredAudioUrl(site: TourSite, lang: Lang): string | null {
     fr: s.audioUrlFr,
     ar: s.audioUrlAr,
     sl: s.audioUrlSl,
+    pt: s.audioUrlPt,
+    cn: s.audioUrlCn,
   };
   return map[lang] || null;
 }
