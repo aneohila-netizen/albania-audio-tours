@@ -1148,6 +1148,7 @@ type DestFormData = {
   lat: string; lng: string;
   region: string; category: string; difficulty: string;
   points: string; visitDuration: string; imageUrl: string;
+  isLocked: boolean; shopifyUrl: string;
 };
 
 const EMPTY_DEST_FORM: DestFormData = {
@@ -1159,6 +1160,7 @@ const EMPTY_DEST_FORM: DestFormData = {
   audioUrlIt: null, audioUrlEs: null, audioUrlDe: null, audioUrlFr: null, audioUrlAr: null, audioUrlSl: null,
   lat: "", lng: "", region: "", category: "", difficulty: "easy",
   points: "100", visitDuration: "120", imageUrl: "",
+  isLocked: false, shopifyUrl: "",
 };
 
 function siteToForm(s: TourSite): DestFormData {
@@ -1180,6 +1182,8 @@ function siteToForm(s: TourSite): DestFormData {
     region: s.region, category: s.category, difficulty: s.difficulty,
     points: String(s.points), visitDuration: String(s.visitDuration),
     imageUrl: s.imageUrl || "",
+    isLocked: (s as any).isLocked || false,
+    shopifyUrl: (s as any).shopifyUrl || "",
   };
 }
 
@@ -1441,6 +1445,48 @@ function EditorView({
                 </Field>
               </CardContent>
             </Card>
+
+            {/* Monetization — lock + Shopify */}
+            <Card className="border-border/60">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-primary" /> Monetization
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div>
+                    <p className="text-sm font-medium">Lock this page</p>
+                    <p className="text-xs text-muted-foreground">Visitors need an unlock code or payment to access</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormState(f => ({ ...f, isLocked: !f.isLocked }))}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                      form.isLocked
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-border text-muted-foreground hover:bg-muted"
+                    }`}
+                    data-testid="lock-toggle"
+                    aria-pressed={form.isLocked}
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    {form.isLocked ? "Locked 🔒" : "Unlocked 🔓"}
+                  </button>
+                </div>
+                <Field label="Shopify booking URL (optional)">
+                  <Input
+                    value={form.shopifyUrl}
+                    onChange={e => set("shopifyUrl", e.target.value)}
+                    placeholder="https://albanianEagleTours.com/products/tirana-private-tour"
+                    data-testid="input-shopify-url"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    When set, a "Book with a Guide" button appears at the bottom of this page.
+                  </p>
+                </Field>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Location — interactive map picker */}
@@ -1608,6 +1654,7 @@ const EMPTY_ATTR_FORM: AttrFormData = {
   audioUrlIt: "", audioUrlEs: "", audioUrlDe: "", audioUrlFr: "", audioUrlAr: "", audioUrlSl: "",
   category: "", points: "50", lat: "", lng: "",
   visitDuration: "30", imageUrl: "",
+  isLocked: false, shopifyUrl: "",
 };
 
 function attrToForm(a: Attraction): AttrFormData {
@@ -1846,6 +1893,42 @@ function AttrEditorView({
                     <Input type="number" min="5" max="300" value={form.visitDuration} onChange={e => set("visitDuration", e.target.value)} />
                   </Field>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Monetization */}
+            <Card className="border-border/60">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-primary" /> Monetization
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div>
+                    <p className="text-sm font-medium">Lock this page</p>
+                    <p className="text-xs text-muted-foreground">Requires unlock code or payment</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormState((f: any) => ({ ...f, isLocked: !f.isLocked }))}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                      (form as any).isLocked
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-border text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    {(form as any).isLocked ? "Locked 🔒" : "Unlocked 🔓"}
+                  </button>
+                </div>
+                <Field label="Shopify booking URL (optional)">
+                  <Input
+                    value={(form as any).shopifyUrl || ""}
+                    onChange={e => set("shopifyUrl" as any, e.target.value)}
+                    placeholder="https://albanianEagleTours.com/products/..."
+                  />
+                </Field>
               </CardContent>
             </Card>
           </TabsContent>

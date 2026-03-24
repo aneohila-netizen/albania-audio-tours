@@ -80,6 +80,8 @@ export default function MapPage() {
   const [layerMode, setLayerMode] = useState<LayerMode>("attractions");
   const [, navigate] = useLocation();
 
+  const [heroDismissed, setHeroDismissed] = useState(false);
+
   // ── GPS blue dot state ────────────────────────────────────────────
   const [autoCenter, setAutoCenter] = useState(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
@@ -466,10 +468,73 @@ export default function MapPage() {
     }
   };
 
+  const handlePlayFromPin = () => {
+    if (!selectedPin) return;
+    const data = selectedPin.data;
+    const descField = `desc${lang.charAt(0).toUpperCase() + lang.slice(1)}`;
+    const text = (data as any)[descField] || (data as any).descEn || "";
+    const nameField = `name${lang.charAt(0).toUpperCase() + lang.slice(1)}`;
+    const siteName = (data as any)[nameField] || (data as any).nameEn || "";
+    const storedAudioField = `audioUrl${lang.charAt(0).toUpperCase() + lang.slice(1)}`;
+    const storedUrl = (data as any)[storedAudioField] || (data as any).audioUrlEn || null;
+    const detailPath = selectedPin.type === "destination"
+      ? `/sites/${selectedPin.data.slug}`
+      : `/sites/${(selectedPin as any).dest.slug}/${selectedPin.data.slug}`;
+    loadTrack({
+      siteId: data.id,
+      siteSlug: data.slug,
+      siteName,
+      lang,
+      text,
+      storedUrl,
+    });
+    navigate(detailPath);
+    setSelectedPin(null);
+  };
+
   return (
     <div className="relative" style={{ height: "calc(100vh - 114px)" }}>
       {/* Map */}
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} data-testid="map-container" />
+
+      {/* 1a: Entry hero CTA — shown on first visit, dismissed after interaction */}
+      {!heroDismissed && !selectedPin && (
+        <div className="absolute bottom-4 left-3 right-3 z-[999] pointer-events-none">
+          <div className="bg-card/96 backdrop-blur-sm border border-primary/20 rounded-2xl shadow-2xl p-4 pointer-events-auto">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-primary mb-0.5">🎧 Self-Guided Audio Tours</p>
+                <p className="font-bold text-base leading-tight mb-1">Discover Albania</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Tap any pin on the map to explore a site, or start a featured tour below.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { navigate("/sites/tirana"); setHeroDismissed(true); }}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                    style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                  >
+                    <Headphones size={14} /> Start Tirana Tour
+                  </button>
+                  <button
+                    onClick={() => { navigate("/sites"); setHeroDismissed(true); }}
+                    className="px-4 py-2 rounded-lg text-sm font-medium border border-border hover:bg-muted transition-colors"
+                  >
+                    Browse All
+                  </button>
+                </div>
+              </div>
+              <button
+                onClick={() => setHeroDismissed(true)}
+                className="p-1 rounded-lg hover:bg-muted shrink-0 -mt-1 -mr-1"
+                aria-label="Dismiss"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* GPS error toast */}
       {gpsError && (
@@ -639,14 +704,30 @@ export default function MapPage() {
                 )}
               </div>
 
+              {/* Tour metadata — duration, stops */}
+              {selectedPin?.type === "attraction" && selectedPin.data.visitDuration && (
+                <p className="text-xs text-muted-foreground flex items-center gap-3">
+                  <span>⏱ {selectedPin.data.visitDuration} min visit</span>
+                  <span>★ {selectedPin.data.points} pts</span>
+                </p>
+              )}
+
               {/* Actions */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={handlePlayFromPin}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
+                  style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                  aria-label="Play audio guide"
+                >
+                  <Headphones size={14} /> Play Audio
+                </button>
                 <button
                   data-testid="view-details-btn"
                   onClick={handleViewDetails}
                   className="flex-1 py-2 rounded-lg text-sm font-medium border border-border hover:bg-muted transition-colors"
                 >
-                  View Details
+                  Details
                 </button>
                 {selectedPin.type === "attraction" && (
                   <button

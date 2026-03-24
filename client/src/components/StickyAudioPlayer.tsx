@@ -20,8 +20,10 @@ export interface AudioTrack {
   lang: string;
   text: string;           // transcript / description text
   storedUrl?: string | null;
-  nextStopUrl?: string | null;  // wouter path to next itinerary stop (optional)
+  nextStopUrl?: string | null;
   nextStopName?: string | null;
+  stopIndex?: number | null;   // e.g. 2 (1-based)
+  totalStops?: number | null;  // e.g. 8
 }
 
 interface AudioPlayerContextType {
@@ -278,6 +280,11 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
           <div className="flex items-center gap-2 min-w-0">
             <Volume2 size={14} className="text-primary shrink-0" aria-hidden="true" />
             <span className="text-xs font-semibold truncate">{track.siteName}</span>
+          {track.stopIndex && track.totalStops && (
+            <span className="text-[10px] font-medium text-muted-foreground shrink-0 bg-muted px-1.5 py-0.5 rounded-full">
+              {track.stopIndex}/{track.totalStops}
+            </span>
+          )}
             {completed && (
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 shrink-0">
                 ✓ Done

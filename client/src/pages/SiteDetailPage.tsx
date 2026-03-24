@@ -3,6 +3,8 @@ import { useRoute, useLocation } from "wouter";
 import { useApp } from "@/App";
 import type { TourSite } from "@shared/schema";
 import AudioPlayer from "@/components/AudioPlayer";
+import PaywallGate from "@/components/PaywallGate";
+import BookWithGuide from "@/components/BookWithGuide";
 import StarRatingDisplay from "@/components/StarRatingDisplay";
 import ItineraryCard from "@/components/ItineraryCard";
 import VisitModal from "@/components/VisitModal";
@@ -156,6 +158,12 @@ export default function SiteDetailPage() {
       {/* Visitor rating average */}
       <StarRatingDisplay siteSlug={site.slug} />
 
+      <PaywallGate
+        isLocked={(site as any).isLocked || false}
+        siteName={name}
+        shopifyUrl={(site as any).shopifyUrl}
+      >
+
       {/* Audio player — primary focus: sits above description */}
       <AudioPlayer site={site} text={desc} onComplete={handleAudioComplete} />
 
@@ -201,6 +209,11 @@ export default function SiteDetailPage() {
           Get Directions
         </a>
       </div>
+
+      {/* Book with a guide */}
+      <BookWithGuide shopifyUrl={(site as any).shopifyUrl || ""} siteName={name} />
+
+      </PaywallGate>
 
       {/* Mark visited CTA */}
       <button

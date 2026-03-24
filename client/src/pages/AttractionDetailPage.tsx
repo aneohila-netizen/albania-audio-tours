@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import type { TourSite, Attraction } from "@shared/schema";
 import { railwayFetch } from "@/lib/queryClient";
 import AudioPlayer from "@/components/AudioPlayer";
+import PaywallGate from "@/components/PaywallGate";
+import BookWithGuide from "@/components/BookWithGuide";
 import StarRatingDisplay from "@/components/StarRatingDisplay";
 import ItineraryCard from "@/components/ItineraryCard";
 import VisitModal from "@/components/VisitModal";
@@ -189,6 +191,12 @@ export default function AttractionDetailPage() {
       {/* Visitor rating average */}
       <StarRatingDisplay siteSlug={attraction.slug} />
 
+      <PaywallGate
+        isLocked={(attraction as any).isLocked || false}
+        siteName={aName}
+        shopifyUrl={(attraction as any).shopifyUrl}
+      >
+
       {/* Audio player — primary focus: sits above description */}
       <AudioPlayer site={siteCompat} text={aDesc} onComplete={() => { if (!isVisited) handleMarkVisited(); }} />
 
@@ -230,6 +238,11 @@ export default function AttractionDetailPage() {
           Get Directions
         </a>
       </div>
+
+      {/* Book with a guide */}
+      <BookWithGuide shopifyUrl={(attraction as any).shopifyUrl || ""} siteName={aName} />
+
+      </PaywallGate>
 
       {/* Mark visited */}
       <button data-testid="mark-visited-btn" onClick={handleMarkVisited} disabled={isVisited}

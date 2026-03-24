@@ -46,6 +46,8 @@ export const tourSites = pgTable("tour_sites", {
   points: integer("points").notNull().default(100),
   imageUrl: text("image_url"),
   visitDuration: integer("visit_duration").notNull().default(60),
+  isLocked: boolean("is_locked").notNull().default(false),
+  shopifyUrl: text("shopify_url"),
   funFactEn: text("fun_fact_en"),
   funFactAl: text("fun_fact_al"),
   funFactGr: text("fun_fact_gr"),

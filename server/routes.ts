@@ -781,6 +781,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(obj);
   });
 
+  // ── Unlock-code check ────────────────────────────────────────────
+  // POST /api/unlock { code: string } — validates against UNLOCK_CODE env var
+  app.post("/api/unlock", (req, res) => {
+    const { code } = req.body as { code: string };
+    const validCode = process.env.UNLOCK_CODE || "ALBANIA2026";
+    if (!code) return res.status(400).json({ error: "Code required" });
+    if (code.trim().toUpperCase() === validCode.trim().toUpperCase()) {
+      res.json({ success: true });
+    } else {
+      res.status(401).json({ success: false, error: "Invalid unlock code" });
+    }
+  });
+
   // ── Ratings ─────────────────────────────────────────────────
   // POST /api/ratings — save a star rating (1–5) for a site
   app.post("/api/ratings", async (req, res) => {

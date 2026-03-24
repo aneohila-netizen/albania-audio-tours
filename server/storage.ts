@@ -103,7 +103,9 @@ class PgStorage implements IStorage {
         difficulty TEXT NOT NULL DEFAULT 'easy',
         points INTEGER NOT NULL DEFAULT 100,
         image_url TEXT,
-        visit_duration INTEGER NOT NULL DEFAULT 60
+        visit_duration INTEGER NOT NULL DEFAULT 60,
+        is_locked BOOLEAN NOT NULL DEFAULT FALSE,
+        shopify_url TEXT
       );
 
       CREATE TABLE IF NOT EXISTS attractions (
@@ -228,6 +230,8 @@ class PgStorage implements IStorage {
       "ALTER TABLE tour_sites ADD COLUMN IF NOT EXISTS fun_fact_cn TEXT",
       "ALTER TABLE tour_sites ADD COLUMN IF NOT EXISTS audio_url_pt TEXT",
       "ALTER TABLE tour_sites ADD COLUMN IF NOT EXISTS audio_url_cn TEXT",
+      "ALTER TABLE tour_sites ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT FALSE",
+      "ALTER TABLE tour_sites ADD COLUMN IF NOT EXISTS shopify_url TEXT",
       // attractions
       "ALTER TABLE attractions ADD COLUMN IF NOT EXISTS name_it TEXT DEFAULT ''",
       "ALTER TABLE attractions ADD COLUMN IF NOT EXISTS name_es TEXT DEFAULT ''",
@@ -261,6 +265,8 @@ class PgStorage implements IStorage {
       "ALTER TABLE attractions ADD COLUMN IF NOT EXISTS fun_fact_cn TEXT DEFAULT ''",
       "ALTER TABLE attractions ADD COLUMN IF NOT EXISTS audio_url_pt TEXT",
       "ALTER TABLE attractions ADD COLUMN IF NOT EXISTS audio_url_cn TEXT",
+      "ALTER TABLE attractions ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT FALSE",
+      "ALTER TABLE attractions ADD COLUMN IF NOT EXISTS shopify_url TEXT",
     ];
     for (const sql of newLangCols) {
       await this.pool.query(sql).catch(() => {}); // ignore if already exists
@@ -345,6 +351,7 @@ class PgStorage implements IStorage {
       category: r.category, points: r.points,
       lat: parseFloat(r.lat), lng: parseFloat(r.lng),
       imageUrl: r.image_url, visitDuration: r.visit_duration,
+      isLocked: r.is_locked ?? false, shopifyUrl: r.shopify_url || null,
     } as any;
   }
 
@@ -399,6 +406,7 @@ class PgStorage implements IStorage {
       audioUrlFr: "audio_url_fr", audioUrlAr: "audio_url_ar", audioUrlSl: "audio_url_sl", audioUrlPt: "audio_url_pt", audioUrlCn: "audio_url_cn",
       lat: "lat", lng: "lng", region: "region", category: "category",
       difficulty: "difficulty", points: "points", imageUrl: "image_url", visitDuration: "visit_duration",
+      isLocked: "is_locked", shopifyUrl: "shopify_url",
     };
     for (const [key, col] of Object.entries(map)) {
       if (key in data) { fields.push(`${col}=$${i++}`); values.push((data as any)[key]); }
@@ -481,6 +489,7 @@ class PgStorage implements IStorage {
       audioUrlFr: "audio_url_fr", audioUrlAr: "audio_url_ar", audioUrlSl: "audio_url_sl", audioUrlPt: "audio_url_pt", audioUrlCn: "audio_url_cn",
       category: "category", points: "points",
       lat: "lat", lng: "lng", imageUrl: "image_url", visitDuration: "visit_duration",
+      isLocked: "is_locked", shopifyUrl: "shopify_url",
     };
     for (const [key, col] of Object.entries(map)) {
       if (key in data) { fields.push(`${col}=$${i++}`); values.push((data as any)[key]); }

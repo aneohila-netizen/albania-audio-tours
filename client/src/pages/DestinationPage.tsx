@@ -6,6 +6,8 @@ import type { TourSite, Attraction } from "@shared/schema";
 import { railwayFetch } from "@/lib/queryClient";
 import MiniMap from "@/components/MiniMap";
 import AudioPlayer from "@/components/AudioPlayer";
+import PaywallGate from "@/components/PaywallGate";
+import BookWithGuide from "@/components/BookWithGuide";
 import StarRatingDisplay from "@/components/StarRatingDisplay";
 import ItineraryCard from "@/components/ItineraryCard";
 import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb, Navigation } from "lucide-react";
@@ -135,6 +137,12 @@ export default function DestinationPage() {
       {/* Visitor rating average */}
       <StarRatingDisplay siteSlug={dest.slug} />
 
+      <PaywallGate
+        isLocked={(dest as any).isLocked || false}
+        siteName={name}
+        shopifyUrl={(dest as any).shopifyUrl}
+      >
+
       {/* Audio Guide — primary focus: sits above description */}
       <AudioPlayer site={dest} />
 
@@ -153,6 +161,11 @@ export default function DestinationPage() {
           {showFullDesc ? "Show less" : "Read more"}
         </button>
       </div>
+
+      {/* Book with a guide */}
+      <BookWithGuide shopifyUrl={(dest as any).shopifyUrl || ""} siteName={name} />
+
+      </PaywallGate>
 
       {/* Attractions */}
       {attractions.length > 0 && (
