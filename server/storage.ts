@@ -4,6 +4,7 @@ import type {
   TourSite, UserProgress, InsertUserProgress, InsertTourSite,
   Attraction, InsertAttraction,
   Itinerary, InsertItinerary,
+  Rating, InsertRating,
 } from "@shared/schema";
 
 // ─── Interface ────────────────────────────────────────────────────────────────
@@ -23,6 +24,9 @@ export interface IStorage {
   createAttraction(data: InsertAttraction): Promise<Attraction>;
   updateAttraction(id: number, data: Partial<InsertAttraction>): Promise<Attraction | undefined>;
   deleteAttraction(id: number): Promise<boolean>;
+  // Ratings
+  saveRating(siteId: number, siteSlug: string, stars: number): Promise<Rating>;
+  getRatingStats(siteSlug: string): Promise<{ average: number; count: number }>;
   // Itineraries
   getItinerariesBySite(siteSlug: string): Promise<Itinerary[]>;
   getItineraryById(id: number): Promise<Itinerary | undefined>;
@@ -153,6 +157,14 @@ class PgStorage implements IStorage {
         site_id INTEGER NOT NULL,
         visited_at TIMESTAMP DEFAULT NOW(),
         points_earned INTEGER NOT NULL DEFAULT 0
+      );
+
+      CREATE TABLE IF NOT EXISTS ratings (
+        id SERIAL PRIMARY KEY,
+        site_id INTEGER NOT NULL,
+        site_slug TEXT NOT NULL,
+        stars INTEGER NOT NULL CHECK (stars >= 1 AND stars <= 5),
+        created_at TEXT NOT NULL
       );
 
       CREATE TABLE IF NOT EXISTS itineraries (
@@ -565,6 +577,27 @@ class PgStorage implements IStorage {
     const { rowCount } = await this.pool.query('DELETE FROM itineraries WHERE id=$1', [id]);
     return (rowCount ?? 0) > 0;
   }
+
+  // ── Ratings ─────────────────────────────────────────
+  async saveRating(siteId: number, siteSlug: string, stars: number): Promise<Rating> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      'INSERT INTO ratings (site_id, site_slug, stars, created_at) VALUES ($1,$2,$3,$4) RETURNING *',
+      [siteId, siteSlug, stars, new Date().toISOString()]
+    );
+    const r = rows[0];
+    return { id: r.id, siteId: r.site_id, siteSlug: r.site_slug, stars: r.stars, createdAt: r.created_at };
+  }
+
+  async getRatingStats(siteSlug: string): Promise<{ average: number; count: number }> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      'SELECT COUNT(*)::int as count, ROUND(AVG(stars)::numeric, 1)::float as average FROM ratings WHERE site_slug=$1',
+      [siteSlug]
+    );
+    const { count, average } = rows[0];
+    return { count: count || 0, average: average || 0 };
+  }
 }
 
 // ─── File-based / memory storage (local dev fallback) ─────────────────────────
@@ -695,6 +728,20 @@ export class MemStorage implements IStorage {
     const before = this.itineraries.length;
     this.itineraries = this.itineraries.filter(i => i.id !== id);
     return this.itineraries.length < before;
+  }
+
+  // MemStorage ratings (in-memory)
+  private ratingsList: Rating[] = [];
+  async saveRating(siteId: number, siteSlug: string, stars: number): Promise<Rating> {
+    const item: Rating = { id: Date.now(), siteId, siteSlug, stars, createdAt: new Date().toISOString() };
+    this.ratingsList.push(item);
+    return item;
+  }
+  async getRatingStats(siteSlug: string): Promise<{ average: number; count: number }> {
+    const list = this.ratingsList.filter(r => r.siteSlug === siteSlug);
+    if (!list.length) return { average: 0, count: 0 };
+    const avg = Math.round((list.reduce((s, r) => s + r.stars, 0) / list.length) * 10) / 10;
+    return { average: avg, count: list.length };
   }
 }
 

@@ -3,6 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { useApp } from "@/App";
 import type { TourSite } from "@shared/schema";
 import AudioPlayer from "@/components/AudioPlayer";
+import StarRatingDisplay from "@/components/StarRatingDisplay";
 import ItineraryCard from "@/components/ItineraryCard";
 import VisitModal from "@/components/VisitModal";
 import MiniMap from "@/components/MiniMap";
@@ -151,6 +152,9 @@ export default function SiteDetailPage() {
           </span>
         </div>
       </div>
+
+      {/* Visitor rating average */}
+      <StarRatingDisplay siteSlug={site.slug} />
 
       {/* Audio player — primary focus: sits above description */}
       <AudioPlayer site={site} text={desc} onComplete={handleAudioComplete} />

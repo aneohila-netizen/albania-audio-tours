@@ -59,6 +59,7 @@ export default function AudioPlayer({ site, text, onComplete, nextStopUrl, nextS
   const handlePlay = () => {
     const track: AudioTrack = {
       siteId: site.id,
+      siteSlug: site.slug,
       siteName: (site as any)[`name${lang.charAt(0).toUpperCase() + lang.slice(1)}`] || site.nameEn,
       lang,
       text: text || "",

@@ -15,6 +15,7 @@ import { RAILWAY_URL } from "@/lib/queryClient";
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface AudioTrack {
   siteId: number;
+  siteSlug: string;
   siteName: string;
   lang: string;
   text: string;           // transcript / description text

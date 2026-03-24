@@ -779,5 +779,30 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(obj);
   });
 
+  // ── Ratings ─────────────────────────────────────────────────
+  // POST /api/ratings — save a star rating (1–5) for a site
+  app.post("/api/ratings", async (req, res) => {
+    const { siteId, siteSlug, stars } = req.body as { siteId: number; siteSlug: string; stars: number };
+    if (!siteSlug || !stars || stars < 1 || stars > 5) {
+      return res.status(400).json({ error: "siteSlug and stars (1–5) are required" });
+    }
+    try {
+      const rating = await storage.saveRating(Number(siteId) || 0, siteSlug, Math.round(stars));
+      res.json({ success: true, rating });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/ratings/:siteSlug — returns { average, count }
+  app.get("/api/ratings/:siteSlug", async (req, res) => {
+    try {
+      const stats = await storage.getRatingStats(req.params.siteSlug);
+      res.json(stats);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   return httpServer;
 }

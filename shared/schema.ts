@@ -123,6 +123,19 @@ export const insertItinerarySchema = createInsertSchema(itineraries).omit({ id: 
 export type Itinerary = typeof itineraries.$inferSelect;
 export type InsertItinerary = z.infer<typeof insertItinerarySchema>;
 
+// ── Ratings ───────────────────────────────────────────────────────────────
+export const ratings = pgTable("ratings", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  siteId: integer("site_id").notNull(),
+  siteSlug: text("site_slug").notNull(),
+  stars: integer("stars").notNull(),        // 1–5
+  createdAt: text("created_at").notNull(),
+});
+
+export const insertRatingSchema = createInsertSchema(ratings).omit({ id: true });
+export type Rating = typeof ratings.$inferSelect;
+export type InsertRating = z.infer<typeof insertRatingSchema>;
+
 export const userProgress = pgTable("user_progress", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   sessionId: text("session_id").notNull(),

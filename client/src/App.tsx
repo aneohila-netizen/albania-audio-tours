@@ -82,11 +82,11 @@ function AppProviders({ children }: { children: React.ReactNode }) {
 function AppRoutes() {
   const [, navigate] = useLocation();
   const [ratingState, setRatingState] = useState<{
-    siteId: number; siteName: string; trigger: "completion" | "exit"; listenedSeconds: number;
+    siteId: number; siteSlug: string; siteName: string; trigger: "completion" | "exit"; listenedSeconds: number;
   } | null>(null);
 
   const handleAudioComplete = (track: AudioTrack, listenedSec: number) => {
-    setRatingState({ siteId: track.siteId, siteName: track.siteName, trigger: "completion", listenedSeconds: listenedSec });
+    setRatingState({ siteId: track.siteId, siteSlug: track.siteSlug, siteName: track.siteName, trigger: "completion", listenedSeconds: listenedSec });
   };
 
   const handleNavigate = (path: string) => {
@@ -130,6 +130,7 @@ function AppRoutes() {
         {ratingState && (
           <RatingSheet
             siteId={ratingState.siteId}
+            siteSlug={ratingState.siteSlug}
             siteName={ratingState.siteName}
             trigger={ratingState.trigger}
             listenedSeconds={ratingState.listenedSeconds}

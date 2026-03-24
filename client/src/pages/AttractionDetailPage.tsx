@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { TourSite, Attraction } from "@shared/schema";
 import { railwayFetch } from "@/lib/queryClient";
 import AudioPlayer from "@/components/AudioPlayer";
+import StarRatingDisplay from "@/components/StarRatingDisplay";
 import ItineraryCard from "@/components/ItineraryCard";
 import VisitModal from "@/components/VisitModal";
 import MiniMap from "@/components/MiniMap";
@@ -184,6 +185,9 @@ export default function AttractionDetailPage() {
           </span>
         </div>
       </div>
+
+      {/* Visitor rating average */}
+      <StarRatingDisplay siteSlug={attraction.slug} />
 
       {/* Audio player — primary focus: sits above description */}
       <AudioPlayer site={siteCompat} text={aDesc} onComplete={() => { if (!isVisited) handleMarkVisited(); }} />

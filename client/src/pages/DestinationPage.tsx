@@ -6,6 +6,7 @@ import type { TourSite, Attraction } from "@shared/schema";
 import { railwayFetch } from "@/lib/queryClient";
 import MiniMap from "@/components/MiniMap";
 import AudioPlayer from "@/components/AudioPlayer";
+import StarRatingDisplay from "@/components/StarRatingDisplay";
 import ItineraryCard from "@/components/ItineraryCard";
 import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb, Navigation } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -130,6 +131,9 @@ export default function DestinationPage() {
           </div>
         </div>
       )}
+
+      {/* Visitor rating average */}
+      <StarRatingDisplay siteSlug={dest.slug} />
 
       {/* Audio Guide — primary focus: sits above description */}
       <AudioPlayer site={dest} />
