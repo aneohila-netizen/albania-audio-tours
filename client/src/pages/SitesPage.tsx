@@ -38,6 +38,7 @@ export default function SitesPage() {
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
 
   const name = (d: Destination) => getLangText(d, "name", lang);
   const tagline = (d: Destination) => getLangText(d, "tagline", lang);
@@ -208,74 +209,105 @@ export default function SitesPage() {
         <div className="flex flex-col gap-3">
           {filtered.map((dest, idx) => {
             const attrCount = ATTRACTIONS.filter(a => a.destinationSlug === dest.slug).length;
+            const isExpanded = expandedSlug === dest.slug;
+            const descText = desc(dest);
+            // Show first 160 chars as preview — enough for 2 readable lines
+            const PREVIEW_LEN = 160;
+            const needsTruncation = descText.length > PREVIEW_LEN;
+            const previewText = needsTruncation && !isExpanded
+              ? descText.slice(0, PREVIEW_LEN).trimEnd() + "…"
+              : descText;
+
             return (
               <article
                 key={dest.slug}
                 data-testid={`dest-list-${dest.slug}`}
-                className="tour-card rounded-xl border border-border bg-card overflow-hidden cursor-pointer group flex items-stretch"
-                onClick={() => navigate(`/sites/${dest.slug}`)}
+                className="tour-card rounded-xl border border-border bg-card overflow-hidden group"
               >
-                {/* Thumbnail */}
-                <div className="relative w-28 sm:w-36 flex-none bg-muted overflow-hidden">
-                  {dest.imageUrl && (
-                    <img
-                      src={dest.imageUrl}
-                      alt={name(dest)}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
-                      onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-                    />
-                  )}
-                  {/* Row number */}
-                  <div className="absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                    style={{ background: "rgba(0,0,0,0.5)" }}>
-                    {idx + 1}
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 p-3 sm:p-4 flex flex-col justify-between min-w-0">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <span
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full text-white"
-                        style={{ background: CATEGORY_COLORS[dest.category] || "#C0392B" }}
-                      >
-                        {CATEGORY_EMOJI[dest.category] || "📍"} {catLabel(dest.category)}
-                      </span>
-                      <span className="points-badge">
-                        <Star size={8} fill="currentColor" />
-                        {dest.totalPoints}
-                      </span>
+                <div className="flex items-stretch">
+                  {/* Thumbnail — fixed 96×96 square, standard list-row size */}
+                  <div
+                    className="relative flex-none bg-muted overflow-hidden cursor-pointer"
+                    style={{ width: 96, minWidth: 96, height: 96 }}
+                    onClick={() => navigate(`/sites/${dest.slug}`)}
+                  >
+                    {dest.imageUrl && (
+                      <img
+                        src={dest.imageUrl}
+                        alt={name(dest)}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        loading="lazy"
+                        onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      />
+                    )}
+                    {/* Row number */}
+                    <div
+                      className="absolute top-1.5 left-1.5 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                      style={{ background: "rgba(0,0,0,0.55)" }}
+                    >
+                      {idx + 1}
                     </div>
-                    <h2 className="font-bold text-base leading-tight mb-1" style={{ fontFamily: "var(--font-display)" }}>
-                      {name(dest)}
-                    </h2>
-                    <p className="text-xs text-muted-foreground italic leading-snug line-clamp-1 mb-1.5">
-                      {tagline(dest)}
-                    </p>
-                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed hidden sm:block">
-                      {desc(dest)}
-                    </p>
                   </div>
 
-                  <div className="flex items-center justify-between mt-2">
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <MapPin size={10} /> {dest.region}
-                      </span>
-                      {attrCount > 0 && (
-                        <span>
-                          📍 {attrCount} places
+                  {/* Content */}
+                  <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span
+                          className="text-xs font-semibold px-2 py-0.5 rounded-full text-white"
+                          style={{ background: CATEGORY_COLORS[dest.category] || "#C0392B" }}
+                        >
+                          {CATEGORY_EMOJI[dest.category] || "📍"} {catLabel(dest.category)}
                         </span>
-                      )}
+                        <span className="points-badge">
+                          <Star size={8} fill="currentColor" />
+                          {dest.totalPoints}
+                        </span>
+                      </div>
+                      <h2
+                        className="font-bold text-sm leading-tight mb-0.5 cursor-pointer hover:text-primary transition-colors"
+                        style={{ fontFamily: "var(--font-display)" }}
+                        onClick={() => navigate(`/sites/${dest.slug}`)}
+                      >
+                        {name(dest)}
+                      </h2>
                     </div>
-                    <span className="flex items-center gap-1 text-xs font-semibold text-primary whitespace-nowrap">
-                      Explore
-                      <ChevronRight size={13} />
-                    </span>
+
+                    <div className="flex items-center justify-between mt-1">
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <MapPin size={10} /> {dest.region}
+                        </span>
+                        {attrCount > 0 && (
+                          <span>📍 {attrCount} places</span>
+                        )}
+                      </div>
+                      <span
+                        className="flex items-center gap-1 text-xs font-semibold text-primary whitespace-nowrap cursor-pointer"
+                        onClick={() => navigate(`/sites/${dest.slug}`)}
+                      >
+                        Explore <ChevronRight size={13} />
+                      </span>
+                    </div>
                   </div>
                 </div>
+
+                {/* Description row — below the thumbnail+content row */}
+                {descText && (
+                  <div className="px-3 pb-3 pt-0">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {previewText}
+                      {needsTruncation && (
+                        <button
+                          className="ml-1 text-primary font-semibold hover:underline focus:outline-none"
+                          onClick={e => { e.stopPropagation(); setExpandedSlug(isExpanded ? null : dest.slug); }}
+                        >
+                          {isExpanded ? "Show less" : "Read more"}
+                        </button>
+                      )}
+                    </p>
+                  </div>
+                )}
               </article>
             );
           })}
