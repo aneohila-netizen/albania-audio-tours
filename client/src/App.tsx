@@ -115,13 +115,10 @@ function AppRoutes() {
                 </Switch>
               </main>
               <footer className="border-t border-border px-4 py-3 text-center" style={{ fontSize: "var(--text-xs)", color: "hsl(var(--muted-foreground))" }}>
-                <a href="https://www.perplexity.ai/computer" target="_blank" rel="noopener noreferrer" className="hover:underline">
-                  Created with Perplexity Computer
-                </a>
-                {" · "}
                 <span>AlbaTour — Albania Self-Guided Audio Tours</span>
+                {"  ·  "}
+                <span>&#169; {new Date().getFullYear()} All Rights Reserved</span>
               </footer>
-              <PerplexityAttribution />
             </div>
           </Route>
         </Switch>
