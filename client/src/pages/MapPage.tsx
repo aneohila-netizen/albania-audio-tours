@@ -650,7 +650,9 @@ export default function MapPage() {
       )}
 
       {/* GPS locate button — pulses until activated to guide the user */}
-      <div className="absolute top-3 left-3 z-[1000] relative">
+      <div className="absolute top-3 left-3 z-[1000]">
+        {/* Inner wrapper is relative so locate-ring span positions against the button */}
+        <div className="relative inline-flex">
         {/* Outer glow ring — only when GPS is off, draws attention without being intrusive */}
         {!autoCenter && (
           <span
@@ -671,6 +673,7 @@ export default function MapPage() {
           {autoCenter ? <LocateFixed size={14} /> : <Locate size={14} />}
           {autoCenter ? "Following" : "My Location"}
         </button>
+        </div>
       </div>
 
       {/* Layer toggle */}
