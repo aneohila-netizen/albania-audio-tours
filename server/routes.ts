@@ -732,6 +732,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   );
 
   // ── Itinerary routes (public GET + admin CUD) ───────────────────────────
+  // Public: GET /api/itineraries  — returns all published itineraries (for nearest-tour discovery)
+  app.get("/api/itineraries", async (_req, res) => {
+    const all = await storage.getAllPublishedItineraries();
+    res.json(all);
+  });
+
   // Public: GET /api/itineraries/:siteSlug  — returns published itineraries for a page
   app.get("/api/itineraries/:siteSlug", async (req, res) => {
     const { siteSlug } = req.params;

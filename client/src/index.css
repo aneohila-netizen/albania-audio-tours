@@ -365,6 +365,50 @@
   100% { transform: scale(2.5); opacity: 0; }
 }
 
+/* ── My Location button: soft pulse glow to guide the user ─────────────────
+   Goal: noticeable but not intrusive — like a heartbeat, not an alarm.
+   Fades completely between pulses so it doesn't become background noise. */
+@keyframes locate-pulse {
+  0%   { box-shadow: 0 0 0 0px rgba(59,130,246,0.55); }
+  50%  { box-shadow: 0 0 0 7px rgba(59,130,246,0.15); }
+  100% { box-shadow: 0 0 0 0px rgba(59,130,246,0); }
+}
+
+/* The outer glow ring that appears behind the button */
+@keyframes locate-ring-expand {
+  0%   { transform: scale(1);   opacity: 0.5; }
+  80%  { transform: scale(1.9); opacity: 0; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+
+.locate-btn-pulse {
+  animation: locate-pulse 2.4s ease-in-out infinite;
+}
+
+/* Absolutely positioned ring behind the button */
+.locate-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.75rem; /* matches rounded-xl */
+  border: 2px solid rgba(59,130,246,0.6);
+  animation: locate-ring-expand 2.4s ease-out infinite;
+  pointer-events: none;
+}
+
+/* ── Hero CTA button: single bounce on first render to attract attention ──── */
+@keyframes hero-cta-bounce {
+  0%, 100% { transform: translateY(0); }
+  25%       { transform: translateY(-4px); }
+  50%       { transform: translateY(0); }
+  65%       { transform: translateY(-2px); }
+  80%       { transform: translateY(0); }
+}
+
+.hero-cta-pulse {
+  /* Bounces once on mount, then stays still — not looping so it doesn't become noise */
+  animation: hero-cta-bounce 0.8s ease-in-out 0.6s both;
+}
+
 /* Push Leaflet zoom control above sticky audio player (approx 7rem) */
 .leaflet-bottom.leaflet-right .leaflet-control-zoom {
   margin-bottom: 7rem;

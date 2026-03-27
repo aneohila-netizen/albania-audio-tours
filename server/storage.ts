@@ -28,6 +28,7 @@ export interface IStorage {
   saveRating(siteId: number, siteSlug: string, stars: number): Promise<Rating>;
   getRatingStats(siteSlug: string): Promise<{ average: number; count: number }>;
   // Itineraries
+  getAllPublishedItineraries(): Promise<Itinerary[]>;
   getItinerariesBySite(siteSlug: string): Promise<Itinerary[]>;
   getItineraryById(id: number): Promise<Itinerary | undefined>;
   createItinerary(data: InsertItinerary): Promise<Itinerary>;
@@ -558,6 +559,14 @@ class PgStorage implements IStorage {
     };
   }
 
+  async getAllPublishedItineraries(): Promise<Itinerary[]> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      'SELECT * FROM itineraries WHERE is_published = true ORDER BY id'
+    );
+    return rows.map(this.rowToItinerary);
+  }
+
   async getItinerariesBySite(siteSlug: string): Promise<Itinerary[]> {
     await this.ready;
     const { rows } = await this.pool.query(
@@ -751,6 +760,7 @@ export class MemStorage implements IStorage {
 
   // MemStorage itineraries (in-memory only, resets on restart)
   private itineraries: Itinerary[] = [];
+  async getAllPublishedItineraries() { return this.itineraries.filter(i => i.isPublished); }
   async getItinerariesBySite(siteSlug: string) { return this.itineraries.filter(i => i.siteSlug === siteSlug); }
   async getItineraryById(id: number) { return this.itineraries.find(i => i.id === id); }
   async createItinerary(data: InsertItinerary): Promise<Itinerary> {

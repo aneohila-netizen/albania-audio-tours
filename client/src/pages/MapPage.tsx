@@ -85,6 +85,12 @@ export default function MapPage() {
   // ── GPS blue dot state ────────────────────────────────────────────
   const [autoCenter, setAutoCenter] = useState(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
+
+  // ── Nearest tour (API-driven, includes all future tours) ─────────
+  // { slug: destinationSlug, name: tour name, distM: distance in metres }
+  const [nearestTour, setNearestTour] = useState<{ slug: string; name: string; distM: number } | null>(null);
+  // All published itineraries fetched once on mount — auto-updates when tours are added
+  const [allItineraries, setAllItineraries] = useState<Array<{ siteSlug: string; name: string }>>([]);
   const blueDotRef = useRef<any>(null); // Leaflet circle marker for user location
   const watchIdRef = useRef<number | null>(null);
 
@@ -205,6 +211,14 @@ export default function MapPage() {
     markersRef.current.push(marker);
   }
 
+  // ── Fetch all published itineraries on mount (API-driven, future-proof) ──────
+  useEffect(() => {
+    fetch("/api/itineraries")
+      .then(r => r.json())
+      .then((data: Array<{ siteSlug: string; name: string }>) => setAllItineraries(data))
+      .catch(() => {}); // silently fail — hero still shows Tirana fallback
+  }, []);
+
   // ── Init Leaflet map ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
@@ -305,6 +319,34 @@ export default function MapPage() {
         blueDotRef.current = L.marker([lat, lng], { icon: blueDotIcon, zIndexOffset: 1000 }).addTo(map);
       }
       map.setView([lat, lng], Math.max(map.getZoom(), 14), { animate: true });
+
+      // ── Nearest tour (API-driven) ─────────────────
+      // Find the published tour whose destination is closest to current position.
+      // Uses allItineraries fetched from /api/itineraries — automatically includes
+      // any new tours added in the future without code changes.
+      if (allItineraries.length > 0) {
+        // Build a deduplicated set of destination slugs that have a tour
+        const slugsWithTours = [...new Set(allItineraries.map(it => it.siteSlug))];
+        // Match each slug to a destination with known coordinates
+        let bestSlug = "";
+        let bestName = "";
+        let bestDist = Infinity;
+        for (const slug of slugsWithTours) {
+          const dest = DESTINATIONS.find(d => d.slug === slug);
+          if (!dest || !dest.lat || !dest.lng) continue;
+          const d = haversineM(lat, lng, dest.lat, dest.lng);
+          if (d < bestDist) {
+            bestDist = d;
+            bestSlug = slug;
+            // Use the first itinerary name for this slug as the CTA label
+            const firstTour = allItineraries.find(it => it.siteSlug === slug);
+            bestName = firstTour?.name ?? dest.nameEn ?? slug;
+          }
+        }
+        if (bestSlug) {
+          setNearestTour({ slug: bestSlug, name: bestName, distM: bestDist });
+        }
+      }
 
       // ── Geofence check ────────────────────────────
       // Only check if GPS accuracy is good enough (<= 50m)
@@ -508,13 +550,22 @@ export default function MapPage() {
                 <p className="text-xs text-muted-foreground mb-3">
                   Tap any pin on the map to explore a site, or start a featured tour below.
                 </p>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
+                  {/* Primary CTA: nearest tour when GPS is on, else Tirana fallback */}
                   <button
-                    onClick={() => { navigate("/sites/tirana"); setHeroDismissed(true); }}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                    onClick={() => {
+                      const dest = nearestTour?.slug ?? "tirana";
+                      navigate(`/sites/${dest}`);
+                      setHeroDismissed(true);
+                    }}
+                    className="hero-cta-pulse flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
                     style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                    aria-label={nearestTour ? `Start nearest tour: ${nearestTour.name}` : "Start Tirana Tour"}
                   >
-                    <Headphones size={14} /> Start Tirana Tour
+                    <Headphones size={14} />
+                    {nearestTour
+                      ? `Start ${DESTINATIONS.find(d => d.slug === nearestTour.slug)?.nameEn ?? nearestTour.slug} Tour`
+                      : "Start Tirana Tour"}
                   </button>
                   <button
                     onClick={() => { navigate("/sites"); setHeroDismissed(true); }}
@@ -523,6 +574,17 @@ export default function MapPage() {
                     Browse All
                   </button>
                 </div>
+                {/* Contextual hint: show distance to nearest tour when GPS is active */}
+                {nearestTour && nearestTour.distM < 50000 && (
+                  <p className="text-xs text-primary/70 mt-2 flex items-center gap-1">
+                    <span>📍</span>
+                    <span>
+                      {nearestTour.distM < 1000
+                        ? `${Math.round(nearestTour.distM)}m from the nearest tour`
+                        : `${(nearestTour.distM / 1000).toFixed(1)}km from the nearest tour`}
+                    </span>
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => setHeroDismissed(true)}
@@ -587,17 +649,24 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* GPS locate button */}
-      <div className="absolute top-3 left-3 z-[1000]">
+      {/* GPS locate button — pulses until activated to guide the user */}
+      <div className="absolute top-3 left-3 z-[1000] relative">
+        {/* Outer glow ring — only when GPS is off, draws attention without being intrusive */}
+        {!autoCenter && (
+          <span
+            className="locate-ring pointer-events-none"
+            aria-hidden="true"
+          />
+        )}
         <button
           onClick={toggleAutoCenter}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border shadow-md text-xs font-semibold transition-colors ${
+          className={`relative flex items-center gap-1.5 px-3 py-2 rounded-xl border shadow-md text-xs font-semibold transition-all duration-300 ${
             autoCenter
-              ? "bg-blue-600 text-white border-blue-700"
-              : "bg-card/95 backdrop-blur border-border text-muted-foreground hover:text-foreground"
+              ? "bg-blue-600 text-white border-blue-700 scale-100"
+              : "bg-card/95 backdrop-blur border-blue-300 text-blue-600 hover:text-blue-700 hover:border-blue-400 locate-btn-pulse"
           }`}
-          aria-label={autoCenter ? "Stop following my location" : "Find my location"}
-          title={autoCenter ? "Auto-center ON — tap to stop" : "Show my location"}
+          aria-label={autoCenter ? "Stop following my location" : "Tap to enable location — find tours near you"}
+          title={autoCenter ? "Auto-center ON — tap to stop" : "Enable location to find tours near you"}
         >
           {autoCenter ? <LocateFixed size={14} /> : <Locate size={14} />}
           {autoCenter ? "Following" : "My Location"}
