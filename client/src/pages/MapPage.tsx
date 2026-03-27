@@ -8,6 +8,9 @@ import VisitModal from "@/components/VisitModal";
 import { apiRequest } from "@/lib/queryClient";
 import { getSessionId } from "@/lib/session";
 import { MapPin, X, Layers, Locate, LocateFixed, Headphones } from "lucide-react";
+// Leaflet marker cluster — groups overlapping pins into numbered bubbles
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { useAudioPlayer } from "@/components/StickyAudioPlayer";
 import { getLangText } from "@/lib/i18n";
 
@@ -110,30 +113,84 @@ export default function MapPage() {
   const destDesc = (d: Destination) => getLangText(d, "desc", lang);
   const attrDesc = (a: Attraction) => getLangText(a, "desc", lang);
 
+  // Holds the active cluster group so we can remove it cleanly on mode switch
+  const clusterGroupRef = useRef<any>(null);
+
   // ── Build markers ────────────────────────────────────────────────────────────
   function buildMarkers() {
     const L = LeafletRef.current;
     const map = mapInstanceRef.current;
     if (!L || !map) return;
 
-    // Clear old markers
+    // Clear old markers and old cluster group
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
+    if (clusterGroupRef.current) {
+      map.removeLayer(clusterGroupRef.current);
+      clusterGroupRef.current = null;
+    }
+
+    // Create a cluster group — pins within ~60px radius cluster into a bubble
+    // disableClusteringAtZoom: at zoom 13+ pins spread out individually (street level)
+    const LCluster = (L as any).markerClusterGroup
+      ? L
+      : (window as any).L; // fallback
+    let clusterGroup: any;
+    try {
+      // Dynamic import of the plugin to avoid SSR issues
+      const MC = (L as any).markerClusterGroup;
+      if (MC) {
+        clusterGroup = MC({
+          disableClusteringAtZoom: 13,
+          spiderfyOnMaxZoom: true,
+          showCoverageOnHover: false,
+          maxClusterRadius: 55,
+          iconCreateFunction: (cluster: any) => {
+            const count = cluster.getChildCount();
+            const size = count < 10 ? 36 : count < 50 ? 42 : 48;
+            return (L as any).divIcon({
+              html: `<div style="
+                width:${size}px;height:${size}px;border-radius:50%;
+                background:hsl(var(--primary));color:white;
+                display:flex;align-items:center;justify-content:center;
+                font-weight:700;font-size:${size < 40 ? 13 : 14}px;
+                box-shadow:0 2px 8px rgba(0,0,0,0.3);
+                border:2.5px solid white;
+              ">${count}</div>`,
+              className: "",
+              iconSize: [size, size],
+              iconAnchor: [size / 2, size / 2],
+            });
+          },
+        });
+        clusterGroup.addTo(map);
+        clusterGroupRef.current = clusterGroup;
+      }
+    } catch (_) {
+      clusterGroup = null;
+    }
+
+    // Helper: add marker to cluster group if available, else directly to map
+    const addTo = (marker: any) => {
+      if (clusterGroup) clusterGroup.addLayer(marker);
+      else marker.addTo(map);
+      markersRef.current.push(marker);
+    };
 
     if (layerMode === "destinations") {
       DESTINATIONS.forEach(dest => {
-        addDestinationMarker(L, map, dest);
+        addDestinationMarker(L, map, dest, addTo);
       });
     } else {
       // Show all attractions — plus destination markers for destinations without attractions
       const destsWithAttrs = new Set(ATTRACTIONS.map(a => a.destinationSlug));
       ATTRACTIONS.forEach(attr => {
-        addAttractionMarker(L, map, attr);
+        addAttractionMarker(L, map, attr, addTo);
       });
       // Destinations that have no attractions yet — show destination marker
       DESTINATIONS.forEach(dest => {
         if (!destsWithAttrs.has(dest.slug)) {
-          addDestinationMarker(L, map, dest);
+          addDestinationMarker(L, map, dest, addTo);
         }
       });
     }
@@ -157,7 +214,7 @@ export default function MapPage() {
       </div>`;
   }
 
-  function addDestinationMarker(L: LeafletLib, map: LeafletMap, dest: Destination) {
+  function addDestinationMarker(L: LeafletLib, map: LeafletMap, dest: Destination, addTo?: (m: any) => void) {
     const color = CATEGORY_COLORS[dest.category] || "#C0392B";
     const emoji = CATEGORY_EMOJI[dest.category] || "📍";
     const icon = L.divIcon({
@@ -179,10 +236,10 @@ export default function MapPage() {
       });
     }
     marker.on("click", () => setSelectedPin({ type: "destination", data: dest }));
-    markersRef.current.push(marker);
+    if (addTo) addTo(marker); else { marker.addTo(map); markersRef.current.push(marker); }
   }
 
-  function addAttractionMarker(L: LeafletLib, map: LeafletMap, attr: Attraction) {
+  function addAttractionMarker(L: LeafletLib, map: LeafletMap, attr: Attraction, addTo?: (m: any) => void) {
     const dest = DESTINATIONS.find(d => d.slug === attr.destinationSlug)!;
     const color = CATEGORY_COLORS[attr.category] || "#C0392B";
     const emoji = CATEGORY_EMOJI[attr.category] || "📍";
@@ -208,7 +265,7 @@ export default function MapPage() {
       });
     }
     marker.on("click", () => setSelectedPin({ type: "attraction", data: attr, dest }));
-    markersRef.current.push(marker);
+    if (addTo) addTo(marker); else { marker.addTo(map); markersRef.current.push(marker); }
   }
 
   // ── Fetch all published itineraries on mount (API-driven, future-proof) ──────
@@ -226,6 +283,8 @@ export default function MapPage() {
 
     (async () => {
       const L = (await import("leaflet")).default;
+      // Load markercluster plugin after Leaflet so it can extend L
+      await import("leaflet.markercluster");
       if (!mounted || !mapRef.current) return;
 
       const map = L.map(mapRef.current, {
@@ -545,10 +604,27 @@ export default function MapPage() {
           <div className="bg-card/96 backdrop-blur-sm border border-primary/20 rounded-2xl shadow-2xl p-4 pointer-events-auto">
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-primary mb-0.5">🎧 Self-Guided Audio Tours</p>
-                <p className="font-bold text-base leading-tight mb-1">Discover Albania</p>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Tap any pin on the map to explore a site, or start a featured tour below.
+                <p className="text-xs font-semibold text-primary mb-0.5">🎧 Free Self-Guided Audio Tours</p>
+                <p className="font-bold text-base leading-tight mb-1">Discover Albania — at your own pace</p>
+                {/* 3-step explainer: answers "what is this?" in one glance */}
+                <div className="flex items-center gap-3 my-2">
+                  <div className="flex flex-col items-center gap-0.5 text-center flex-1">
+                    <span className="text-base">📍</span>
+                    <span className="text-[10px] text-muted-foreground leading-tight">Tap a pin</span>
+                  </div>
+                  <span className="text-muted-foreground/40 text-xs">→</span>
+                  <div className="flex flex-col items-center gap-0.5 text-center flex-1">
+                    <span className="text-base">🎧</span>
+                    <span className="text-[10px] text-muted-foreground leading-tight">Hear the story</span>
+                  </div>
+                  <span className="text-muted-foreground/40 text-xs">→</span>
+                  <div className="flex flex-col items-center gap-0.5 text-center flex-1">
+                    <span className="text-base">🗺️</span>
+                    <span className="text-[10px] text-muted-foreground leading-tight">Track your journey</span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground mb-3">
+                  Free · Works offline · 43 destinations · 10 walking tours
                 </p>
                 <div className="flex gap-2 flex-wrap">
                   {/* Primary CTA: nearest tour when GPS is on, else Tirana fallback */}

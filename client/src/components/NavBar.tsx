@@ -1,8 +1,10 @@
 import { Link, useLocation } from "wouter";
 import { useApp } from "@/App";
 import { LANG_LABELS, LANG_NAMES, type Lang } from "@/lib/i18n";
-import { Map, List, BookOpen, Trophy, Moon, Sun, Settings, ChevronDown } from "lucide-react";
+import { Map, List, Route, Trophy, Moon, Sun, Settings, ChevronDown, Search, X } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { useDestinations, useAttractions } from "@/lib/useApiData";
+import { getLangText } from "@/lib/i18n";
 
 export default function NavBar() {
   const [location] = useLocation();
@@ -11,7 +13,7 @@ export default function NavBar() {
   const navItems = [
     { href: "/", icon: Map, label: t.exploreMap },
     { href: "/sites", icon: List, label: t.tourSites },
-    { href: "/passport", icon: BookOpen, label: t.myPassport },
+    { href: "/passport", icon: Route, label: t.myPassport },
     { href: "/leaderboard", icon: Trophy, label: t.leaderboard },
   ];
 
@@ -23,6 +25,59 @@ export default function NavBar() {
 
   const [langOpen, setLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
+
+  // Global search state
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const DESTINATIONS_DATA = useDestinations();
+  const ATTRACTIONS_DATA = useAttractions();
+
+  // Focus input when search opens
+  useEffect(() => {
+    if (searchOpen) setTimeout(() => searchInputRef.current?.focus(), 50);
+    else setSearchQuery("");
+  }, [searchOpen]);
+
+  // Close search on outside click
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, []);
+
+  // Compute search results — destinations + attractions, max 8
+  const searchResults = searchQuery.trim().length < 2 ? [] : (() => {
+    const q = searchQuery.toLowerCase();
+    const results: Array<{
+      type: "destination" | "attraction";
+      slug: string;
+      destSlug?: string;
+      name: string;
+      sub: string;
+    }> = [];
+
+    // Search destinations
+    for (const d of DESTINATIONS_DATA) {
+      const name = getLangText(d, "name", lang);
+      if (name.toLowerCase().includes(q) && results.length < 4) {
+        results.push({ type: "destination", slug: d.slug, name, sub: d.region || d.category });
+      }
+    }
+    // Search attractions
+    for (const a of ATTRACTIONS_DATA) {
+      const name = getLangText(a, "name", lang);
+      if (name.toLowerCase().includes(q) && results.length < 8) {
+        results.push({ type: "attraction", slug: a.slug, destSlug: a.destinationSlug, name, sub: a.category });
+      }
+    }
+    return results;
+  })();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -79,6 +134,71 @@ export default function NavBar() {
 
         {/* Right controls */}
         <div className="flex items-center gap-2">
+
+          {/* ── Global Search ───────────────────────────────────────── */}
+          <div className="relative" ref={searchRef}>
+            {/* Search button — expands to input on click */}
+            {!searchOpen ? (
+              <button
+                onClick={() => setSearchOpen(true)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                aria-label="Search destinations and attractions"
+                title="Search"
+              >
+                <Search size={16} />
+              </button>
+            ) : (
+              <div className="flex items-center gap-1 bg-card border border-primary/30 rounded-xl px-2.5 py-1.5 shadow-md w-56">
+                <Search size={14} className="text-muted-foreground shrink-0" />
+                <input
+                  ref={searchInputRef}
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  onKeyDown={e => e.key === "Escape" && setSearchOpen(false)}
+                  placeholder="Search destinations, tours…"
+                  className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60 min-w-0"
+                  aria-label="Search"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery("")} className="text-muted-foreground hover:text-foreground">
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            )}
+            {/* Results dropdown */}
+            {searchOpen && searchResults.length > 0 && (
+              <div className="absolute right-0 top-full mt-1.5 w-72 rounded-xl border border-border bg-card shadow-xl overflow-hidden z-[3000]">
+                {searchResults.map((r, i) => (
+                  <a
+                    key={i}
+                    href={r.type === "destination"
+                      ? `${window.location.href.split("#")[0]}#/sites/${r.slug}`
+                      : `${window.location.href.split("#")[0]}#/sites/${r.destSlug}/${r.slug}`}
+                    onClick={() => setSearchOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted transition-colors border-b border-border/40 last:border-0"
+                  >
+                    <span className="text-base shrink-0">
+                      {r.type === "destination" ? "📍" : "🎯"}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{r.name}</p>
+                      <p className="text-xs text-muted-foreground capitalize truncate">
+                        {r.type === "destination" ? "Destination" : "Attraction"} · {r.sub}
+                      </p>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            )}
+            {/* No results message */}
+            {searchOpen && searchQuery.trim().length >= 2 && searchResults.length === 0 && (
+              <div className="absolute right-0 top-full mt-1.5 w-64 rounded-xl border border-border bg-card shadow-xl z-[3000] px-4 py-3">
+                <p className="text-sm text-muted-foreground">No results for "{searchQuery}"</p>
+              </div>
+            )}
+          </div>
+
           {/* Points display */}
           <div className="points-badge hidden sm:flex items-center gap-1" data-testid="total-points">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">

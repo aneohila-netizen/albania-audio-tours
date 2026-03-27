@@ -119,7 +119,7 @@ function AppRoutes() {
                   Created with Perplexity Computer
                 </a>
                 {" · "}
-                <span>Albanian Eagle Tours prototype</span>
+                <span>AlbaTour — Albania Self-Guided Audio Tours</span>
               </footer>
               <PerplexityAttribution />
             </div>
