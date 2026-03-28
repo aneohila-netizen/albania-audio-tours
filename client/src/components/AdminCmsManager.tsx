@@ -185,12 +185,33 @@ function CoverImageUploader({
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) return;
     setUploading(true);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      onChange(e.target?.result as string);
+
+    // Resize + compress via canvas before storing as base64
+    // Target: max 1200px wide, 16:9 aspect, JPEG quality 0.82 — keeps size well under 500kb
+    const img = new window.Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX_W = 1200;
+      const MAX_H = 675; // 16:9
+      let { width, height } = img;
+
+      // Scale down proportionally if too large
+      if (width > MAX_W) { height = Math.round(height * MAX_W / width); width = MAX_W; }
+      if (height > MAX_H) { width = Math.round(width * MAX_H / height); height = MAX_H; }
+
+      const canvas = document.createElement("canvas");
+      canvas.width  = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const base64 = canvas.toDataURL("image/jpeg", 0.82);
+      URL.revokeObjectURL(objectUrl);
+      onChange(base64);
       setUploading(false);
     };
-    reader.readAsDataURL(file);
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); setUploading(false); };
+    img.src = objectUrl;
   }, [onChange]);
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -208,7 +229,9 @@ function CoverImageUploader({
 
       {value ? (
         <div className="relative rounded-xl overflow-hidden border border-border">
-          <img src={value} alt="Cover" className="w-full h-32 object-cover" />
+          <div className="w-full" style={{ aspectRatio: "16/9" }}>
+            <img src={value} alt="Cover" className="w-full h-full object-cover" />
+          </div>
           <button
             type="button"
             onClick={() => onChange("")}

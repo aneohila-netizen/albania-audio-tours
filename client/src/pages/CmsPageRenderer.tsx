@@ -73,7 +73,7 @@ export default function CmsPageRenderer() {
 
       {/* Cover image */}
       {page.coverImage && (
-        <div className="rounded-2xl overflow-hidden aspect-[16/7]">
+        <div className="rounded-2xl overflow-hidden" style={{ aspectRatio: "16/9" }}>
           <img
             src={page.coverImage}
             alt={page.title}

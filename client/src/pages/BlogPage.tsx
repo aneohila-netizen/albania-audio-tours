@@ -81,7 +81,7 @@ export default function BlogPage() {
               <Link key={post.id} href={`/p/${post.slug}`}>
                 <a className="block rounded-2xl border border-border bg-card hover:bg-muted/40 transition-colors overflow-hidden group">
                   {post.coverImage && (
-                    <div className="aspect-[16/6] overflow-hidden">
+                    <div className="overflow-hidden" style={{ aspectRatio: "16/9" }}>
                       <img
                         src={post.coverImage}
                         alt={post.title}

@@ -15,11 +15,13 @@ declare module "http" {
 
 app.use(
   express.json({
+    limit: "10mb",
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
   }),
 );
+app.use(express.urlencoded({ limit: "10mb", extended: false }));
 
 app.use(cors({
   origin: [
@@ -33,7 +35,7 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.urlencoded({ extended: false }));
+// urlencoded limit already set above
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
