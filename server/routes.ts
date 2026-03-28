@@ -139,6 +139,21 @@ function requireAdmin(req: any, res: any, next: any) {
   next();
 }
 
+// 2-step protection: all DELETE routes require this header in addition to admin token.
+// The admin UI must show a confirmation dialog and set x-confirm-delete: yes.
+// Prevents any accidental data wipe — media, text, tours, itineraries are never
+// deleted without explicit admin intent AND header confirmation.
+function requireDeleteConfirmation(req: any, res: any, next: any) {
+  const confirm = req.headers["x-confirm-delete"];
+  if (confirm !== "yes") {
+    return res.status(403).json({
+      error: "Destructive action requires 2-step confirmation.",
+      hint: "Set header x-confirm-delete: yes after confirming in the admin panel."
+    });
+  }
+  next();
+}
+
 // ─── Upload dirs ─────────────────────────────────────────────────────────────
 const AUDIO_DIR = path.join(process.cwd(), "data", "audio");
 const IMAGE_DIR = path.join(process.cwd(), "data", "images");
@@ -156,16 +171,8 @@ const audioStorage = multer.diskStorage({
   },
 });
 
-const imageStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    if (!fs.existsSync(IMAGE_DIR)) fs.mkdirSync(IMAGE_DIR, { recursive: true });
-    cb(null, IMAGE_DIR);
-  },
-  filename: (_req, file, cb) => {
-    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
-    cb(null, `${Date.now()}_${safe}`);
-  },
-});
+// Use memory storage for images — stored as base64 in DB, never filesystem
+const imageStorage = multer.memoryStorage();
 
 const upload = multer({
   storage: audioStorage,
@@ -193,6 +200,16 @@ const imageUpload = multer({
 
 const AUDIO_LANGS = ['En','Al','Gr','It','Es','De','Fr','Ar','Sl'] as const;
 
+// Replace imageUrl data URI with a lightweight serve URL
+function stripImageData(obj: any, type: 'attraction'|'site'): any {
+  if (!obj) return obj;
+  const out = { ...obj };
+  if (out.imageUrl && out.imageUrl.startsWith('data:')) {
+    out.imageUrl = `${RAILWAY_BASE}/api/images/db/${type}/${obj.id}`;
+  }
+  return out;
+}
+
 // Replace any data URI audio fields with a lightweight serve URL
 function stripAudioData(obj: any, type: 'attraction'|'site'): any {
   if (!obj) return obj;
@@ -213,7 +230,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ── Public API ──────────────────────────────────────────────────────────────
   app.get("/api/sites", async (_req, res) => {
     const sites = await storage.getAllSites();
-    res.json(sites.map(s => stripAudioData(s, 'site')));
+    res.json(sites.map(s => stripImageData(stripAudioData(s, 'site'), 'site')));
   });
 
   app.get("/api/sites/:slug", async (req, res) => {
@@ -299,7 +316,34 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.redirect(val);
   });
 
-  // Serve uploaded image files
+  // ── Serve image from DB base64 (permanent — survives all redeploys) ──────────
+  // GET /api/images/db/site/:id  or  /api/images/db/attraction/:id
+  app.get("/api/images/db/:type/:id", async (req, res) => {
+    const { type, id } = req.params;
+    const numId = parseInt(id);
+    let imageData: string | null = null;
+    if (type === "site") {
+      const site = await storage.getSiteById(numId);
+      imageData = (site as any)?.imageUrl || null;
+    } else if (type === "attraction") {
+      const attr = await storage.getAttractionById(numId);
+      imageData = (attr as any)?.imageUrl || null;
+    }
+    if (!imageData) return res.status(404).json({ error: "Image not found" });
+    if (imageData.startsWith("data:")) {
+      const mimeMatch = imageData.match(/^data:([^;]+);base64,/);
+      const mime = mimeMatch ? mimeMatch[1] : "image/jpeg";
+      const b64 = imageData.split(",")[1];
+      const buf = Buffer.from(b64, "base64");
+      res.setHeader("Content-Type", mime);
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      return res.send(buf);
+    }
+    // Fallback: redirect to external URL
+    res.redirect(imageData);
+  });
+
+  // Serve uploaded image files (legacy filesystem — kept for backward compat)
   app.use("/api/images", (req, res, next) => {
     const filePath = path.join(IMAGE_DIR, req.path.replace(/^\//, ""));
     if (fs.existsSync(filePath)) {
@@ -312,12 +356,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ── Public: Attractions ────────────────────────────────────────────────────
   app.get("/api/attractions", async (_req, res) => {
     const attrs = await storage.getAllAttractions();
-    res.json(attrs.map(a => stripAudioData(a, 'attraction')));
+    res.json(attrs.map(a => stripImageData(stripAudioData(a, 'attraction'), 'attraction')));
   });
 
   app.get("/api/attractions/:destinationSlug", async (req, res) => {
     const attrs = await storage.getAttractionsByDestination(req.params.destinationSlug);
-    res.json(attrs.map(a => stripAudioData(a, 'attraction')));
+    res.json(attrs.map(a => stripImageData(stripAudioData(a, 'attraction'), 'attraction')));
   });
 
   app.get("/api/attractions/:destinationSlug/:slug", async (req, res) => {
@@ -344,12 +388,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ── Admin: Attractions CRUD ────────────────────────────────────────────────
   app.get("/api/admin/attractions", requireAdmin, async (_req, res) => {
     const attrs = await storage.getAllAttractions();
-    res.json(attrs.map(a => stripAudioData(a, 'attraction')));
+    res.json(attrs.map(a => stripImageData(stripAudioData(a, 'attraction'), 'attraction')));
   });
 
   app.get("/api/admin/attractions/:destinationSlug", requireAdmin, async (req, res) => {
     const attrs = await storage.getAttractionsByDestination(req.params.destinationSlug);
-    res.json(attrs.map(a => stripAudioData(a, 'attraction')));
+    res.json(attrs.map(a => stripImageData(stripAudioData(a, 'attraction'), 'attraction')));
   });
 
   app.post("/api/admin/attractions", requireAdmin, async (req, res) => {
@@ -378,7 +422,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(stripAudioData(updated, 'attraction'));
   });
 
-  app.delete("/api/admin/attractions/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/admin/attractions/:id", requireAdmin, requireDeleteConfirmation, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
     const ok = await storage.deleteAttraction(id);
@@ -616,7 +660,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   );
 
-  app.delete("/api/admin/attractions/:id/audio/:lang", requireAdmin, async (req, res) => {
+  app.delete("/api/admin/attractions/:id/audio/:lang", requireAdmin, requireDeleteConfirmation, async (req, res) => {
     const id = parseInt(req.params.id);
     const lang = req.params.lang as SupportedLang;
     const field = audioField(lang);
@@ -625,7 +669,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json({ success: true, attraction: updated });
   });
 
-  // ── Admin: Attraction Image Upload ──────────────────────────────────────────
+  // ── Admin: Attraction Image Upload — stored as base64 in DB (survives redeploys) ──
   app.post(
     "/api/admin/attractions/:id/image",
     requireAdmin,
@@ -633,9 +677,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     async (req: any, res) => {
       const id = parseInt(req.params.id);
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      const imageUrl = `${RAILWAY_BASE}/api/images/${req.file.filename}`;
-      const updated = await storage.updateAttraction(id, { imageUrl } as any);
+      // Store image as data URI in DB — never lost on Railway redeploy
+      const mime = req.file.mimetype || "image/jpeg";
+      const b64 = (req.file.buffer ?? fs.readFileSync(req.file.path)).toString("base64");
+      const dataUri = `data:${mime};base64,${b64}`;
+      const imageUrl = `${RAILWAY_BASE}/api/images/db/attraction/${id}`;
+      const updated = await storage.updateAttraction(id, { imageUrl: dataUri } as any);
       if (!updated) return res.status(404).json({ error: "Attraction not found" });
+      // Clean up temp file if multer used diskStorage
+      if (req.file.path) try { fs.unlinkSync(req.file.path); } catch (_) {}
       res.json({ url: imageUrl, attraction: updated });
     }
   );
@@ -643,7 +693,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ── Admin: Sites CRUD ───────────────────────────────────────────────────────
   app.get("/api/admin/sites", requireAdmin, async (_req, res) => {
     const sites = await storage.getAllSites();
-    res.json(sites.map(s => stripAudioData(s, 'site')));
+    res.json(sites.map(s => stripImageData(stripAudioData(s, 'site'), 'site')));
   });
 
   app.post("/api/admin/sites", requireAdmin, async (req, res) => {
@@ -663,7 +713,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(stripAudioData(updated, 'site'));
   });
 
-  app.delete("/api/admin/sites/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/admin/sites/:id", requireAdmin, requireDeleteConfirmation, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
     const ok = await storage.deleteSite(id);
@@ -695,7 +745,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   );
 
   // DELETE audio for a site/lang
-  app.delete("/api/admin/sites/:id/audio/:lang", requireAdmin, async (req, res) => {
+  app.delete("/api/admin/sites/:id/audio/:lang", requireAdmin, requireDeleteConfirmation, async (req, res) => {
     const id = parseInt(req.params.id);
     const lang = req.params.lang as SupportedLang;
     const field = audioField(lang);
@@ -704,7 +754,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json({ success: true, site: updated });
   });
 
-  // ── Admin: Image Upload ─────────────────────────────────────────────────────────────
+  // ── Admin: Site Image Upload — stored as base64 in DB (survives redeploys) ──────
   app.post(
     "/api/admin/sites/:id/image",
     requireAdmin,
@@ -712,22 +762,29 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     async (req: any, res) => {
       const id = parseInt(req.params.id);
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      const imageUrl = `${RAILWAY_BASE}/api/images/${req.file.filename}`;
-      const updated = await storage.updateSite(id, { imageUrl } as any);
+      const mime = req.file.mimetype || "image/jpeg";
+      const b64 = (req.file.buffer ?? fs.readFileSync(req.file.path)).toString("base64");
+      const dataUri = `data:${mime};base64,${b64}`;
+      const imageUrl = `${RAILWAY_BASE}/api/images/db/site/${id}`;
+      const updated = await storage.updateSite(id, { imageUrl: dataUri } as any);
       if (!updated) return res.status(404).json({ error: "Site not found" });
+      if (req.file.path) try { fs.unlinkSync(req.file.path); } catch (_) {}
       res.json({ url: imageUrl, site: updated });
     }
   );
 
-  // POST /api/admin/upload-image — generic image upload (returns absolute URL)
+  // POST /api/admin/upload-image — generic image upload (returns data URI for immediate use)
   app.post(
     "/api/admin/upload-image",
     requireAdmin,
     imageUpload.single("image"),
     async (req: any, res) => {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      const imageUrl = `${RAILWAY_BASE}/api/images/${req.file.filename}`;
-      res.json({ url: imageUrl });
+      const mime = req.file.mimetype || "image/jpeg";
+      const b64 = (req.file.buffer ?? fs.readFileSync(req.file.path)).toString("base64");
+      const dataUri = `data:${mime};base64,${b64}`;
+      if (req.file.path) try { fs.unlinkSync(req.file.path); } catch (_) {}
+      res.json({ url: dataUri });
     }
   );
 
@@ -771,7 +828,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // Admin: Delete
-  app.delete("/api/admin/itineraries/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/admin/itineraries/:id", requireAdmin, requireDeleteConfirmation, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
     const ok = await storage.deleteItinerary(id);

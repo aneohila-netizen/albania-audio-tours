@@ -303,7 +303,7 @@ function SitesView({
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
     setDeleting(id);
     try {
-      await adminFetch(`/api/admin/sites/${id}`, { method: "DELETE" });
+      await adminFetch(`/api/admin/sites/${id}`, { method: "DELETE", headers: { "x-confirm-delete": "yes" } });
     } catch { /* offline */ }
     const updated = sites.filter(s => s.id !== id);
     setSites(updated);
@@ -507,7 +507,7 @@ function AttractionsView({
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
     setDeleting(id);
     try {
-      const res = await adminFetch(`/api/admin/attractions/${id}`, { method: "DELETE" });
+      const res = await adminFetch(`/api/admin/attractions/${id}`, { method: "DELETE", headers: { "x-confirm-delete": "yes" } });
       if (res.ok) {
         setAttractions(prev => prev.filter(a => a.id !== id));
       } else {
@@ -759,7 +759,7 @@ function AudioCard({
 
   async function handleDelete() {
     if (!confirm("Remove this audio file?") || siteId === null) return;
-    const res = await adminFetch(`/api/admin/${entityType}/${siteId}/audio/${lang}`, { method: "DELETE" });
+    const res = await adminFetch(`/api/admin/${entityType}/${siteId}/audio/${lang}`, { method: "DELETE", headers: { "x-confirm-delete": "yes" } });
     if (res.ok) onUpdate(null);
   }
 

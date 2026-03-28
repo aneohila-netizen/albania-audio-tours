@@ -17,6 +17,9 @@ import DestinationPage from "@/pages/DestinationPage";
 import AttractionDetailPage from "@/pages/AttractionDetailPage";
 import PassportPage from "@/pages/PassportPage";
 import LeaderboardPage from "@/pages/LeaderboardPage";
+import ContactPage from "@/pages/ContactPage";
+import TermsPage from "@/pages/TermsPage";
+import RefundPage from "@/pages/RefundPage";
 import AdminPanel from "@/components/AdminPanel";
 import NavBar from "@/components/NavBar";
 
@@ -112,14 +115,53 @@ function AppRoutes() {
                   <Route path="/sites/:dest" component={DestinationPage} />
                   <Route path="/passport" component={PassportPage} />
                   <Route path="/leaderboard" component={LeaderboardPage} />
+              <Route path="/contact" component={ContactPage} />
+              <Route path="/terms" component={TermsPage} />
+              <Route path="/refund-policy" component={RefundPage} />
                 </Switch>
               </main>
-              <footer className="border-t border-border px-4 py-3 text-center" style={{ fontSize: "var(--text-xs)", color: "hsl(var(--muted-foreground))" }}>
-                <span>AlbaTour — Albania Self-Guided Audio Tours</span>
-                {"  ·  "}
-                <span>&#169; {new Date().getFullYear()} All Rights Reserved</span>
+              <footer className="border-t border-border px-4 py-4 text-center space-y-1.5" style={{ fontSize: "var(--text-xs)", color: "hsl(var(--muted-foreground))" }}>
+                <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+                  <a href="#/contact" className="hover:text-primary transition-colors">Contact</a>
+                  <a href="#/terms" className="hover:text-primary transition-colors">Terms of Service</a>
+                  <a href="#/refund-policy" className="hover:text-primary transition-colors">Refund Policy</a>
+                </div>
+                <div>
+                  <span>AlbaTour — Albania Self-Guided Audio Tours</span>
+                  {"  ·  "}
+                  <span>&#169; {new Date().getFullYear()} All Rights Reserved</span>
+                </div>
               </footer>
             </div>
+
+            {/* WhatsApp floating button — bottom right, clears zoom controls and audio player */}
+            <a
+              href="https://wa.me/355686064077"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Chat with us on WhatsApp"
+              title="Chat on WhatsApp"
+              style={{
+                position: "fixed",
+                bottom: "5.5rem",
+                right: "0.75rem",
+                zIndex: 1500,
+                width: "52px",
+                height: "52px",
+                borderRadius: "50%",
+                background: "#25D366",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+              }}
+            >
+              <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+                <path d="M16 2C8.268 2 2 8.268 2 16c0 2.4.636 4.65 1.748 6.6L2 30l7.6-1.72A13.94 13.94 0 0016 30c7.732 0 14-6.268 14-14S23.732 2 16 2z" fill="white"/>
+                <path d="M23.5 19.9c-.3-.15-1.77-.87-2.04-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.27-.47-2.42-1.5-.89-.8-1.5-1.78-1.67-2.08-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51H12.5c-.2 0-.52.07-.79.37-.27.3-1.02 1-1.02 2.43 0 1.43 1.05 2.82 1.2 3.02.15.2 2.06 3.14 4.99 4.4.7.3 1.24.48 1.67.62.7.22 1.33.19 1.83.12.56-.08 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.12-.27-.2-.57-.35z" fill="#25D366"/>
+              </svg>
+            </a>
+
           </Route>
         </Switch>
 

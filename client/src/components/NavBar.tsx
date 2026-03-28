@@ -141,11 +141,11 @@ export default function NavBar() {
             {!searchOpen ? (
               <button
                 onClick={() => setSearchOpen(true)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                className="w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 aria-label="Search destinations and attractions"
                 title="Search"
               >
-                <Search size={16} />
+                <Search size={20} className="sm:w-4 sm:h-4" />
               </button>
             ) : (
               <div className="flex items-center gap-1 bg-card border border-primary/30 rounded-xl px-2.5 py-1.5 shadow-md w-56">

@@ -743,11 +743,11 @@ export default function MapPage() {
               ? "bg-blue-600 text-white border-blue-700 scale-100"
               : "bg-card/95 backdrop-blur border-blue-300 text-blue-600 hover:text-blue-700 hover:border-blue-400 locate-btn-pulse"
           }`}
-          aria-label={autoCenter ? "Stop following my location" : "Tap to enable location — find tours near you"}
-          title={autoCenter ? "Auto-center ON — tap to stop" : "Enable location to find tours near you"}
+          aria-label={autoCenter ? "Stop following my location" : "Share your location to find tours near you"}
+          title={autoCenter ? "Auto-center ON — tap to stop" : "Share your location to discover nearby tours"}
         >
           {autoCenter ? <LocateFixed size={14} /> : <Locate size={14} />}
-          {autoCenter ? "Following" : "My Location"}
+          {autoCenter ? "Following" : "Share Location"}
         </button>
         </div>
       </div>
