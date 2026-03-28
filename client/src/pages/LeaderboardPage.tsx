@@ -35,7 +35,7 @@ export default function LeaderboardPage() {
   const myRank = allEntries.findIndex(e => e.sessionId === mySessionId) + 1;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6" data-testid="leaderboard-page">
+    <div className="max-w-2xl mx-auto px-4 py-6 pb-28 space-y-6" data-testid="leaderboard-page">
       {/* Header */}
       <div className="text-center">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4"

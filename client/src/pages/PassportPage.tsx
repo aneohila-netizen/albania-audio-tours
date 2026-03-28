@@ -43,7 +43,7 @@ export default function PassportPage() {
   const name = (s: TourSite) => lang === "al" ? s.nameAl : lang === "gr" ? s.nameGr : s.nameEn;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6" data-testid="passport-page">
+    <div className="max-w-2xl mx-auto px-4 py-6 pb-28 space-y-6" data-testid="passport-page">
       {/* Header */}
       <div className="text-center">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4"

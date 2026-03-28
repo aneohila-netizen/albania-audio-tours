@@ -1,6 +1,6 @@
 export default function RefundPage() {
   return (
-    <div className="max-w-2xl mx-auto px-4 py-10">
+    <div className="max-w-2xl mx-auto px-4 py-10 pb-28">
       <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: "var(--font-display)" }}>Refund Policy</h1>
       <p className="text-xs text-muted-foreground mb-8">Last updated: {new Date().getFullYear()}</p>
 

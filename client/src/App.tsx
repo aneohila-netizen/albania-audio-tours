@@ -107,7 +107,7 @@ function AppRoutes() {
           <Route>
             <div className="flex flex-col min-h-screen bg-background text-foreground">
               <NavBar />
-              <main className="flex-1 pb-28"> {/* pb-28 = space for sticky player */}
+              <main className="flex-none"> {/* map page controls its own height; pb-28 added per-page */}
                 <Switch>
                   <Route path="/" component={MapPage} />
                   <Route path="/sites" component={SitesPage} />
@@ -143,11 +143,13 @@ function AppRoutes() {
               title="Chat on WhatsApp"
               style={{
                 position: "fixed",
-                bottom: "5.5rem",
+                // Mobile: raise above zoom controls (zoom has 7rem margin-bottom for audio player)
+                // Desktop: 5.5rem is fine — zoom is at bottom-right and doesn't conflict
+                bottom: "9rem",
                 right: "0.75rem",
                 zIndex: 1500,
-                width: "52px",
-                height: "52px",
+                width: "48px",
+                height: "48px",
                 borderRadius: "50%",
                 background: "#25D366",
                 display: "flex",

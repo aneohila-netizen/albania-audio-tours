@@ -752,6 +752,45 @@ export default function MapPage() {
         </div>
       </div>
 
+      {/* Scroll-down handle — mobile only, right edge of map, red-box position ──
+           The map captures all touch events so users can't swipe-scroll past it.
+           This pill button lets them scroll down to the footer without touching the map. */}
+      <button
+        className="md:hidden absolute z-[1000] flex flex-col items-center gap-0.5"
+        style={{
+          right: "0.5rem",
+          top: "50%",
+          transform: "translateY(-50%)",
+          background: "hsl(var(--card)/0.92)",
+          backdropFilter: "blur(4px)",
+          border: "1px solid hsl(var(--border))",
+          borderRadius: "999px",
+          padding: "10px 6px",
+          boxShadow: "0 2px 10px rgba(0,0,0,0.18)",
+          cursor: "pointer",
+        }}
+        aria-label="Scroll down to footer"
+        title="Scroll down"
+        onClick={() => {
+          // Scroll past the map into the footer area
+          const mapEl = document.querySelector("[data-testid='map-container']")?.parentElement?.parentElement;
+          if (mapEl) {
+            const rect = mapEl.getBoundingClientRect();
+            window.scrollBy({ top: rect.height + 200, behavior: "smooth" });
+          } else {
+            window.scrollBy({ top: window.innerHeight, behavior: "smooth" });
+          }
+        }}
+      >
+        {/* Three stacked chevron dots — universal scroll indicator */}
+        <svg width="12" height="20" viewBox="0 0 12 20" fill="none" aria-hidden="true">
+          <path d="M2 2L6 6L10 2" stroke="hsl(var(--muted-foreground))" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M2 8L6 12L10 8" stroke="hsl(var(--muted-foreground))" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M2 14L6 18L10 14" stroke="hsl(var(--muted-foreground))" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        <span style={{ fontSize: "9px", color: "hsl(var(--muted-foreground))", lineHeight: 1, writingMode: "vertical-rl", transform: "rotate(180deg)", letterSpacing: "0.5px" }}>scroll</span>
+      </button>
+
       {/* Layer toggle */}
       <div className="absolute top-3 right-3 z-[1000]">
         <div className="flex items-center gap-1 rounded-xl border border-border bg-card/95 backdrop-blur p-1 shadow-md">

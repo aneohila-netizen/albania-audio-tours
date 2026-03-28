@@ -2,7 +2,7 @@ import { Mail, Phone, MapPin, MessageCircle } from "lucide-react";
 
 export default function ContactPage() {
   return (
-    <div className="max-w-2xl mx-auto px-4 py-10 space-y-8">
+    <div className="max-w-2xl mx-auto px-4 py-10 pb-28 space-y-8">
       <div className="text-center space-y-2">
         <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)" }}>Contact Us</h1>
         <p className="text-muted-foreground text-sm">We're here to help. Reach out any time.</p>
