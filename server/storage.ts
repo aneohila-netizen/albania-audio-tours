@@ -6,6 +6,7 @@ import type {
   Itinerary, InsertItinerary,
   Rating, InsertRating,
   CmsPage, InsertCmsPage,
+  AppSetting,
 } from "@shared/schema";
 
 // ─── Interface ────────────────────────────────────────────────────────────────
@@ -39,6 +40,10 @@ export interface IStorage {
   getProgress(sessionId: string): Promise<UserProgress[]>;
   addProgress(data: InsertUserProgress): Promise<UserProgress>;
   getLeaderboard(): Promise<{ sessionId: string; totalPoints: number; visitCount: number }[]>;
+  // App Settings
+  getSetting(key: string): Promise<string | null>;
+  setSetting(key: string, value: string): Promise<AppSetting>;
+  getAllSettings(): Promise<AppSetting[]>;
   // CMS Pages
   getAllCmsPages(): Promise<CmsPage[]>;
   getCmsPageBySlug(slug: string): Promise<CmsPage | undefined>;
@@ -281,6 +286,21 @@ class PgStorage implements IStorage {
     for (const sql of newLangCols) {
       await this.pool.query(sql).catch(() => {}); // ignore if already exists
     }
+
+    // App settings table
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL DEFAULT 'true',
+        updated_at TEXT NOT NULL DEFAULT 'now'
+      );
+    `);
+    // Seed default settings
+    await this.pool.query(`
+      INSERT INTO app_settings (key, value, updated_at)
+      VALUES ('launch_banner_enabled', 'true', $1)
+      ON CONFLICT (key) DO NOTHING
+    `, [new Date().toISOString()]);
 
     // CMS pages table
     await this.pool.query(`
@@ -681,6 +701,30 @@ class PgStorage implements IStorage {
     return { count: count || 0, average: average || 0 };
   }
 
+  // ── App Settings ───────────────────────────────────────────────────────────────
+  async getSetting(key: string): Promise<string | null> {
+    await this.ready;
+    const { rows } = await this.pool.query('SELECT value FROM app_settings WHERE key=$1', [key]);
+    return rows[0]?.value ?? null;
+  }
+
+  async setSetting(key: string, value: string): Promise<AppSetting> {
+    await this.ready;
+    const now = new Date().toISOString();
+    const { rows } = await this.pool.query(
+      `INSERT INTO app_settings (key, value, updated_at) VALUES ($1,$2,$3)
+       ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=$3 RETURNING *`,
+      [key, value, now]
+    );
+    return { key: rows[0].key, value: rows[0].value, updatedAt: rows[0].updated_at };
+  }
+
+  async getAllSettings(): Promise<AppSetting[]> {
+    await this.ready;
+    const { rows } = await this.pool.query('SELECT * FROM app_settings ORDER BY key ASC');
+    return rows.map((r: any) => ({ key: r.key, value: r.value, updatedAt: r.updated_at }));
+  }
+
   // ── CMS Pages ──────────────────────────────────────────────────────────────
   private rowToCmsPage(r: any): CmsPage {
     return {
@@ -941,6 +985,17 @@ export class MemStorage implements IStorage {
     const avg = Math.round((list.reduce((s, r) => s + r.stars, 0) / list.length) * 10) / 10;
     return { average: avg, count: list.length };
   }
+  // App Settings stubs for MemStorage
+  private _settings: Record<string, string> = { launch_banner_enabled: 'true' };
+  async getSetting(key: string) { return this._settings[key] ?? null; }
+  async setSetting(key: string, value: string): Promise<AppSetting> {
+    this._settings[key] = value;
+    return { key, value, updatedAt: new Date().toISOString() };
+  }
+  async getAllSettings(): Promise<AppSetting[]> {
+    return Object.entries(this._settings).map(([key, value]) => ({ key, value, updatedAt: '' }));
+  }
+
   // CMS stubs for MemStorage (in-memory only)
   private cmsPages: CmsPage[] = [];
   private nextCmsId = 1;

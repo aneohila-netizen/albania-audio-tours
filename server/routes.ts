@@ -948,5 +948,31 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ── App Settings ────────────────────────────────────────────────────────────
+
+  // Public: read a single setting value (no auth — used by the banner)
+  app.get('/api/settings/:key', async (req, res) => {
+    try {
+      const value = await storage.getSetting(req.params.key);
+      res.json({ key: req.params.key, value: value ?? null });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Admin: get all settings
+  app.get('/api/admin/settings', requireAdmin, async (_req, res) => {
+    try { res.json(await storage.getAllSettings()); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Admin: update a setting
+  app.put('/api/admin/settings/:key', requireAdmin, async (req, res) => {
+    try {
+      const { value } = req.body as { value: string };
+      if (value === undefined) return res.status(400).json({ error: 'value required' });
+      const setting = await storage.setSetting(req.params.key, String(value));
+      res.json(setting);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   return httpServer;
 }

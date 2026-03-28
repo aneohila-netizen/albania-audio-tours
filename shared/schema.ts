@@ -190,6 +190,15 @@ export const insertCmsPageSchema = createInsertSchema(cmsPages).omit({ id: true 
 export type CmsPage = typeof cmsPages.$inferSelect;
 export type InsertCmsPage = z.infer<typeof insertCmsPageSchema>;
 
+// ── App Settings (global key/value flags) ──────────────────────────────────────
+// Used for toggles like launch_banner_enabled, maintenance_mode, etc.
+export const appSettings = pgTable("app_settings", {
+  key:       text("key").primaryKey(),
+  value:     text("value").notNull().default("true"),
+  updatedAt: text("updated_at").notNull().default("now"),
+});
+export type AppSetting = typeof appSettings.$inferSelect;
+
 export const insertTourSiteSchema = createInsertSchema(tourSites).omit({ id: true });
 export const insertAttractionSchema = createInsertSchema(attractions).omit({ id: true });
 export const insertUserProgressSchema = createInsertSchema(userProgress).omit({ id: true });

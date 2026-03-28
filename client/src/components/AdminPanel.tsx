@@ -16,7 +16,7 @@ import {
   Lock, Eye, EyeOff, Plus, Pencil, Trash2, LogOut,
   MapPin, Globe, Music, Image, Info, ArrowLeft, Save,
   Upload, Play, Pause, Loader2, X, Link, CheckCircle2,
-  LayoutList, Star, Route, FileText,
+  LayoutList, Star, Route, FileText, Settings, Megaphone, Power, PowerOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -268,6 +268,130 @@ function LoginView({ onLogin }: { onLogin: () => void }) {
 }
 
 // ─── SITES LIST ───────────────────────────────────────────────────────────────
+// ─── ADMIN SETTINGS ─────────────────────────────────────────────────────────────
+function AdminSettings() {
+  const token = getAdminToken() || "";
+  const headers = { "Content-Type": "application/json", "x-admin-token": token };
+
+  const [bannerEnabled, setBannerEnabled] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState("");
+  const [error, setError] = useState("");
+
+  // Load current value
+  useEffect(() => {
+    fetch(`${RAILWAY_API}/api/admin/settings`, { headers: { "x-admin-token": token } })
+      .then(r => r.json())
+      .then((settings: { key: string; value: string }[]) => {
+        const s = settings.find(s => s.key === "launch_banner_enabled");
+        setBannerEnabled(s ? s.value === "true" : true);
+      })
+      .catch(() => setBannerEnabled(true));
+  }, []);
+
+  async function toggle() {
+    if (bannerEnabled === null) return;
+    setSaving(true); setError("");
+    const next = !bannerEnabled;
+    try {
+      const res = await fetch(`${RAILWAY_API}/api/admin/settings/launch_banner_enabled`, {
+        method: "PUT", headers,
+        body: JSON.stringify({ value: String(next) }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setBannerEnabled(next);
+      setSavedAt(new Date().toLocaleTimeString());
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="font-bold text-base">Settings</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">Global flags that control live features on the site.</p>
+      </div>
+
+      {/* Launch Banner toggle */}
+      <Card>
+        <CardContent className="px-5 py-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                bannerEnabled ? "bg-amber-100" : "bg-muted"
+              }`}>
+                <Megaphone size={18} className={bannerEnabled ? "text-amber-600" : "text-muted-foreground"} />
+              </div>
+              <div>
+                <p className="font-semibold text-sm">Launch Banner</p>
+                <p className="text-xs text-muted-foreground mt-0.5 max-w-xs">
+                  The announcement bar shown at the top of every page. Toggle it on for launch periods or promotional campaigns, off once the promotion ends.
+                </p>
+                {savedAt && (
+                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <CheckCircle2 size={11} /> Saved at {savedAt}
+                  </p>
+                )}
+                {error && (
+                  <p className="text-xs text-red-500 mt-1">{error}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Toggle switch */}
+            <div className="flex flex-col items-end gap-2 shrink-0">
+              <button
+                onClick={toggle}
+                disabled={saving || bannerEnabled === null}
+                className={`relative w-12 h-6 rounded-full transition-colors focus:outline-none ${
+                  bannerEnabled ? "bg-amber-500" : "bg-muted-foreground/30"
+                } disabled:opacity-50`}
+                aria-label={bannerEnabled ? "Disable launch banner" : "Enable launch banner"}
+              >
+                {saving ? (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : (
+                  <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                    bannerEnabled ? "translate-x-6" : "translate-x-0.5"
+                  }`} />
+                )}
+              </button>
+              <span className={`text-xs font-semibold ${
+                bannerEnabled ? "text-amber-600" : "text-muted-foreground"
+              }`}>
+                {bannerEnabled === null ? "Loading…" : bannerEnabled ? "ON" : "OFF"}
+              </span>
+            </div>
+          </div>
+
+          {/* Status callout */}
+          <div className={`mt-4 p-3 rounded-lg text-xs ${
+            bannerEnabled
+              ? "bg-amber-50 border border-amber-200 text-amber-800"
+              : "bg-muted border border-border text-muted-foreground"
+          }`}>
+            {bannerEnabled ? (
+              <span>⚡ <strong>Banner is live.</strong> All visitors see the launch announcement at the top of every page. Turn it off when the promotion ends or you are ready to switch to paid plans.</span>
+            ) : (
+              <span>💬 <strong>Banner is hidden.</strong> No announcement is shown to visitors. Turn it back on at any time for a new campaign or pricing announcement.</span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Placeholder for future settings */}
+      <div className="text-xs text-muted-foreground border border-dashed border-border rounded-xl p-4 text-center">
+        More settings will appear here as the platform grows — maintenance mode, subscription pricing visibility, and more.
+      </div>
+    </div>
+  );
+}
+
 function SitesView({
   onEdit,
   onNew,
@@ -282,7 +406,7 @@ function SitesView({
   const [sites, setSites] = useState<TourSite[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<number | null>(null);
-  const [adminTab, setAdminTab] = useState<"destinations" | "pages">("destinations");
+  const [adminTab, setAdminTab] = useState<"destinations" | "pages" | "settings">("destinations");
 
   useEffect(() => { fetchSites(); }, []);
 
@@ -356,7 +480,8 @@ function SitesView({
           {([
             { id: "destinations", label: "Destinations & Tours", icon: MapPin },
             { id: "pages",        label: "Page Manager",         icon: FileText },
-          ] as { id: "destinations" | "pages"; label: string; icon: any }[]).map(({ id, label, icon: Icon }) => (
+            { id: "settings",     label: "Settings",             icon: Settings },
+          ] as { id: "destinations" | "pages" | "settings"; label: string; icon: any }[]).map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setAdminTab(id)}
@@ -376,6 +501,10 @@ function SitesView({
         {/* CMS PAGE MANAGER */}
         {adminTab === "pages" && (
           <AdminCmsManager />
+        )}
+
+        {adminTab === "settings" && (
+          <AdminSettings />
         )}
 
         {adminTab === "destinations" && (<>
