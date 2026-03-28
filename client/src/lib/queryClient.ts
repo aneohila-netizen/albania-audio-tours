@@ -1,7 +1,9 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 export const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
-const API_BASE = "__PORT_5000__".startsWith("__") ? RAILWAY_URL : "__PORT_5000__";
+// Always use Railway URL directly — this frontend is statically hosted and always
+// calls the Railway backend regardless of where it's served from.
+const API_BASE = RAILWAY_URL;
 
 /** Direct Railway fetch — always goes to Railway, never through Perplexity proxy */
 export async function railwayFetch<T>(path: string): Promise<T> {
