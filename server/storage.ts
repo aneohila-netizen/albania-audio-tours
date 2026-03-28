@@ -725,6 +725,13 @@ class PgStorage implements IStorage {
 
   async getPublishedCmsPages(type?: string): Promise<CmsPage[]> {
     await this.ready;
+    if (type === 'blog') {
+      // Blog index: any published page that has show_in_blog=TRUE, regardless of page_type
+      const { rows } = await this.pool.query(
+        'SELECT * FROM cms_pages WHERE is_published=TRUE AND show_in_blog=TRUE ORDER BY sort_order ASC, published_at DESC'
+      );
+      return rows.map((r: any) => this.rowToCmsPage(r));
+    }
     if (type) {
       const { rows } = await this.pool.query(
         'SELECT * FROM cms_pages WHERE is_published=TRUE AND page_type=$1 ORDER BY sort_order ASC, published_at DESC', [type]
@@ -941,6 +948,7 @@ export class MemStorage implements IStorage {
   async getCmsPageBySlug(slug: string) { return this.cmsPages.find(p => p.slug === slug); }
   async getCmsPageById(id: number) { return this.cmsPages.find(p => p.id === id); }
   async getPublishedCmsPages(type?: string) {
+    if (type === 'blog') return this.cmsPages.filter(p => p.isPublished && p.showInBlog);
     return this.cmsPages.filter(p => p.isPublished && (!type || p.pageType === type));
   }
   async createCmsPage(data: InsertCmsPage): Promise<CmsPage> {

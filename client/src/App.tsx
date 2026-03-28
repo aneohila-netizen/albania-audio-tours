@@ -2,7 +2,7 @@ import { Switch, Route, Router, useLocation } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { useState, createContext, useContext } from "react";
+import { useState, createContext, useContext, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { PerplexityAttribution } from "@/components/PerplexityAttribution";
 import type { Lang, Translations } from "@/lib/i18n";
@@ -84,6 +84,49 @@ function AppProviders({ children }: { children: React.ReactNode }) {
   );
 }
 
+// ─── Dynamic footer — merges fixed links with CMS pages marked showInFooter ─
+const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
+
+interface CmsFooterPage { id: number; slug: string; title: string; }
+
+function DynamicFooter() {
+  const [cmsLinks, setCmsLinks] = useState<CmsFooterPage[]>([]);
+
+  useEffect(() => {
+    fetch(`${RAILWAY_URL}/api/cms/pages`)
+      .then(r => r.json())
+      .then((pages: any[]) => {
+        // Only pages with showInFooter=true, exclude slugs already in fixed links
+        const fixed = new Set(["contact", "terms", "refund-policy"]);
+        setCmsLinks(
+          pages
+            .filter((p: any) => p.showInFooter && !fixed.has(p.slug))
+            .map((p: any) => ({ id: p.id, slug: p.slug, title: p.title }))
+        );
+      })
+      .catch(() => {});
+  }, []);
+
+  return (
+    <footer className="border-t border-border px-4 py-4 text-center space-y-1.5" style={{ fontSize: "var(--text-xs)", color: "hsl(var(--muted-foreground))" }}>
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+        <a href="#/blog" className="hover:text-primary transition-colors">Blog</a>
+        {cmsLinks.map(p => (
+          <a key={p.id} href={`#/p/${p.slug}`} className="hover:text-primary transition-colors">{p.title}</a>
+        ))}
+        <a href="#/contact" className="hover:text-primary transition-colors">Contact</a>
+        <a href="#/terms" className="hover:text-primary transition-colors">Terms of Service</a>
+        <a href="#/refund-policy" className="hover:text-primary transition-colors">Refund Policy</a>
+      </div>
+      <div>
+        <span>AlbaTour — Albania Self-Guided Audio Tours</span>
+        {"  ·  "}
+        <span>&#169; {new Date().getFullYear()} All Rights Reserved</span>
+      </div>
+    </footer>
+  );
+}
+
 function AppRoutes() {
   const [, navigate] = useLocation();
   const [ratingState, setRatingState] = useState<{
@@ -124,19 +167,7 @@ function AppRoutes() {
               <Route path="/p/:slug" component={CmsPageRenderer} />
                 </Switch>
               </main>
-              <footer className="border-t border-border px-4 py-4 text-center space-y-1.5" style={{ fontSize: "var(--text-xs)", color: "hsl(var(--muted-foreground))" }}>
-                <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
-                  <a href="#/blog" className="hover:text-primary transition-colors">Blog</a>
-                  <a href="#/contact" className="hover:text-primary transition-colors">Contact</a>
-                  <a href="#/terms" className="hover:text-primary transition-colors">Terms of Service</a>
-                  <a href="#/refund-policy" className="hover:text-primary transition-colors">Refund Policy</a>
-                </div>
-                <div>
-                  <span>AlbaTour — Albania Self-Guided Audio Tours</span>
-                  {"  ·  "}
-                  <span>&#169; {new Date().getFullYear()} All Rights Reserved</span>
-                </div>
-              </footer>
+              <DynamicFooter />
             </div>
 
             {/* WhatsApp floating button — bottom right, clears zoom controls and audio player */}
