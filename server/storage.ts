@@ -7,6 +7,8 @@ import type {
   Rating, InsertRating,
   CmsPage, InsertCmsPage,
   AppSetting,
+  SubscriptionPlan, InsertSubscriptionPlan,
+  SubscriptionLead, InsertLead,
 } from "@shared/schema";
 
 // ─── Interface ────────────────────────────────────────────────────────────────
@@ -40,6 +42,16 @@ export interface IStorage {
   getProgress(sessionId: string): Promise<UserProgress[]>;
   addProgress(data: InsertUserProgress): Promise<UserProgress>;
   getLeaderboard(): Promise<{ sessionId: string; totalPoints: number; visitCount: number }[]>;
+  // Subscription Plans
+  getAllPlans(): Promise<SubscriptionPlan[]>;
+  getActivePlans(): Promise<SubscriptionPlan[]>;
+  getPlanBySlug(slug: string): Promise<SubscriptionPlan | undefined>;
+  createPlan(data: InsertSubscriptionPlan): Promise<SubscriptionPlan>;
+  updatePlan(id: number, data: Partial<InsertSubscriptionPlan>): Promise<SubscriptionPlan | undefined>;
+  deletePlan(id: number): Promise<boolean>;
+  // Leads
+  getAllLeads(): Promise<SubscriptionLead[]>;
+  createLead(data: InsertLead): Promise<SubscriptionLead>;
   // App Settings
   getSetting(key: string): Promise<string | null>;
   setSetting(key: string, value: string): Promise<AppSetting>;
@@ -285,6 +297,66 @@ class PgStorage implements IStorage {
     ];
     for (const sql of newLangCols) {
       await this.pool.query(sql).catch(() => {}); // ignore if already exists
+    }
+
+    // Subscription plans table
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS subscription_plans (
+        id SERIAL PRIMARY KEY,
+        slug TEXT UNIQUE NOT NULL,
+        tier TEXT NOT NULL DEFAULT 'individual',
+        name TEXT NOT NULL,
+        tagline TEXT NOT NULL DEFAULT '',
+        price_eur REAL NOT NULL,
+        billing_period TEXT NOT NULL DEFAULT 'year',
+        features TEXT NOT NULL DEFAULT '[]',
+        is_popular BOOLEAN NOT NULL DEFAULT FALSE,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        shopify_variant_id TEXT DEFAULT '',
+        shopify_checkout_url TEXT DEFAULT '',
+        cta_label TEXT NOT NULL DEFAULT 'Get Started',
+        notes TEXT DEFAULT ''
+      );
+    `);
+
+    // Subscription leads table
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS subscription_leads (
+        id SERIAL PRIMARY KEY,
+        email TEXT NOT NULL,
+        plan_slug TEXT NOT NULL,
+        plan_name TEXT NOT NULL,
+        source TEXT DEFAULT 'pricing-page',
+        created_at TEXT NOT NULL,
+        notes TEXT DEFAULT ''
+      );
+    `);
+
+    // Seed default plans if none exist
+    const { rows: planRows } = await this.pool.query('SELECT COUNT(*) as c FROM subscription_plans');
+    if (parseInt(planRows[0].c) === 0) {
+      const defaultPlans = [
+        { slug: 'trip-pass', tier: 'individual', name: 'Trip Pass', tagline: 'Perfect for a week in Albania', price: 7.99, period: '7-day',
+          features: JSON.stringify(['7 days full access','All 43 destinations','All 305 attractions','10 audio walking tours','Offline audio playback','Works on any device']),
+          popular: false, order: 1, cta: 'Buy Trip Pass' },
+        { slug: 'explorer', tier: 'individual', name: 'Explorer', tagline: 'Best value for Albania lovers', price: 19.99, period: 'year',
+          features: JSON.stringify(['Full year access','All 43 destinations','All 305 attractions','10 audio walking tours','Offline audio playback','New tours as added','All 11 languages']),
+          popular: true, order: 2, cta: 'Start Exploring' },
+        { slug: 'operator', tier: 'commercial', name: 'Operator Licence', tagline: 'For tour guides, hostels & small agencies', price: 199, period: 'year',
+          features: JSON.stringify(['Up to 10 active guides','All individual features','Commercial use permitted','Priority email support','Early access to new tours','Attribution-free use']),
+          popular: false, order: 3, cta: 'Get Operator Licence' },
+        { slug: 'agency', tier: 'commercial', name: 'Agency Licence', tagline: 'For tour operators & travel agencies', price: 499, period: 'year',
+          features: JSON.stringify(['Unlimited guides & staff','All Operator features','API access (on request)','White-label use permitted','Dedicated account support','Co-marketing opportunities','Custom tour additions (on request)']),
+          popular: false, order: 4, cta: 'Contact for Agency Licence' },
+      ];
+      for (const p of defaultPlans) {
+        await this.pool.query(
+          `INSERT INTO subscription_plans (slug,tier,name,tagline,price_eur,billing_period,features,is_popular,is_active,sort_order,shopify_variant_id,shopify_checkout_url,cta_label)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,TRUE,$9,'','', $10) ON CONFLICT (slug) DO NOTHING`,
+          [p.slug, p.tier, p.name, p.tagline, p.price, p.period, p.features, p.popular, p.order, p.cta]
+        );
+      }
     }
 
     // App settings table
@@ -701,7 +773,83 @@ class PgStorage implements IStorage {
     return { count: count || 0, average: average || 0 };
   }
 
-  // ── App Settings ───────────────────────────────────────────────────────────────
+  // ── Subscription Plans ────────────────────────────────────────────────────
+  private rowToPlan(r: any): SubscriptionPlan {
+    return {
+      id: r.id, slug: r.slug, tier: r.tier, name: r.name, tagline: r.tagline,
+      priceEur: parseFloat(r.price_eur), billingPeriod: r.billing_period,
+      features: r.features || '[]', isPopular: r.is_popular || false,
+      isActive: r.is_active || true, sortOrder: r.sort_order || 0,
+      shopifyVariantId: r.shopify_variant_id || '',
+      shopifyCheckoutUrl: r.shopify_checkout_url || '',
+      ctaLabel: r.cta_label || 'Get Started', notes: r.notes || '',
+    };
+  }
+  async getAllPlans(): Promise<SubscriptionPlan[]> {
+    await this.ready;
+    const { rows } = await this.pool.query('SELECT * FROM subscription_plans ORDER BY sort_order ASC, id ASC');
+    return rows.map((r: any) => this.rowToPlan(r));
+  }
+  async getActivePlans(): Promise<SubscriptionPlan[]> {
+    await this.ready;
+    const { rows } = await this.pool.query('SELECT * FROM subscription_plans WHERE is_active=TRUE ORDER BY sort_order ASC');
+    return rows.map((r: any) => this.rowToPlan(r));
+  }
+  async getPlanBySlug(slug: string): Promise<SubscriptionPlan | undefined> {
+    await this.ready;
+    const { rows } = await this.pool.query('SELECT * FROM subscription_plans WHERE slug=$1', [slug]);
+    return rows[0] ? this.rowToPlan(rows[0]) : undefined;
+  }
+  async createPlan(data: InsertSubscriptionPlan): Promise<SubscriptionPlan> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      `INSERT INTO subscription_plans (slug,tier,name,tagline,price_eur,billing_period,features,is_popular,is_active,sort_order,shopify_variant_id,shopify_checkout_url,cta_label,notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+      [data.slug,data.tier||'individual',data.name,data.tagline||'',data.priceEur,
+       data.billingPeriod||'year',data.features||'[]',data.isPopular??false,
+       data.isActive??true,data.sortOrder??0,data.shopifyVariantId||'',
+       data.shopifyCheckoutUrl||'',data.ctaLabel||'Get Started',data.notes||'']
+    );
+    return this.rowToPlan(rows[0]);
+  }
+  async updatePlan(id: number, data: Partial<InsertSubscriptionPlan>): Promise<SubscriptionPlan | undefined> {
+    await this.ready;
+    const map: Record<string,string> = {
+      slug:'slug',tier:'tier',name:'name',tagline:'tagline',priceEur:'price_eur',
+      billingPeriod:'billing_period',features:'features',isPopular:'is_popular',
+      isActive:'is_active',sortOrder:'sort_order',shopifyVariantId:'shopify_variant_id',
+      shopifyCheckoutUrl:'shopify_checkout_url',ctaLabel:'cta_label',notes:'notes',
+    };
+    const fields: string[] = []; const vals: any[] = []; let i = 1;
+    for (const [k, col] of Object.entries(map)) {
+      if (k in data) { fields.push(`${col}=$${i++}`); vals.push((data as any)[k]); }
+    }
+    if (!fields.length) return undefined;
+    vals.push(id);
+    const { rows } = await this.pool.query(`UPDATE subscription_plans SET ${fields.join(', ')} WHERE id=$${i} RETURNING *`, vals);
+    return rows[0] ? this.rowToPlan(rows[0]) : undefined;
+  }
+  async deletePlan(id: number): Promise<boolean> {
+    await this.ready;
+    const { rowCount } = await this.pool.query('DELETE FROM subscription_plans WHERE id=$1', [id]);
+    return (rowCount ?? 0) > 0;
+  }
+  async getAllLeads(): Promise<SubscriptionLead[]> {
+    await this.ready;
+    const { rows } = await this.pool.query('SELECT * FROM subscription_leads ORDER BY id DESC');
+    return rows.map((r: any) => ({ id:r.id, email:r.email, planSlug:r.plan_slug, planName:r.plan_name, source:r.source||'', createdAt:r.created_at, notes:r.notes||'' }));
+  }
+  async createLead(data: InsertLead): Promise<SubscriptionLead> {
+    await this.ready;
+    const now = new Date().toISOString();
+    const { rows } = await this.pool.query(
+      `INSERT INTO subscription_leads (email,plan_slug,plan_name,source,created_at,notes) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [data.email,data.planSlug,data.planName,data.source||'pricing-page',now,data.notes||'']
+    );
+    return { id:rows[0].id, email:rows[0].email, planSlug:rows[0].plan_slug, planName:rows[0].plan_name, source:rows[0].source, createdAt:rows[0].created_at, notes:rows[0].notes };
+  }
+
+  // ── App Settings ──────────────────────────────────────────────────────────────
   async getSetting(key: string): Promise<string | null> {
     await this.ready;
     const { rows } = await this.pool.query('SELECT value FROM app_settings WHERE key=$1', [key]);
@@ -985,6 +1133,35 @@ export class MemStorage implements IStorage {
     const avg = Math.round((list.reduce((s, r) => s + r.stars, 0) / list.length) * 10) / 10;
     return { average: avg, count: list.length };
   }
+  // Subscription stubs for MemStorage
+  private _plans: SubscriptionPlan[] = [];
+  private _leads: SubscriptionLead[] = [];
+  private _nextPlanId = 1;
+  private _nextLeadId = 1;
+  async getAllPlans() { return [...this._plans]; }
+  async getActivePlans() { return this._plans.filter(p => p.isActive); }
+  async getPlanBySlug(slug: string) { return this._plans.find(p => p.slug === slug); }
+  async createPlan(data: InsertSubscriptionPlan): Promise<SubscriptionPlan> {
+    const p = { id: this._nextPlanId++, ...data } as SubscriptionPlan;
+    this._plans.push(p); return p;
+  }
+  async updatePlan(id: number, data: Partial<InsertSubscriptionPlan>) {
+    const idx = this._plans.findIndex(p => p.id === id);
+    if (idx === -1) return undefined;
+    this._plans[idx] = { ...this._plans[idx], ...data };
+    return this._plans[idx];
+  }
+  async deletePlan(id: number) {
+    const idx = this._plans.findIndex(p => p.id === id);
+    if (idx === -1) return false;
+    this._plans.splice(idx, 1); return true;
+  }
+  async getAllLeads() { return [...this._leads]; }
+  async createLead(data: InsertLead): Promise<SubscriptionLead> {
+    const l = { id: this._nextLeadId++, ...data, createdAt: new Date().toISOString() } as SubscriptionLead;
+    this._leads.push(l); return l;
+  }
+
   // App Settings stubs for MemStorage
   private _settings: Record<string, string> = { launch_banner_enabled: 'true' };
   async getSetting(key: string) { return this._settings[key] ?? null; }

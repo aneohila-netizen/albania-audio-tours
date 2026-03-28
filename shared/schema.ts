@@ -190,6 +190,44 @@ export const insertCmsPageSchema = createInsertSchema(cmsPages).omit({ id: true 
 export type CmsPage = typeof cmsPages.$inferSelect;
 export type InsertCmsPage = z.infer<typeof insertCmsPageSchema>;
 
+// ── Subscription Plans ───────────────────────────────────────────────────
+// Admin-editable plans shown on the public /subscriptions page
+export const subscriptionPlans = pgTable("subscription_plans", {
+  id:            integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  slug:          text("slug").notNull().unique(),          // e.g. "trip-pass", "explorer", "operator"
+  tier:          text("tier").notNull().default("individual"), // "individual" | "commercial"
+  name:          text("name").notNull(),
+  tagline:       text("tagline").notNull().default(""),    // e.g. "Perfect for a week in Albania"
+  priceEur:      real("price_eur").notNull(),              // e.g. 7.99
+  billingPeriod: text("billing_period").notNull().default("year"), // "7-day" | "month" | "year"
+  features:      text("features").notNull().default("[]"), // JSON array of feature strings
+  isPopular:     boolean("is_popular").notNull().default(false),
+  isActive:      boolean("is_active").notNull().default(true),
+  sortOrder:     integer("sort_order").notNull().default(0),
+  shopifyVariantId: text("shopify_variant_id").default(""), // Shopify product variant ID for Buy Button
+  shopifyCheckoutUrl: text("shopify_checkout_url").default(""), // Direct checkout URL
+  ctaLabel:      text("cta_label").notNull().default("Get Started"),
+  notes:         text("notes").default(""),                // Admin-only notes
+});
+export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({ id: true });
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema>;
+
+// ── Subscription Leads ───────────────────────────────────────────────────
+// Captures email interest before Shopify checkout is fully wired
+export const subscriptionLeads = pgTable("subscription_leads", {
+  id:        integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  email:     text("email").notNull(),
+  planSlug:  text("plan_slug").notNull(),
+  planName:  text("plan_name").notNull(),
+  source:    text("source").default("pricing-page"),
+  createdAt: text("created_at").notNull(),
+  notes:     text("notes").default(""),
+});
+export const insertLeadSchema = createInsertSchema(subscriptionLeads).omit({ id: true });
+export type SubscriptionLead = typeof subscriptionLeads.$inferSelect;
+export type InsertLead = z.infer<typeof insertLeadSchema>;
+
 // ── App Settings (global key/value flags) ──────────────────────────────────────
 // Used for toggles like launch_banner_enabled, maintenance_mode, etc.
 export const appSettings = pgTable("app_settings", {

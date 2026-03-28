@@ -35,6 +35,7 @@ import type { Destination, Attraction } from "@/lib/staticData";
 import type { TourSite } from "@shared/schema";
 import ItineraryManager from "@/components/ItineraryManager";
 import AdminCmsManager from "@/components/AdminCmsManager";
+import AdminSubscriptions from "@/components/AdminSubscriptions";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 const ADMIN_PASSWORD = "AlbaTour2026!";
@@ -406,7 +407,7 @@ function SitesView({
   const [sites, setSites] = useState<TourSite[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<number | null>(null);
-  const [adminTab, setAdminTab] = useState<"destinations" | "pages" | "settings">("destinations");
+  const [adminTab, setAdminTab] = useState<"destinations" | "pages" | "settings" | "subscriptions">("destinations");
 
   useEffect(() => { fetchSites(); }, []);
 
@@ -478,10 +479,11 @@ function SitesView({
       <div className="border-b border-border/60 bg-background">
         <div className="max-w-5xl mx-auto px-4 flex gap-0">
           {([
-            { id: "destinations", label: "Destinations & Tours", icon: MapPin },
-            { id: "pages",        label: "Page Manager",         icon: FileText },
-            { id: "settings",     label: "Settings",             icon: Settings },
-          ] as { id: "destinations" | "pages" | "settings"; label: string; icon: any }[]).map(({ id, label, icon: Icon }) => (
+            { id: "destinations",  label: "Destinations & Tours", icon: MapPin },
+            { id: "pages",         label: "Page Manager",          icon: FileText },
+            { id: "subscriptions", label: "Subscriptions",          icon: Megaphone },
+            { id: "settings",      label: "Settings",              icon: Settings },
+          ] as { id: "destinations" | "pages" | "settings" | "subscriptions"; label: string; icon: any }[]).map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setAdminTab(id)}
@@ -505,6 +507,10 @@ function SitesView({
 
         {adminTab === "settings" && (
           <AdminSettings />
+        )}
+
+        {adminTab === "subscriptions" && (
+          <AdminSubscriptions />
         )}
 
         {adminTab === "destinations" && (<>

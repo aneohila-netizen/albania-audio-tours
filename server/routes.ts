@@ -948,6 +948,60 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ── Subscription Plans ────────────────────────────────────────────────────────────
+
+  // Public: get active plans for the pricing page
+  app.get('/api/plans', async (_req, res) => {
+    try { res.json(await storage.getActivePlans()); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Public: capture a lead (interest before Shopify is wired)
+  app.post('/api/plans/lead', async (req, res) => {
+    try {
+      const { email, planSlug, planName } = req.body;
+      if (!email || !planSlug) return res.status(400).json({ error: 'email and planSlug required' });
+      const lead = await storage.createLead({ email, planSlug, planName: planName || planSlug, source: 'pricing-page', notes: '' });
+      res.json({ success: true, lead });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Admin: get all plans (including inactive)
+  app.get('/api/admin/plans', requireAdmin, async (_req, res) => {
+    try { res.json(await storage.getAllPlans()); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Admin: create plan
+  app.post('/api/admin/plans', requireAdmin, async (req, res) => {
+    try { res.json(await storage.createPlan(req.body)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Admin: update plan
+  app.put('/api/admin/plans/:id', requireAdmin, async (req, res) => {
+    try {
+      const updated = await storage.updatePlan(Number(req.params.id), req.body);
+      if (!updated) return res.status(404).json({ error: 'Plan not found' });
+      res.json(updated);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Admin: delete plan
+  app.delete('/api/admin/plans/:id', requireAdmin, requireDeleteConfirmation, async (req, res) => {
+    try {
+      const ok = await storage.deletePlan(Number(req.params.id));
+      if (!ok) return res.status(404).json({ error: 'Plan not found' });
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Admin: get all leads
+  app.get('/api/admin/leads', requireAdmin, async (_req, res) => {
+    try { res.json(await storage.getAllLeads()); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // ── App Settings ────────────────────────────────────────────────────────────
 
   // Public: read a single setting value (no auth — used by the banner)

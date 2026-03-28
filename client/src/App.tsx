@@ -21,6 +21,7 @@ import ContactPage from "@/pages/ContactPage";
 import TermsPage from "@/pages/TermsPage";
 import RefundPage from "@/pages/RefundPage";
 import BlogPage from "@/pages/BlogPage";
+import SubscriptionsPage from "@/pages/SubscriptionsPage";
 import CmsPageRenderer from "@/pages/CmsPageRenderer";
 import AdminPanel from "@/components/AdminPanel";
 import NavBar from "@/components/NavBar";
@@ -112,6 +113,7 @@ function DynamicFooter() {
     <footer className="border-t border-border px-4 py-4 text-center space-y-1.5" style={{ fontSize: "var(--text-xs)", color: "hsl(var(--muted-foreground))" }}>
       <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
         <a href="#/blog" className="hover:text-primary transition-colors">Blog</a>
+                  <a href="#/subscriptions" className="hover:text-primary transition-colors font-medium" style={{color:"hsl(var(--primary))"}}>Subscribe</a>
         {cmsLinks.map(p => (
           <a key={p.id} href={`#/p/${p.slug}`} className="hover:text-primary transition-colors">{p.title}</a>
         ))}
@@ -166,6 +168,7 @@ function AppRoutes() {
               <Route path="/terms" component={TermsPage} />
               <Route path="/refund-policy" component={RefundPage} />
               <Route path="/blog" component={BlogPage} />
+              <Route path="/subscriptions" component={SubscriptionsPage} />
               <Route path="/p/:slug" component={CmsPageRenderer} />
                 </Switch>
               </main>
