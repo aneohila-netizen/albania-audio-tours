@@ -163,6 +163,33 @@ export const userProgress = pgTable("user_progress", {
   audioCompleted: boolean("audio_completed").notNull().default(false),
 });
 
+// ── CMS Pages ────────────────────────────────────────────────────────────────
+// Covers: editable footer pages (contact/terms/refund), blog posts, SEO landing pages
+export const cmsPages = pgTable("cms_pages", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  slug: text("slug").notNull().unique(),           // URL: /#/p/slug (or /contact, /terms, /refund-policy)
+  pageType: text("page_type").notNull().default("info"), // "info" | "blog" | "landing" | "system"
+  title: text("title").notNull(),
+  excerpt: text("excerpt").default(""),             // blog card subtitle / meta description fallback
+  body: text("body").notNull().default(""),         // HTML content (rich text)
+  coverImage: text("cover_image").default(""),      // base64 or URL
+  seoTitle: text("seo_title").default(""),
+  seoDescription: text("seo_description").default(""),
+  seoKeywords: text("seo_keywords").default(""),
+  author: text("author").default("AlbaTour"),
+  publishedAt: text("published_at").default(""),    // ISO date string
+  isPublished: boolean("is_published").notNull().default(false),
+  showInFooter: boolean("show_in_footer").notNull().default(false),
+  showInBlog: boolean("show_in_blog").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: text("created_at").notNull().default("now"),
+  updatedAt: text("updated_at").notNull().default("now"),
+});
+
+export const insertCmsPageSchema = createInsertSchema(cmsPages).omit({ id: true });
+export type CmsPage = typeof cmsPages.$inferSelect;
+export type InsertCmsPage = z.infer<typeof insertCmsPageSchema>;
+
 export const insertTourSiteSchema = createInsertSchema(tourSites).omit({ id: true });
 export const insertAttractionSchema = createInsertSchema(attractions).omit({ id: true });
 export const insertUserProgressSchema = createInsertSchema(userProgress).omit({ id: true });

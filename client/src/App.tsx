@@ -20,6 +20,8 @@ import LeaderboardPage from "@/pages/LeaderboardPage";
 import ContactPage from "@/pages/ContactPage";
 import TermsPage from "@/pages/TermsPage";
 import RefundPage from "@/pages/RefundPage";
+import BlogPage from "@/pages/BlogPage";
+import CmsPageRenderer from "@/pages/CmsPageRenderer";
 import AdminPanel from "@/components/AdminPanel";
 import NavBar from "@/components/NavBar";
 
@@ -118,10 +120,13 @@ function AppRoutes() {
               <Route path="/contact" component={ContactPage} />
               <Route path="/terms" component={TermsPage} />
               <Route path="/refund-policy" component={RefundPage} />
+              <Route path="/blog" component={BlogPage} />
+              <Route path="/p/:slug" component={CmsPageRenderer} />
                 </Switch>
               </main>
               <footer className="border-t border-border px-4 py-4 text-center space-y-1.5" style={{ fontSize: "var(--text-xs)", color: "hsl(var(--muted-foreground))" }}>
                 <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+                  <a href="#/blog" className="hover:text-primary transition-colors">Blog</a>
                   <a href="#/contact" className="hover:text-primary transition-colors">Contact</a>
                   <a href="#/terms" className="hover:text-primary transition-colors">Terms of Service</a>
                   <a href="#/refund-policy" className="hover:text-primary transition-colors">Refund Policy</a>

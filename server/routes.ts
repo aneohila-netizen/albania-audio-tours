@@ -882,5 +882,71 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ── CMS Pages ───────────────────────────────────────────────────────────────
+
+  // Public: get all published pages (optionally by type)
+  app.get("/api/cms/pages", async (req, res) => {
+    try {
+      const type = req.query.type as string | undefined;
+      const pages = await storage.getPublishedCmsPages(type);
+      res.json(pages);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Public: get single published page by slug
+  app.get("/api/cms/pages/:slug", async (req, res) => {
+    try {
+      const page = await storage.getCmsPageBySlug(req.params.slug);
+      if (!page) return res.status(404).json({ error: "Page not found" });
+      res.json(page);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Admin: get ALL pages (including drafts)
+  app.get("/api/admin/cms/pages", requireAdmin, async (_req, res) => {
+    try {
+      const pages = await storage.getAllCmsPages();
+      res.json(pages);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Admin: create page
+  app.post("/api/admin/cms/pages", requireAdmin, async (req, res) => {
+    try {
+      const page = await storage.createCmsPage(req.body);
+      res.json(page);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Admin: update page
+  app.put("/api/admin/cms/pages/:id", requireAdmin, async (req, res) => {
+    try {
+      const updated = await storage.updateCmsPage(Number(req.params.id), req.body);
+      if (!updated) return res.status(404).json({ error: "Page not found" });
+      res.json(updated);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Admin: delete page (2-step header protection)
+  app.delete("/api/admin/cms/pages/:id", requireAdmin, requireDeleteConfirmation, async (req, res) => {
+    try {
+      const ok = await storage.deleteCmsPage(Number(req.params.id));
+      if (!ok) return res.status(404).json({ error: "Page not found" });
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   return httpServer;
 }

@@ -5,6 +5,7 @@ import type {
   Attraction, InsertAttraction,
   Itinerary, InsertItinerary,
   Rating, InsertRating,
+  CmsPage, InsertCmsPage,
 } from "@shared/schema";
 
 // ─── Interface ────────────────────────────────────────────────────────────────
@@ -38,6 +39,14 @@ export interface IStorage {
   getProgress(sessionId: string): Promise<UserProgress[]>;
   addProgress(data: InsertUserProgress): Promise<UserProgress>;
   getLeaderboard(): Promise<{ sessionId: string; totalPoints: number; visitCount: number }[]>;
+  // CMS Pages
+  getAllCmsPages(): Promise<CmsPage[]>;
+  getCmsPageBySlug(slug: string): Promise<CmsPage | undefined>;
+  getCmsPageById(id: number): Promise<CmsPage | undefined>;
+  getPublishedCmsPages(type?: string): Promise<CmsPage[]>;
+  createCmsPage(data: InsertCmsPage): Promise<CmsPage>;
+  updateCmsPage(id: number, data: Partial<InsertCmsPage>): Promise<CmsPage | undefined>;
+  deleteCmsPage(id: number): Promise<boolean>;
 }
 
 // ─── PostgreSQL storage ───────────────────────────────────────────────────────
@@ -272,6 +281,30 @@ class PgStorage implements IStorage {
     for (const sql of newLangCols) {
       await this.pool.query(sql).catch(() => {}); // ignore if already exists
     }
+
+    // CMS pages table
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS cms_pages (
+        id SERIAL PRIMARY KEY,
+        slug TEXT UNIQUE NOT NULL,
+        page_type TEXT NOT NULL DEFAULT 'info',
+        title TEXT NOT NULL,
+        excerpt TEXT DEFAULT '',
+        body TEXT NOT NULL DEFAULT '',
+        cover_image TEXT DEFAULT '',
+        seo_title TEXT DEFAULT '',
+        seo_description TEXT DEFAULT '',
+        seo_keywords TEXT DEFAULT '',
+        author TEXT DEFAULT 'AlbaTour',
+        published_at TEXT DEFAULT '',
+        is_published BOOLEAN NOT NULL DEFAULT FALSE,
+        show_in_footer BOOLEAN NOT NULL DEFAULT FALSE,
+        show_in_blog BOOLEAN NOT NULL DEFAULT FALSE,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT 'now',
+        updated_at TEXT NOT NULL DEFAULT 'now'
+      );
+    `);
 
     // Seed tour_sites if empty
     const { rows: siteRows } = await this.pool.query("SELECT COUNT(*) as c FROM tour_sites");
@@ -647,6 +680,114 @@ class PgStorage implements IStorage {
     const { count, average } = rows[0];
     return { count: count || 0, average: average || 0 };
   }
+
+  // ── CMS Pages ──────────────────────────────────────────────────────────────
+  private rowToCmsPage(r: any): CmsPage {
+    return {
+      id: r.id,
+      slug: r.slug,
+      pageType: r.page_type,
+      title: r.title,
+      excerpt: r.excerpt || '',
+      body: r.body || '',
+      coverImage: r.cover_image || '',
+      seoTitle: r.seo_title || '',
+      seoDescription: r.seo_description || '',
+      seoKeywords: r.seo_keywords || '',
+      author: r.author || 'AlbaTour',
+      publishedAt: r.published_at || '',
+      isPublished: r.is_published || false,
+      showInFooter: r.show_in_footer || false,
+      showInBlog: r.show_in_blog || false,
+      sortOrder: r.sort_order || 0,
+      createdAt: r.created_at || 'now',
+      updatedAt: r.updated_at || 'now',
+    };
+  }
+
+  async getAllCmsPages(): Promise<CmsPage[]> {
+    await this.ready;
+    const { rows } = await this.pool.query('SELECT * FROM cms_pages ORDER BY sort_order ASC, id ASC');
+    return rows.map((r: any) => this.rowToCmsPage(r));
+  }
+
+  async getCmsPageBySlug(slug: string): Promise<CmsPage | undefined> {
+    await this.ready;
+    const { rows } = await this.pool.query('SELECT * FROM cms_pages WHERE slug=$1', [slug]);
+    return rows[0] ? this.rowToCmsPage(rows[0]) : undefined;
+  }
+
+  async getCmsPageById(id: number): Promise<CmsPage | undefined> {
+    await this.ready;
+    const { rows } = await this.pool.query('SELECT * FROM cms_pages WHERE id=$1', [id]);
+    return rows[0] ? this.rowToCmsPage(rows[0]) : undefined;
+  }
+
+  async getPublishedCmsPages(type?: string): Promise<CmsPage[]> {
+    await this.ready;
+    if (type) {
+      const { rows } = await this.pool.query(
+        'SELECT * FROM cms_pages WHERE is_published=TRUE AND page_type=$1 ORDER BY sort_order ASC, published_at DESC', [type]
+      );
+      return rows.map((r: any) => this.rowToCmsPage(r));
+    }
+    const { rows } = await this.pool.query(
+      'SELECT * FROM cms_pages WHERE is_published=TRUE ORDER BY sort_order ASC, published_at DESC'
+    );
+    return rows.map((r: any) => this.rowToCmsPage(r));
+  }
+
+  async createCmsPage(data: InsertCmsPage): Promise<CmsPage> {
+    await this.ready;
+    const now = new Date().toISOString();
+    const { rows } = await this.pool.query(
+      `INSERT INTO cms_pages (slug, page_type, title, excerpt, body, cover_image,
+        seo_title, seo_description, seo_keywords, author, published_at,
+        is_published, show_in_footer, show_in_blog, sort_order, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$16)
+       RETURNING *`,
+      [
+        data.slug, data.pageType || 'info', data.title, data.excerpt || '',
+        data.body || '', data.coverImage || '',
+        data.seoTitle || '', data.seoDescription || '', data.seoKeywords || '',
+        data.author || 'AlbaTour', data.publishedAt || '',
+        data.isPublished ?? false, data.showInFooter ?? false,
+        data.showInBlog ?? false, data.sortOrder ?? 0, now,
+      ]
+    );
+    return this.rowToCmsPage(rows[0]);
+  }
+
+  async updateCmsPage(id: number, data: Partial<InsertCmsPage>): Promise<CmsPage | undefined> {
+    await this.ready;
+    const now = new Date().toISOString();
+    const fields: string[] = [];
+    const vals: any[] = [];
+    let i = 1;
+    const map: Record<string, string> = {
+      slug: 'slug', pageType: 'page_type', title: 'title', excerpt: 'excerpt',
+      body: 'body', coverImage: 'cover_image', seoTitle: 'seo_title',
+      seoDescription: 'seo_description', seoKeywords: 'seo_keywords',
+      author: 'author', publishedAt: 'published_at', isPublished: 'is_published',
+      showInFooter: 'show_in_footer', showInBlog: 'show_in_blog', sortOrder: 'sort_order',
+    };
+    for (const [k, col] of Object.entries(map)) {
+      if (k in data) { fields.push(`${col}=$${i++}`); vals.push((data as any)[k]); }
+    }
+    if (!fields.length) return this.getCmsPageById(id);
+    fields.push(`updated_at=$${i++}`); vals.push(now);
+    vals.push(id);
+    const { rows } = await this.pool.query(
+      `UPDATE cms_pages SET ${fields.join(', ')} WHERE id=$${i} RETURNING *`, vals
+    );
+    return rows[0] ? this.rowToCmsPage(rows[0]) : undefined;
+  }
+
+  async deleteCmsPage(id: number): Promise<boolean> {
+    await this.ready;
+    const { rowCount } = await this.pool.query('DELETE FROM cms_pages WHERE id=$1', [id]);
+    return (rowCount ?? 0) > 0;
+  }
 }
 
 // ─── File-based / memory storage (local dev fallback) ─────────────────────────
@@ -792,6 +933,31 @@ export class MemStorage implements IStorage {
     if (!list.length) return { average: 0, count: 0 };
     const avg = Math.round((list.reduce((s, r) => s + r.stars, 0) / list.length) * 10) / 10;
     return { average: avg, count: list.length };
+  }
+  // CMS stubs for MemStorage (in-memory only)
+  private cmsPages: CmsPage[] = [];
+  private nextCmsId = 1;
+  async getAllCmsPages() { return [...this.cmsPages]; }
+  async getCmsPageBySlug(slug: string) { return this.cmsPages.find(p => p.slug === slug); }
+  async getCmsPageById(id: number) { return this.cmsPages.find(p => p.id === id); }
+  async getPublishedCmsPages(type?: string) {
+    return this.cmsPages.filter(p => p.isPublished && (!type || p.pageType === type));
+  }
+  async createCmsPage(data: InsertCmsPage): Promise<CmsPage> {
+    const now = new Date().toISOString();
+    const page: CmsPage = { id: this.nextCmsId++, ...data, createdAt: now, updatedAt: now } as CmsPage;
+    this.cmsPages.push(page); return page;
+  }
+  async updateCmsPage(id: number, data: Partial<InsertCmsPage>): Promise<CmsPage | undefined> {
+    const idx = this.cmsPages.findIndex(p => p.id === id);
+    if (idx === -1) return undefined;
+    this.cmsPages[idx] = { ...this.cmsPages[idx], ...data, updatedAt: new Date().toISOString() };
+    return this.cmsPages[idx];
+  }
+  async deleteCmsPage(id: number): Promise<boolean> {
+    const idx = this.cmsPages.findIndex(p => p.id === id);
+    if (idx === -1) return false;
+    this.cmsPages.splice(idx, 1); return true;
   }
 }
 

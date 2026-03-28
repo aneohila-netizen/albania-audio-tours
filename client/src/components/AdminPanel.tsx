@@ -16,7 +16,7 @@ import {
   Lock, Eye, EyeOff, Plus, Pencil, Trash2, LogOut,
   MapPin, Globe, Music, Image, Info, ArrowLeft, Save,
   Upload, Play, Pause, Loader2, X, Link, CheckCircle2,
-  LayoutList, Star, Route,
+  LayoutList, Star, Route, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,7 @@ import { STATIC_SITES, DESTINATIONS, ATTRACTIONS } from "@/lib/staticData";
 import type { Destination, Attraction } from "@/lib/staticData";
 import type { TourSite } from "@shared/schema";
 import ItineraryManager from "@/components/ItineraryManager";
+import AdminCmsManager from "@/components/AdminCmsManager";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 const ADMIN_PASSWORD = "AlbaTour2026!";
@@ -281,6 +282,7 @@ function SitesView({
   const [sites, setSites] = useState<TourSite[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [adminTab, setAdminTab] = useState<"destinations" | "pages">("destinations");
 
   useEffect(() => { fetchSites(); }, []);
 
@@ -348,7 +350,35 @@ function SitesView({
         </div>
       </header>
 
+      {/* Admin top nav tabs */}
+      <div className="border-b border-border/60 bg-background">
+        <div className="max-w-5xl mx-auto px-4 flex gap-0">
+          {([
+            { id: "destinations", label: "Destinations & Tours", icon: MapPin },
+            { id: "pages",        label: "Page Manager",         icon: FileText },
+          ] as { id: "destinations" | "pages"; label: string; icon: any }[]).map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setAdminTab(id)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${
+                adminTab === id
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon size={13} /> {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+        {/* CMS PAGE MANAGER */}
+        {adminTab === "pages" && (
+          <AdminCmsManager />
+        )}
+
+        {adminTab === "destinations" && (<>
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
           {[
@@ -467,6 +497,7 @@ function SitesView({
             })}
           </div>
         )}
+        </>)}
       </main>
     </div>
   );
