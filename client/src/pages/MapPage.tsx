@@ -624,7 +624,7 @@ export default function MapPage() {
           <div className="bg-card/96 backdrop-blur-sm border border-primary/20 rounded-2xl shadow-2xl p-4 pointer-events-auto">
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-primary mb-0.5">🎧 Free Self-Guided Audio Tours</p>
+                <p className="text-xs font-semibold text-primary mb-0.5">🎧 Free during launch · Subscription coming soon</p>
                 <p className="font-bold text-base leading-tight mb-1">Discover Albania — at your own pace</p>
                 {/* 3-step explainer: answers "what is this?" in one glance */}
                 <div className="flex items-center gap-3 my-2">
@@ -644,7 +644,7 @@ export default function MapPage() {
                   </div>
                 </div>
                 <p className="text-[11px] text-muted-foreground mb-3">
-                  Free · Works offline · 43 destinations · 10 walking tours
+                  Free during launch · Works offline · 43 destinations · 10 walking tours
                 </p>
                 <div className="flex gap-2 flex-wrap">
                   {/* Primary CTA: nearest tour when GPS is on, else Tirana fallback */}

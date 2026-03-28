@@ -24,6 +24,7 @@ import BlogPage from "@/pages/BlogPage";
 import CmsPageRenderer from "@/pages/CmsPageRenderer";
 import AdminPanel from "@/components/AdminPanel";
 import NavBar from "@/components/NavBar";
+import LaunchBanner from "@/components/LaunchBanner";
 
 // Global context
 interface AppContextType {
@@ -151,6 +152,7 @@ function AppRoutes() {
           {/* Public routes */}
           <Route>
             <div className="flex flex-col min-h-screen bg-background text-foreground">
+              <LaunchBanner />
               <NavBar />
               <main className="flex-none"> {/* map page controls its own height; pb-28 added per-page */}
                 <Switch>

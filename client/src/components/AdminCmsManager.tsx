@@ -58,11 +58,11 @@ const PAGE_TYPE_LABELS: Record<string, { label: string; icon: any; color: string
 // ─── Free tour alternative landing page template ──────────────────────────────
 const FREE_TOUR_TEMPLATE = {
   pageType: "landing",
-  title: "Skip the Tip Jar — Albania's Best Self-Guided Audio Tour Is Completely Free",
+  title: "Skip the Tip Jar — Albania\'s Self-Guided Audio Tour Is Free During Launch",
   slug: "free-audio-tour-albania",
-  excerpt: "Why wait for a group, follow a guide, or feel pressured to tip? Explore Albania at your own pace, on your own time — with a full audio tour at zero cost.",
+  excerpt: "No group, no guide, no tip jar. Explore Albania at your own pace — and right now, during our launch period, it\'s completely free.",
   seoTitle: "Free Self-Guided Audio Tour Albania — No Tips, No Groups, No Schedules",
-  seoDescription: "Albania's best audio tour is completely free. No waiting for a group, no tip pressure, no fixed schedule. Explore Tirana, Berat, Gjirokastër at your own pace.",
+  seoDescription: "Albania\'s self-guided audio tour is free during our launch period. No tip pressure, no fixed schedule. Explore Tirana, Berat, Gjirokastër at your own pace — before subscription pricing begins.",
   seoKeywords: "free tour albania, self-guided tour albania, albania audio tour free, alternative free tour albania, berat walking tour, tirana walking tour",
   author: "AlbaTour",
   isPublished: false,
@@ -73,11 +73,15 @@ const FREE_TOUR_TEMPLATE = {
   coverImage: "",
   body: `<section style="max-width:680px;margin:0 auto;">
 
-  <h1>Skip the Tip Jar. Albania's Best Audio Tour Is 100% Free.</h1>
+  <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:14px 18px;margin-bottom:28px;">
+    <p style="margin:0;font-size:14px;"><strong>🚨 Launch period — free access, limited time.</strong> AlbaTour is currently free while we build and launch. A subscription plan will follow. Travellers using the platform now get full access at no cost — no strings attached, no credit card, no expiry date announced yet.</p>
+  </div>
 
-  <p>You've probably seen the "free" walking tours in Tirana or Berat. They're free — until the end, when there's a hat going around and the social pressure to leave a good tip. What if you could skip all that and still get a rich, detailed, historically accurate audio experience of Albania?</p>
+  <h1>Skip the Tip Jar. Explore Albania on Your Own Terms.</h1>
 
-  <p>That's exactly what AlbaTour is. No group. No schedule. No guide waiting for a tip. Just you, your phone, and the stories of one of Europe's most fascinating and underrated countries.</p>
+  <p>You've probably seen the "free" walking tours in Tirana or Berat. They're free — until the end, when a hat goes around and you feel the pressure to tip. What if you could skip all that and still get a rich, detailed, historically accurate audio experience of Albania?</p>
+
+  <p>That's what AlbaTour is. No group. No schedule. No guide waiting for a donation. Just you, your phone, and the stories of one of Europe's most fascinating countries — told at your pace, on your terms.</p>
 
   <hr />
 
@@ -85,57 +89,61 @@ const FREE_TOUR_TEMPLATE = {
 
   <ul>
     <li><strong>No fixed schedule.</strong> Start when you wake up. Pause for coffee. Resume after lunch. The tour waits for you.</li>
-    <li><strong>No group pace.</strong> Move as fast or as slow as you want. Spend 20 minutes at one spot because you're fascinated — no one's rushing you.</li>
-    <li><strong>No tip pressure.</strong> AlbaTour is genuinely free. No donation box, no awkward moment at the end.</li>
-    <li><strong>No waiting.</strong> Open the app and go. No meeting points, no waiting for stragglers.</li>
-    <li><strong>Works offline.</strong> Once loaded, the audio plays even without a signal — perfect for exploring old towns with patchy coverage.</li>
+    <li><strong>No group pace.</strong> Spend as long as you want at any spot. No one is rushing you to the next stop.</li>
+    <li><strong>No tip pressure.</strong> During launch, AlbaTour is genuinely free. No donation box, no awkward moment at the end.</li>
+    <li><strong>No waiting.</strong> Open the app and go. No meeting points, no late arrivals, no stragglers.</li>
+    <li><strong>Works offline.</strong> The audio plays without a signal — perfect for old towns and mountain villages with patchy coverage.</li>
   </ul>
 
   <hr />
 
-  <h2>What's Included</h2>
+  <h2>What's Included Right Now</h2>
 
-  <p>AlbaTour covers <strong>43 destinations</strong> and over <strong>300 individual sites</strong> across Albania — with detailed audio narration, interactive maps, and a passport-style journey tracker that rewards your exploration.</p>
+  <p>During the launch period, you get full access to everything AlbaTour has built so far:</p>
 
   <ul>
-    <li>🏛️ Tirana — Communist history, Ottoman bazaars, and modern street art</li>
-    <li>🏰 Berat — The UNESCO "City of a Thousand Windows"</li>
-    <li>🏯 Gjirokastër — A hilltop Ottoman town frozen in time</li>
-    <li>🌊 Sarandë — Riviera beaches and ancient Butrint ruins</li>
-    <li>🏔️ The Albanian Alps — Theth, Valbona, and Europe's last wild mountains</li>
-    <li>…and 38 more destinations</li>
+    <li>🏛️ <strong>Tirana</strong> — Communist history, Ottoman bazaars, and modern street art</li>
+    <li>🏰 <strong>Berat</strong> — The UNESCO "City of a Thousand Windows"</li>
+    <li>🏯 <strong>Gjirokastër</strong> — A hilltop Ottoman town frozen in time</li>
+    <li>🌊 <strong>Sarandë</strong> — Riviera beaches and the ancient ruins of Butrint</li>
+    <li>🏔️ <strong>Albanian Alps</strong> — Theth, Valbona, and Europe's last truly wild mountains</li>
+    <li>…and <strong>38 more destinations</strong>, 300+ individual sites, 10 walking tours</li>
   </ul>
+
+  <p>New destinations and audio tours are being added regularly throughout the launch period.</p>
 
   <hr />
 
   <h2>How It Works</h2>
 
   <ol>
-    <li><strong>Open AlbaTour</strong> on your phone — no download, no account needed.</li>
-    <li><strong>Find your destination</strong> on the map or browse the list.</li>
-    <li><strong>Tap a site</strong> to start the audio narration — and start walking.</li>
-    <li><strong>Collect stamps</strong> as you visit each site and build your Albania passport.</li>
+    <li><strong>Open AlbaTour</strong> on your phone — no download or account needed.</li>
+    <li><strong>Find your destination</strong> on the interactive map or browse the full list.</li>
+    <li><strong>Tap a site</strong> to start the audio narration and begin walking.</li>
+    <li><strong>Collect passport stamps</strong> as you visit each site and build your Albania travel record.</li>
   </ol>
 
   <hr />
 
   <h2>Built for Independent Travellers</h2>
 
-  <p>AlbaTour was designed for the kind of traveller who doesn't want to be herded around. You've done your research, you know what you want to see, and you want the freedom to explore on your terms. The audio gives you the context — the history, the stories, the insider details — without taking control of your day.</p>
+  <p>AlbaTour was made for the kind of traveller who doesn't want to be herded around. You've done your research, you know what you want to see, and you want the freedom to explore on your own terms. The audio gives you the context — the history, the stories, the local details — without taking control of your day.</p>
 
-  <p>Whether you have an afternoon in Tirana or a full week in the south, AlbaTour adapts to your time, not the other way around.</p>
+  <p>Whether you have an afternoon in Tirana or a full week in the south, AlbaTour fits around your time, not the other way around.</p>
 
   <hr />
 
-  <h2>Start Your Tour Now — It's Free</h2>
+  <h2>Start Now — While It's Still Free</h2>
 
-  <p>No sign-up. No payment. No tip at the end. Just open the map and start exploring.</p>
+  <p>No sign-up. No payment. No tip at the end. Open the map and start exploring. This won't always be free — but it is right now.</p>
 
   <p style="text-align:center;margin-top:24px;">
     <a href="/#/" style="display:inline-block;background:#c0392b;color:#fff;padding:14px 32px;border-radius:8px;font-weight:bold;text-decoration:none;font-size:16px;">
       Open the Map →
     </a>
   </p>
+
+  <p style="text-align:center;margin-top:12px;font-size:12px;color:#888;">Free during launch period. Subscription pricing will be announced in advance.</p>
 
 </section>`,
 };
