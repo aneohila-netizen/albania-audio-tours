@@ -395,6 +395,12 @@
   pointer-events: none;
 }
 
+/* ── Explore nearby popup entrance animation ─────────────────────────────── */
+@keyframes popup-in {
+  0%   { opacity: 0; transform: scale(0.88) translateY(12px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
 /* ── Hero CTA button: single bounce on first render to attract attention ──── */
 @keyframes hero-cta-bounce {
   0%, 100% { transform: translateY(0); }

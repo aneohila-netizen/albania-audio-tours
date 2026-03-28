@@ -84,6 +84,9 @@ export default function MapPage() {
   const [, navigate] = useLocation();
 
   const [heroDismissed, setHeroDismissed] = useState(false);
+  // 10-second idle popup — shown once per session, dismissed permanently on close
+  const [showExplorePopup, setShowExplorePopup] = useState(false);
+  const [popupDismissed, setPopupDismissed] = useState(false);
 
   // ── GPS blue dot state ────────────────────────────────────────────
   const [autoCenter, setAutoCenter] = useState(false);
@@ -267,6 +270,23 @@ export default function MapPage() {
     marker.on("click", () => setSelectedPin({ type: "attraction", data: attr, dest }));
     if (addTo) addTo(marker); else { marker.addTo(map); markersRef.current.push(marker); }
   }
+
+  // ── 10-second idle prompt — show "Explore nearby" popup if user hasn't acted ─
+  useEffect(() => {
+    if (popupDismissed || autoCenter || heroDismissed) return;
+    const timer = setTimeout(() => {
+      // Only show if user is still idle (no pin selected, GPS not active)
+      if (!autoCenter && !heroDismissed) {
+        setShowExplorePopup(true);
+      }
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, []); // runs once on mount
+
+  // Hide popup once GPS is activated (user acted through other means)
+  useEffect(() => {
+    if (autoCenter) setShowExplorePopup(false);
+  }, [autoCenter]);
 
   // ── Fetch all published itineraries on mount (API-driven, future-proof) ──────
   useEffect(() => {
@@ -721,6 +741,81 @@ export default function MapPage() {
             >
               <X size={14} />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 10-second explore popup ────────────────────────────────────────────
+           Shown after idle: prompts visitor to share location and discover nearby sites.
+           Clean, minimal, mobile-first. X to dismiss forever in session. */}
+      {showExplorePopup && !popupDismissed && !autoCenter && (
+        <div
+          className="absolute inset-0 z-[1050] flex items-center justify-center pointer-events-none"
+          aria-live="polite"
+        >
+          {/* Subtle backdrop — doesn't block map, just softens it slightly */}
+          <div
+            className="absolute inset-0 bg-black/20 pointer-events-auto"
+            onClick={() => { setShowExplorePopup(false); setPopupDismissed(true); }}
+            aria-hidden="true"
+          />
+
+          {/* Popup card */}
+          <div
+            className="relative pointer-events-auto mx-4 w-full max-w-xs rounded-2xl bg-card shadow-2xl border border-border overflow-hidden"
+            style={{ animation: "popup-in 0.35s cubic-bezier(0.34,1.56,0.64,1) both" }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Explore nearby places"
+          >
+            {/* Top accent bar */}
+            <div className="h-1 w-full" style={{ background: "hsl(var(--primary))" }} />
+
+            <div className="px-5 pt-4 pb-5">
+              {/* Header row */}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl" aria-hidden="true">🗺️</span>
+                  <div>
+                    <p className="font-bold text-base leading-tight" style={{ fontFamily: "var(--font-display)" }}>
+                      Explore Nearby
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-tight">Find places around you</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setShowExplorePopup(false); setPopupDismissed(true); }}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors shrink-0 -mt-0.5 -mr-1"
+                  aria-label="Close"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Body text */}
+              <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+                Discover audio tours, attractions and hidden gems closest to where you are right now.
+              </p>
+
+              {/* CTA button */}
+              <button
+                onClick={() => {
+                  setShowExplorePopup(false);
+                  setPopupDismissed(true);
+                  setAutoCenter(true); // triggers the existing GPS flow
+                }}
+                className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+              >
+                <span>📍</span>
+                Show Me What's Nearby
+              </button>
+
+              {/* Privacy note */}
+              <p className="text-[10px] text-muted-foreground/70 text-center mt-2.5 leading-relaxed">
+                Your location is used only to find nearby tours and is never stored or shared.
+              </p>
+            </div>
           </div>
         </div>
       )}
