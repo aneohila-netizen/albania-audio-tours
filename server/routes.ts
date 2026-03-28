@@ -1028,5 +1028,180 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // ── Subscription System ────────────────────────────────────────────────────────────
+  import('crypto').then(({ createHmac }) => {
+    // ── Shopify orders/paid webhook ────────────────────────────────────────────
+    // Receives orders/paid from Shopify, verifies HMAC, creates subscription.
+    // Set SHOPIFY_WEBHOOK_SECRET in Railway env vars.
+    app.post('/api/webhooks/shopify/orders-paid', async (req: any, res) => {
+      try {
+        // HMAC verification
+        const secret = process.env.SHOPIFY_WEBHOOK_SECRET || '';
+        const hmacHeader = (req.headers['x-shopify-hmac-sha256'] as string) || '';
+        if (secret && req.rawBody) {
+          const computed = createHmac('sha256', secret).update(req.rawBody).digest('base64');
+          if (computed !== hmacHeader) {
+            return res.status(401).json({ error: 'HMAC verification failed' });
+          }
+        }
+
+        const order = req.body;
+        const orderId = String(order.id);
+        const email = (order.contact_email || order.email || order.customer?.email || '').toLowerCase();
+        if (!email || !orderId) return res.status(400).json({ error: 'Missing email or order ID' });
+
+        // Idempotency: skip if already processed
+        const existing = await storage.getSubscriptionByOrderId(orderId);
+        if (existing) return res.status(200).json({ ok: true, duplicate: true });
+
+        // Identify which AlbaTour plan was purchased by variant ID
+        const plans = await storage.getAllPlans();
+        let matchedPlan = null;
+        for (const item of (order.line_items || [])) {
+          const variantId = String(item.variant_id);
+          matchedPlan = plans.find(p => p.shopifyVariantId === variantId);
+          if (matchedPlan) break;
+        }
+        if (!matchedPlan) {
+          // Log unmatched but still return 200 to prevent Shopify retries
+          console.warn('[webhook] No plan matched for order', orderId, 'variants:', order.line_items?.map((l: any) => l.variant_id));
+          return res.status(200).json({ ok: true, warning: 'No matching plan' });
+        }
+
+        // Calculate expiry
+        const now = new Date();
+        const expiresAt = new Date(now);
+        if (matchedPlan.billingPeriod === '7-day')   expiresAt.setDate(expiresAt.getDate() + 7);
+        else if (matchedPlan.billingPeriod === 'month') expiresAt.setMonth(expiresAt.getMonth() + 1);
+        else expiresAt.setFullYear(expiresAt.getFullYear() + 1); // year (default)
+
+        // Generate session token (crypto random, 32 bytes hex)
+        const { randomBytes } = await import('crypto');
+        const sessionToken = randomBytes(32).toString('hex');
+
+        const sub = await storage.createSubscription({
+          email,
+          planSlug: matchedPlan.slug,
+          planName: matchedPlan.name,
+          shopifyOrderId: orderId,
+          priceEur: matchedPlan.priceEur,
+          startsAt: now.toISOString(),
+          expiresAt: expiresAt.toISOString(),
+          isActive: true,
+          deviceCount: 0,
+          devices: '[]',
+          sessionToken,
+          notes: '',
+          createdAt: now.toISOString(),
+        });
+
+        console.log(`[webhook] Subscription created: ${email} → ${matchedPlan.name} expires ${expiresAt.toISOString()}`);
+        res.status(200).json({ ok: true, subscriptionId: sub.id });
+      } catch (e: any) {
+        console.error('[webhook] Error:', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+  });
+
+  // ── Activate subscription (post-checkout page calls this) ────────────────
+  // Client sends { orderId, email } — server returns session token + subscription info
+  app.post('/api/subscription/activate', async (req, res) => {
+    try {
+      const { orderId, email } = req.body as { orderId: string; email: string };
+      if (!orderId || !email) return res.status(400).json({ error: 'orderId and email required' });
+
+      const sub = await storage.getSubscriptionByOrderId(String(orderId));
+      if (!sub) return res.status(404).json({ error: 'Subscription not found. The webhook may still be processing — try again in a moment.' });
+      if (!sub.isActive) return res.status(403).json({ error: 'Subscription has been revoked.' });
+      if (sub.email !== email.toLowerCase()) return res.status(403).json({ error: 'Email does not match order.' });
+
+      const now = new Date().toISOString();
+      if (sub.expiresAt < now) return res.status(403).json({ error: 'Subscription has expired.' });
+
+      // Register device (max 2)
+      const deviceFingerprint = req.headers['x-device-id'] as string || req.ip || 'unknown';
+      const devices: string[] = JSON.parse(sub.devices || '[]');
+      if (!devices.includes(deviceFingerprint)) {
+        if (devices.length >= 2) {
+          return res.status(403).json({
+            error: 'Device limit reached. This subscription allows 2 devices. Manage your devices at /subscriptions.',
+            code: 'DEVICE_LIMIT'
+          });
+        }
+        devices.push(deviceFingerprint);
+        await storage.updateSubscription(sub.id, { devices: JSON.stringify(devices), deviceCount: devices.length });
+      }
+
+      res.json({
+        ok: true,
+        token: sub.sessionToken,
+        email: sub.email,
+        planName: sub.planName,
+        planSlug: sub.planSlug,
+        expiresAt: sub.expiresAt,
+        deviceCount: devices.length,
+      });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Check subscription by token (client polls on load) ───────────────────
+  app.get('/api/subscription/check', async (req, res) => {
+    try {
+      const token = (req.headers['x-subscription-token'] as string) || '';
+      if (!token) return res.json({ active: false });
+      const sub = await storage.getSubscriptionByToken(token);
+      if (!sub || !sub.isActive) return res.json({ active: false });
+      const now = new Date().toISOString();
+      if (sub.expiresAt < now) return res.json({ active: false, expired: true, expiresAt: sub.expiresAt });
+      res.json({
+        active: true,
+        planName: sub.planName,
+        planSlug: sub.planSlug,
+        expiresAt: sub.expiresAt,
+        email: sub.email,
+      });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Admin: list all subscribers ────────────────────────────────────────────
+  app.get('/api/admin/subscriptions', requireAdmin, async (_req, res) => {
+    try { res.json(await storage.getAllSubscriptions()); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Admin: revoke a subscription ───────────────────────────────────────
+  app.put('/api/admin/subscriptions/:id/revoke', requireAdmin, async (req, res) => {
+    try {
+      const ok = await storage.revokeSubscription(Number(req.params.id));
+      if (!ok) return res.status(404).json({ error: 'Subscription not found' });
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Admin: manual test activation (no Shopify needed) ──────────────────
+  app.post('/api/admin/subscriptions/test-activate', requireAdmin, async (req, res) => {
+    try {
+      const { email, planSlug, daysFromNow = 7 } = req.body as { email: string; planSlug: string; daysFromNow?: number };
+      if (!email || !planSlug) return res.status(400).json({ error: 'email and planSlug required' });
+      const plan = await storage.getPlanBySlug(planSlug);
+      if (!plan) return res.status(404).json({ error: 'Plan not found' });
+      const { randomBytes } = await import('crypto');
+      const now = new Date();
+      const expiresAt = new Date(now);
+      expiresAt.setDate(expiresAt.getDate() + daysFromNow);
+      const sub = await storage.createSubscription({
+        email: email.toLowerCase(), planSlug, planName: plan.name,
+        shopifyOrderId: `TEST-${randomBytes(8).toString('hex')}`,
+        priceEur: plan.priceEur, startsAt: now.toISOString(),
+        expiresAt: expiresAt.toISOString(), isActive: true,
+        deviceCount: 0, devices: '[]',
+        sessionToken: randomBytes(32).toString('hex'),
+        notes: 'TEST ACTIVATION', createdAt: now.toISOString(),
+      });
+      res.json({ success: true, sub });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   return httpServer;
 }

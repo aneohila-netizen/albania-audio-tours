@@ -228,6 +228,28 @@ export const insertLeadSchema = createInsertSchema(subscriptionLeads).omit({ id:
 export type SubscriptionLead = typeof subscriptionLeads.$inferSelect;
 export type InsertLead = z.infer<typeof insertLeadSchema>;
 
+// ── User Subscriptions ───────────────────────────────────────────────────
+// One row per purchase. Created by the Shopify orders/paid webhook.
+export const userSubscriptions = pgTable("user_subscriptions", {
+  id:           integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  email:        text("email").notNull(),
+  planSlug:     text("plan_slug").notNull(),
+  planName:     text("plan_name").notNull(),
+  shopifyOrderId: text("shopify_order_id").notNull().unique(),
+  priceEur:     real("price_eur").notNull().default(0),
+  startsAt:     text("starts_at").notNull(),
+  expiresAt:    text("expires_at").notNull(),  // ISO date — checked on every audio request
+  isActive:     boolean("is_active").notNull().default(true),  // admin can revoke
+  deviceCount:  integer("device_count").notNull().default(0),
+  devices:      text("devices").notNull().default("[]"), // JSON array of device fingerprints (max 2)
+  sessionToken: text("session_token").default(""),  // opaque token issued to client
+  notes:        text("notes").default(""),
+  createdAt:    text("created_at").notNull(),
+});
+export const insertUserSubscriptionSchema = createInsertSchema(userSubscriptions).omit({ id: true });
+export type UserSubscription = typeof userSubscriptions.$inferSelect;
+export type InsertUserSubscription = z.infer<typeof insertUserSubscriptionSchema>;
+
 // ── App Settings (global key/value flags) ──────────────────────────────────────
 // Used for toggles like launch_banner_enabled, maintenance_mode, etc.
 export const appSettings = pgTable("app_settings", {

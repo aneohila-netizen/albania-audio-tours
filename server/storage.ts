@@ -9,6 +9,7 @@ import type {
   AppSetting,
   SubscriptionPlan, InsertSubscriptionPlan,
   SubscriptionLead, InsertLead,
+  UserSubscription, InsertUserSubscription,
 } from "@shared/schema";
 
 // ─── Interface ────────────────────────────────────────────────────────────────
@@ -52,6 +53,14 @@ export interface IStorage {
   // Leads
   getAllLeads(): Promise<SubscriptionLead[]>;
   createLead(data: InsertLead): Promise<SubscriptionLead>;
+  // User Subscriptions
+  createSubscription(data: InsertUserSubscription): Promise<UserSubscription>;
+  getSubscriptionByOrderId(orderId: string): Promise<UserSubscription | undefined>;
+  getSubscriptionByToken(token: string): Promise<UserSubscription | undefined>;
+  getActiveSubscriptionByEmail(email: string): Promise<UserSubscription | undefined>;
+  getAllSubscriptions(): Promise<UserSubscription[]>;
+  updateSubscription(id: number, data: Partial<InsertUserSubscription>): Promise<UserSubscription | undefined>;
+  revokeSubscription(id: number): Promise<boolean>;
   // App Settings
   getSetting(key: string): Promise<string | null>;
   setSetting(key: string, value: string): Promise<AppSetting>;
@@ -358,6 +367,26 @@ class PgStorage implements IStorage {
         );
       }
     }
+
+    // User subscriptions table
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS user_subscriptions (
+        id SERIAL PRIMARY KEY,
+        email TEXT NOT NULL,
+        plan_slug TEXT NOT NULL,
+        plan_name TEXT NOT NULL,
+        shopify_order_id TEXT NOT NULL UNIQUE,
+        price_eur REAL NOT NULL DEFAULT 0,
+        starts_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        device_count INTEGER NOT NULL DEFAULT 0,
+        devices TEXT NOT NULL DEFAULT '[]',
+        session_token TEXT DEFAULT '',
+        notes TEXT DEFAULT '',
+        created_at TEXT NOT NULL
+      );
+    `);
 
     // App settings table
     await this.pool.query(`
@@ -849,6 +878,81 @@ class PgStorage implements IStorage {
     return { id:rows[0].id, email:rows[0].email, planSlug:rows[0].plan_slug, planName:rows[0].plan_name, source:rows[0].source, createdAt:rows[0].created_at, notes:rows[0].notes };
   }
 
+
+  // ── User Subscriptions ────────────────────────────────────────────────────
+  private rowToSub(r: any): UserSubscription {
+    return {
+      id: r.id, email: r.email, planSlug: r.plan_slug, planName: r.plan_name,
+      shopifyOrderId: r.shopify_order_id, priceEur: parseFloat(r.price_eur)||0,
+      startsAt: r.starts_at, expiresAt: r.expires_at, isActive: r.is_active,
+      deviceCount: r.device_count||0, devices: r.devices||'[]',
+      sessionToken: r.session_token||'', notes: r.notes||'', createdAt: r.created_at,
+    };
+  }
+  async createSubscription(data: InsertUserSubscription): Promise<UserSubscription> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      `INSERT INTO user_subscriptions (email,plan_slug,plan_name,shopify_order_id,price_eur,
+        starts_at,expires_at,is_active,device_count,devices,session_token,notes,created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      [data.email, data.planSlug, data.planName, data.shopifyOrderId, data.priceEur||0,
+       data.startsAt, data.expiresAt, data.isActive??true, data.deviceCount||0,
+       data.devices||'[]', data.sessionToken||'', data.notes||'', data.createdAt]
+    );
+    return this.rowToSub(rows[0]);
+  }
+  async getSubscriptionByOrderId(orderId: string): Promise<UserSubscription | undefined> {
+    await this.ready;
+    const { rows } = await this.pool.query('SELECT * FROM user_subscriptions WHERE shopify_order_id=$1', [orderId]);
+    return rows[0] ? this.rowToSub(rows[0]) : undefined;
+  }
+  async getSubscriptionByToken(token: string): Promise<UserSubscription | undefined> {
+    await this.ready;
+    if (!token) return undefined;
+    const { rows } = await this.pool.query('SELECT * FROM user_subscriptions WHERE session_token=$1', [token]);
+    return rows[0] ? this.rowToSub(rows[0]) : undefined;
+  }
+  async getActiveSubscriptionByEmail(email: string): Promise<UserSubscription | undefined> {
+    await this.ready;
+    const now = new Date().toISOString();
+    const { rows } = await this.pool.query(
+      `SELECT * FROM user_subscriptions WHERE email=$1 AND is_active=TRUE AND expires_at > $2
+       ORDER BY expires_at DESC LIMIT 1`, [email.toLowerCase(), now]
+    );
+    return rows[0] ? this.rowToSub(rows[0]) : undefined;
+  }
+  async getAllSubscriptions(): Promise<UserSubscription[]> {
+    await this.ready;
+    const { rows } = await this.pool.query('SELECT * FROM user_subscriptions ORDER BY id DESC');
+    return rows.map((r: any) => this.rowToSub(r));
+  }
+  async updateSubscription(id: number, data: Partial<InsertUserSubscription>): Promise<UserSubscription | undefined> {
+    await this.ready;
+    const map: Record<string,string> = {
+      email:'email', planSlug:'plan_slug', planName:'plan_name',
+      shopifyOrderId:'shopify_order_id', priceEur:'price_eur',
+      startsAt:'starts_at', expiresAt:'expires_at', isActive:'is_active',
+      deviceCount:'device_count', devices:'devices', sessionToken:'session_token', notes:'notes',
+    };
+    const fields: string[] = []; const vals: any[] = []; let i = 1;
+    for (const [k, col] of Object.entries(map)) {
+      if (k in data) { fields.push(`${col}=$${i++}`); vals.push((data as any)[k]); }
+    }
+    if (!fields.length) return undefined;
+    vals.push(id);
+    const { rows } = await this.pool.query(
+      `UPDATE user_subscriptions SET ${fields.join(', ')} WHERE id=$${i} RETURNING *`, vals
+    );
+    return rows[0] ? this.rowToSub(rows[0]) : undefined;
+  }
+  async revokeSubscription(id: number): Promise<boolean> {
+    await this.ready;
+    const { rowCount } = await this.pool.query(
+      `UPDATE user_subscriptions SET is_active=FALSE, session_token='' WHERE id=$1`, [id]
+    );
+    return (rowCount ?? 0) > 0;
+  }
+
   // ── App Settings ──────────────────────────────────────────────────────────────
   async getSetting(key: string): Promise<string | null> {
     await this.ready;
@@ -1160,6 +1264,31 @@ export class MemStorage implements IStorage {
   async createLead(data: InsertLead): Promise<SubscriptionLead> {
     const l = { id: this._nextLeadId++, ...data, createdAt: new Date().toISOString() } as SubscriptionLead;
     this._leads.push(l); return l;
+  }
+
+  // User Subscription stubs for MemStorage
+  private _subs: UserSubscription[] = [];
+  private _nextSubId = 1;
+  async createSubscription(data: InsertUserSubscription): Promise<UserSubscription> {
+    const s = { id: this._nextSubId++, ...data } as UserSubscription;
+    this._subs.push(s); return s;
+  }
+  async getSubscriptionByOrderId(id: string) { return this._subs.find(s => s.shopifyOrderId === id); }
+  async getSubscriptionByToken(token: string) { return this._subs.find(s => s.sessionToken === token); }
+  async getActiveSubscriptionByEmail(email: string) {
+    const now = new Date().toISOString();
+    return this._subs.find(s => s.email === email.toLowerCase() && s.isActive && s.expiresAt > now);
+  }
+  async getAllSubscriptions() { return [...this._subs]; }
+  async updateSubscription(id: number, data: Partial<InsertUserSubscription>) {
+    const idx = this._subs.findIndex(s => s.id === id);
+    if (idx === -1) return undefined;
+    this._subs[idx] = { ...this._subs[idx], ...data }; return this._subs[idx];
+  }
+  async revokeSubscription(id: number) {
+    const idx = this._subs.findIndex(s => s.id === id);
+    if (idx === -1) return false;
+    this._subs[idx].isActive = false; this._subs[idx].sessionToken = ''; return true;
   }
 
   // App Settings stubs for MemStorage

@@ -33,7 +33,14 @@ interface Lead {
   source: string; createdAt: string;
 }
 
-type SubView = "plans" | "edit" | "new" | "leads";
+interface Subscriber {
+  id: number; email: string; planSlug: string; planName: string;
+  shopifyOrderId: string; priceEur: number;
+  startsAt: string; expiresAt: string;
+  isActive: boolean; deviceCount: number; notes: string; createdAt: string;
+}
+
+type SubView = "plans" | "edit" | "new" | "leads" | "subscribers" | "test";
 
 function blankPlan(): Omit<Plan, "id"> {
   return {
@@ -51,6 +58,12 @@ export default function AdminSubscriptions() {
   const [view, setView] = useState<SubView>("plans");
   const [plans, setPlans] = useState<Plan[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
+  const [testEmail, setTestEmail] = useState("");
+  const [testPlan, setTestPlan] = useState("");
+  const [testDays, setTestDays] = useState(7);
+  const [testResult, setTestResult] = useState<any>(null);
+  const [testLoading, setTestLoading] = useState(false);
   const [editPlan, setEditPlan] = useState<(Omit<Plan,"id"> & { id?: number }) | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -69,9 +82,32 @@ export default function AdminSubscriptions() {
     const res = await fetch(`${RAILWAY_URL}/api/admin/leads`, { headers: { "x-admin-token": token } });
     if (res.ok) setLeads(await res.json());
   }
+  async function loadSubscribers() {
+    const res = await fetch(`${RAILWAY_URL}/api/admin/subscriptions`, { headers: { "x-admin-token": token } });
+    if (res.ok) setSubscribers(await res.json());
+  }
+  async function revokeSubscriber(id: number) {
+    if (!confirm("Revoke this subscription? The user will immediately lose access.")) return;
+    const res = await fetch(`${RAILWAY_URL}/api/admin/subscriptions/${id}/revoke`, {
+      method: "PUT", headers: { "x-admin-token": token },
+    });
+    if (res.ok) setSubscribers(prev => prev.map(s => s.id === id ? { ...s, isActive: false } : s));
+  }
+  async function runTestActivate() {
+    if (!testEmail || !testPlan) return;
+    setTestLoading(true); setTestResult(null);
+    const res = await fetch(`${RAILWAY_URL}/api/admin/subscriptions/test-activate`, {
+      method: "POST", headers,
+      body: JSON.stringify({ email: testEmail, planSlug: testPlan, daysFromNow: testDays }),
+    });
+    const data = await res.json();
+    setTestResult(data);
+    setTestLoading(false);
+    if (data.success) loadSubscribers();
+  }
 
   const [loaded, setLoaded] = useState(false);
-  if (!loaded) { setLoaded(true); loadPlans(); loadLeads(); }
+  if (!loaded) { setLoaded(true); loadPlans(); loadLeads(); loadSubscribers(); }
 
   // ── Save ────────────────────────────────────────────────────────────────────
   async function savePlan() {
@@ -139,9 +175,15 @@ export default function AdminSubscriptions() {
             <h2 className="font-bold text-base">Subscriptions</h2>
             <p className="text-xs text-muted-foreground mt-0.5">Manage plans, Shopify checkout URLs, and view leads</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1 flex-wrap">
+            <Button variant="outline" size="sm" onClick={() => { setView("subscribers"); loadSubscribers(); }}>
+              <Users size={13} className="mr-1" /> Subscribers {subscribers.length > 0 && `(${subscribers.length})`}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => { setView("leads"); loadLeads(); }}>
-              <Users size={13} className="mr-1" /> Leads {leads.length > 0 && `(${leads.length})`}
+              <Mail size={13} className="mr-1" /> Leads {leads.length > 0 && `(${leads.length})`}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setView("test")}>
+              🧪 Test
             </Button>
             <Button size="sm" onClick={() => { setEditPlan(blankPlan()); setView("new"); setError(""); }}>
               <Plus size={13} className="mr-1" /> New Plan
@@ -408,6 +450,151 @@ export default function AdminSubscriptions() {
             {saving ? "Saving…" : <><Save size={13} className="mr-1" />Save Plan</>}
           </Button>
         </div>
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // SUBSCRIBERS LIST
+  // ════════════════════════════════════════════════════════════════
+  if (view === "subscribers") {
+    const active = subscribers.filter(s => s.isActive && new Date(s.expiresAt) > new Date());
+    const expired = subscribers.filter(s => !s.isActive || new Date(s.expiresAt) <= new Date());
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <button onClick={() => setView("plans")} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+            <ArrowLeft size={14} /> Back
+          </button>
+          <h2 className="font-bold text-sm flex-1 text-center">Subscribers ({subscribers.length})</h2>
+          <Button size="sm" variant="outline" onClick={loadSubscribers}>Refresh</Button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 text-center">
+          {[{label: "Total", val: subscribers.length}, {label: "Active", val: active.length}, {label: "Expired/Revoked", val: expired.length}].map(({label,val}) => (
+            <div key={label} className="p-2 rounded-xl border border-border bg-card">
+              <p className="font-black text-lg">{val}</p>
+              <p className="text-xs text-muted-foreground">{label}</p>
+            </div>
+          ))}
+        </div>
+
+        {subscribers.length === 0 ? (
+          <div className="text-center py-10 text-muted-foreground text-sm">
+            <Users size={28} className="mx-auto mb-2 opacity-30" />
+            No subscribers yet. Use the 🧪 Test button to create a test subscription.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {subscribers.map(sub => {
+              const isLive = sub.isActive && new Date(sub.expiresAt) > new Date();
+              const expDate = new Date(sub.expiresAt).toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" });
+              return (
+                <div key={sub.id} className={`flex items-start gap-3 p-3 rounded-xl border bg-card ${
+                  isLive ? "border-border" : "border-dashed border-border opacity-60"
+                }`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm truncate">{sub.email}</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{sub.planName}</span>
+                      {isLive
+                        ? <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700">Active</span>
+                        : <span className="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-600">{sub.isActive ? "Expired" : "Revoked"}</span>}
+                      {sub.notes?.includes("TEST") && <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700">Test</span>}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {isLive ? `Expires: ${expDate}` : `Expired: ${expDate}`} · {sub.deviceCount} device(s) · €{sub.priceEur}
+                    </p>
+                    <p className="text-xs font-mono text-muted-foreground opacity-60">{sub.shopifyOrderId}</p>
+                  </div>
+                  {isLive && (
+                    <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 text-xs shrink-0"
+                      onClick={() => revokeSubscriber(sub.id)}>
+                      Revoke
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // TEST ACTIVATION
+  // ════════════════════════════════════════════════════════════════
+  if (view === "test") {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <button onClick={() => setView("plans")} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+            <ArrowLeft size={14} /> Back
+          </button>
+          <h2 className="font-bold text-sm flex-1 text-center">🧪 Test Subscription Activation</h2>
+          <div className="w-16" />
+        </div>
+
+        <div className="p-3 rounded-xl bg-yellow-50 border border-yellow-200 text-xs text-yellow-800">
+          <p className="font-semibold">How this test works:</p>
+          <ol className="list-decimal list-inside mt-1 space-y-0.5">
+            <li>Enter any email and select a plan below</li>
+            <li>Click "Create Test Subscription" — creates a real DB record with TEST flag</li>
+            <li>Copy the session token, go to <code>/#/activate</code>, paste to verify unlock works</li>
+            <li>The test subscription auto-expires after the days you set</li>
+            <li>You can also revoke it immediately from the Subscribers list</li>
+          </ol>
+        </div>
+
+        <Card>
+          <CardContent className="px-4 py-4 space-y-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Test Email</label>
+              <Input value={testEmail} onChange={e => setTestEmail(e.target.value)}
+                placeholder="test@example.com" className="h-8 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Plan</label>
+              <Select value={testPlan} onValueChange={setTestPlan}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select a plan" /></SelectTrigger>
+                <SelectContent>
+                  {plans.map(p => <SelectItem key={p.slug} value={p.slug}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Expires in (days)</label>
+              <Input type="number" value={testDays} onChange={e => setTestDays(parseInt(e.target.value)||1)}
+                min={1} max={365} className="h-8 text-sm" />
+            </div>
+            <Button className="w-full" onClick={runTestActivate} disabled={testLoading || !testEmail || !testPlan}>
+              {testLoading ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Running…</> : "🧪 Create Test Subscription"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {testResult && (
+          <div className={`p-4 rounded-xl border text-xs font-mono space-y-2 ${
+            testResult.success ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"
+          }`}>
+            <p className={testResult.success ? "text-green-700 font-bold" : "text-red-700 font-bold"}>
+              {testResult.success ? "✓ Test subscription created" : "✗ Error"}
+            </p>
+            {testResult.success && (
+              <>
+                <p className="text-green-700">Session token: <span className="break-all">{testResult.sub?.sessionToken}</span></p>
+                <p className="text-green-700">Expires: {testResult.sub?.expiresAt}</p>
+                <p className="text-muted-foreground mt-2">To test the unlock flow:</p>
+                <p className="text-muted-foreground">1. Open <a className="text-primary underline" href={`/#/activate?order_id=${testResult.sub?.shopifyOrderId}&email=${testResult.sub?.email}`} target="_blank">this activation link</a></p>
+                <p className="text-muted-foreground">2. The page should show "You're all set" and activate your session</p>
+                <p className="text-muted-foreground">3. Navigate to any destination — audio should be unlocked</p>
+                <p className="text-muted-foreground">4. To test lock: go to Subscribers and Revoke this subscription, then refresh</p>
+              </>
+            )}
+            {!testResult.success && <p className="text-red-700">{testResult.error}</p>}
+          </div>
+        )}
       </div>
     );
   }
