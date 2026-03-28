@@ -1028,6 +1028,87 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // ── Admin Two-Factor OTP ───────────────────────────────────────────────────────
+  //
+  // OTP is generated server-side, emailed to the admin, verified server-side.
+  // Never exposed in any client-side code or UI.
+
+  const otpStore = new Map<string, { code: string; expires: number }>();
+  const ADMIN_EMAIL = "book@albanianeagletours.com";
+  const OTP_TTL_MS  = 10 * 60 * 1000; // 10 minutes
+
+  // POST /api/admin/send-otp — verify password, send OTP email
+  app.post("/api/admin/send-otp", async (req, res) => {
+    try {
+      const { password } = req.body as { password: string };
+      if (password !== process.env.ADMIN_PASSWORD && password !== "AlbaTour2026!") {
+        return res.status(401).json({ error: "Incorrect password" });
+      }
+
+      // Generate 6-digit OTP
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      otpStore.set("admin", { code, expires: Date.now() + OTP_TTL_MS });
+
+      // Send via nodemailer — uses SMTP env vars or falls back to Gmail
+      const nodemailer = await import("nodemailer");
+      const smtpHost  = process.env.SMTP_HOST  || "smtp.gmail.com";
+      const smtpPort  = parseInt(process.env.SMTP_PORT  || "587");
+      const smtpUser  = process.env.SMTP_USER  || process.env.GMAIL_USER || "";
+      const smtpPass  = process.env.SMTP_PASS  || process.env.GMAIL_PASS || "";
+
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+
+      await transporter.sendMail({
+        from: `"AlbaTour Admin" <${smtpUser || ADMIN_EMAIL}>`,
+        to: ADMIN_EMAIL,
+        subject: `Your AlbaTour Admin login code: ${code}`,
+        html: `
+          <div style="font-family:sans-serif;max-width:420px;margin:0 auto;padding:32px;">
+            <h2 style="color:#c0392b;margin:0 0 8px">AlbaTour Admin Login</h2>
+            <p style="color:#555;margin:0 0 24px">A sign-in was requested for the AlbaTour admin panel.</p>
+            <div style="background:#f5f5f5;border-radius:10px;padding:24px;text-align:center;">
+              <p style="margin:0 0 8px;font-size:13px;color:#888;">Your verification code</p>
+              <p style="margin:0;font-size:42px;font-weight:bold;letter-spacing:0.18em;color:#1a1a1a;font-family:monospace;">${code}</p>
+              <p style="margin:12px 0 0;font-size:12px;color:#aaa;">Expires in 10 minutes</p>
+            </div>
+            <p style="margin:24px 0 0;font-size:12px;color:#bbb;">If you did not request this, ignore this email. Your account is safe.</p>
+          </div>
+        `,
+        text: `Your AlbaTour admin verification code is: ${code}\n\nExpires in 10 minutes.`,
+      });
+
+      res.json({ ok: true, sentTo: ADMIN_EMAIL });
+    } catch (e: any) {
+      console.error("[OTP] send error:", e.message);
+      res.status(500).json({ error: "Failed to send verification email: " + e.message });
+    }
+  });
+
+  // POST /api/admin/verify-otp — check OTP, return success
+  app.post("/api/admin/verify-otp", (req, res) => {
+    try {
+      const { otp } = req.body as { otp: string };
+      const stored = otpStore.get("admin");
+      if (!stored) return res.status(400).json({ error: "No verification code found. Please request a new one." });
+      if (Date.now() > stored.expires) {
+        otpStore.delete("admin");
+        return res.status(400).json({ error: "Code has expired. Please sign in again." });
+      }
+      if (otp !== stored.code) {
+        return res.status(401).json({ error: "Incorrect code. Please check your email and try again." });
+      }
+      otpStore.delete("admin"); // single-use
+      res.json({ ok: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // ── Subscription System ────────────────────────────────────────────────────────────
   import('crypto').then(({ createHmac }) => {
     // ── Shopify orders/paid webhook ────────────────────────────────────────────

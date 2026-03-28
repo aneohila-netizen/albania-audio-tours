@@ -171,25 +171,94 @@ function BackendStatusBanner() {
 }
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
+// ─── Two-step admin login ────────────────────────────────────────────────────
+// Step 1: password check (client-side)
+// Step 2: 6-digit OTP emailed to book@albanianeagletours.com — verified server-side
+const ADMIN_OTP_EMAIL = "book@albanianeagletours.com";
+
 function LoginView({ onLogin }: { onLogin: () => void }) {
+  const [step, setStep] = useState<"password" | "otp">("password");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [otpSentAt, setOtpSentAt] = useState<number | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
-  function handleSubmit(e: React.FormEvent) {
+  // Countdown timer for resend cooldown
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
+
+  // Step 1 — verify password, then request OTP email
+  async function handlePasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (password !== ADMIN_PASSWORD) {
+      setError("Incorrect password. Please try again.");
+      return;
+    }
     setLoading(true);
-    setTimeout(() => {
-      if (password === ADMIN_PASSWORD) {
-        setAdminToken(TOKEN_VALUE);
-        onLogin();
-      } else {
-        setError("Incorrect password. Please try again.");
-      }
+    try {
+      const res = await fetch(`${RAILWAY_API}/api/admin/send-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setStep("otp");
+      setOtpSentAt(Date.now());
+      setResendCooldown(60);
+    } catch (err: any) {
+      setError("Failed to send verification email. Please try again.");
+    } finally {
       setLoading(false);
-    }, 300);
+    }
+  }
+
+  // Step 2 — verify OTP
+  async function handleOtpSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (otp.length !== 6) { setError("Enter the 6-digit code from your email."); return; }
+    setLoading(true);
+    try {
+      const res = await fetch(`${RAILWAY_API}/api/admin/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ otp }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "Invalid code");
+      setAdminToken(TOKEN_VALUE);
+      onLogin();
+    } catch (err: any) {
+      setError(err.message || "Invalid or expired code. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Resend OTP
+  async function resendOtp() {
+    if (resendCooldown > 0) return;
+    setError(""); setLoading(true);
+    try {
+      await fetch(`${RAILWAY_API}/api/admin/send-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      setOtpSentAt(Date.now());
+      setResendCooldown(60);
+    } catch {
+      setError("Failed to resend. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -210,59 +279,99 @@ function LoginView({ onLogin }: { onLogin: () => void }) {
           <CardHeader className="pb-0 pt-6 px-6">
             <div className="flex items-center gap-2 text-muted-foreground text-sm">
               <Lock className="w-4 h-4" />
-              <span>Sign in to manage tours</span>
+              <span>{step === "password" ? "Sign in to manage tours" : "Email verification"}</span>
             </div>
           </CardHeader>
           <CardContent className="p-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-foreground block mb-1.5">
-                  Admin Password
-                </label>
-                <div className="relative">
+
+            {/* ── Step 1: Password ── */}
+            {step === "password" && (
+              <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-foreground block mb-1.5">
+                    Admin Password
+                  </label>
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter your admin password"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      className="w-full pr-10"
+                      autoFocus
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      tabIndex={-1}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+                {error && (
+                  <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
+                    {error}
+                  </p>
+                )}
+                <Button type="submit" className="w-full" disabled={loading || !password}>
+                  {loading ? "Sending verification…" : "Continue →"}
+                </Button>
+              </form>
+            )}
+
+            {/* ── Step 2: OTP ── */}
+            {step === "otp" && (
+              <form onSubmit={handleOtpSubmit} className="space-y-4">
+                <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs text-muted-foreground space-y-0.5">
+                  <p className="font-semibold text-foreground text-sm">Check your email</p>
+                  <p>A 6-digit verification code was sent to</p>
+                  <p className="font-mono text-primary">{ADMIN_OTP_EMAIL}</p>
+                  <p className="text-[11px] mt-1">Code expires in 10 minutes. Check your spam folder if needed.</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground block mb-1.5">
+                    Verification Code
+                  </label>
                   <Input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter your admin password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="w-full pr-10"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    placeholder="000000"
+                    value={otp}
+                    onChange={e => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    className="w-full text-center text-xl font-mono tracking-[0.4em] h-12"
                     autoFocus
-                    data-testid="input-password"
+                    autoComplete="one-time-code"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    tabIndex={-1}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </div>
+                {error && (
+                  <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
+                    {error}
+                  </p>
+                )}
+                <Button type="submit" className="w-full" disabled={loading || otp.length !== 6}>
+                  {loading ? "Verifying…" : "Verify & Sign In"}
+                </Button>
+                <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+                  <button type="button" onClick={() => { setStep("password"); setOtp(""); setError(""); }}
+                    className="hover:text-foreground transition-colors underline underline-offset-2">
+                    ← Back
+                  </button>
+                  <button type="button" onClick={resendOtp} disabled={resendCooldown > 0}
+                    className="hover:text-foreground transition-colors disabled:opacity-40">
+                    {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend code"}
                   </button>
                 </div>
-              </div>
-              {error && (
-                <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
-                  {error}
-                </p>
-              )}
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={loading || !password}
-                data-testid="button-login"
-              >
-                {loading ? "Signing in…" : "Sign In"}
-              </Button>
-            </form>
+              </form>
+            )}
+
           </CardContent>
         </Card>
-
-        <p className="text-center text-xs text-muted-foreground mt-4">
-          Password:{" "}
-          <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">
-            AlbaTour2026!
-          </code>
-        </p>
       </div>
     </div>
   );
