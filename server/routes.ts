@@ -1034,7 +1034,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Never exposed in any client-side code or UI.
 
   const otpStore = new Map<string, { code: string; expires: number }>();
-  const ADMIN_EMAIL = "book@albanianeagletours.com";
+  // OTP_EMAIL: recipient for OTP codes. Defaults to ADMIN_OTP_EMAIL env var.
+  // While Resend domain is unverified, set ADMIN_OTP_EMAIL=aneo.hila@gmail.com in Railway.
+  // Once albanianeagletours.com is verified in Resend, set it to book@albanianeagletours.com.
+  const ADMIN_EMAIL = process.env.ADMIN_OTP_EMAIL || "book@albanianeagletours.com";
+  // Resend from address — must use a verified Resend domain OR onboarding@resend.dev (test only)
+  const RESEND_FROM = process.env.RESEND_FROM || "onboarding@resend.dev";
   const OTP_TTL_MS  = 10 * 60 * 1000; // 10 minutes
 
   // POST /api/admin/send-otp — verify password, send OTP email
@@ -1073,7 +1078,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: "AlbaTour Admin <onboarding@resend.dev>",
+          from: `AlbaTour Admin <${RESEND_FROM}>`,
           to: [ADMIN_EMAIL],
           subject: `Your AlbaTour Admin login code: ${code}`,
           html: emailHtml,
