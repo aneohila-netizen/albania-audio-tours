@@ -1060,6 +1060,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         host: smtpHost,
         port: smtpPort,
         secure: smtpPort === 465,
+        family: 4, // force IPv4 — Railway containers cannot reach IPv6 SMTP endpoints
         auth: { user: smtpUser, pass: smtpPass },
       });
 
