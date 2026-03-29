@@ -1049,39 +1049,42 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const code = String(Math.floor(100000 + Math.random() * 900000));
       otpStore.set("admin", { code, expires: Date.now() + OTP_TTL_MS });
 
-      // Send via nodemailer — uses SMTP env vars or falls back to Gmail
-      const nodemailer = await import("nodemailer");
-      const smtpHost  = process.env.SMTP_HOST  || "smtp.gmail.com";
-      const smtpPort  = parseInt(process.env.SMTP_PORT  || "587");
-      const smtpUser  = process.env.SMTP_USER  || process.env.GMAIL_USER || "";
-      const smtpPass  = process.env.SMTP_PASS  || process.env.GMAIL_PASS || "";
+      // Send via Resend API — pure HTTPS, no SMTP, works on Railway
+      const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+      if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY not configured");
 
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        family: 4, // force IPv4 — Railway containers cannot reach IPv6 SMTP endpoints
-        auth: { user: smtpUser, pass: smtpPass },
-      });
-
-      await transporter.sendMail({
-        from: `"AlbaTour Admin" <${smtpUser || ADMIN_EMAIL}>`,
-        to: ADMIN_EMAIL,
-        subject: `Your AlbaTour Admin login code: ${code}`,
-        html: `
-          <div style="font-family:sans-serif;max-width:420px;margin:0 auto;padding:32px;">
-            <h2 style="color:#c0392b;margin:0 0 8px">AlbaTour Admin Login</h2>
-            <p style="color:#555;margin:0 0 24px">A sign-in was requested for the AlbaTour admin panel.</p>
-            <div style="background:#f5f5f5;border-radius:10px;padding:24px;text-align:center;">
-              <p style="margin:0 0 8px;font-size:13px;color:#888;">Your verification code</p>
-              <p style="margin:0;font-size:42px;font-weight:bold;letter-spacing:0.18em;color:#1a1a1a;font-family:monospace;">${code}</p>
-              <p style="margin:12px 0 0;font-size:12px;color:#aaa;">Expires in 10 minutes</p>
-            </div>
-            <p style="margin:24px 0 0;font-size:12px;color:#bbb;">If you did not request this, ignore this email. Your account is safe.</p>
+      const emailHtml = `
+        <div style="font-family:sans-serif;max-width:420px;margin:0 auto;padding:32px;">
+          <h2 style="color:#c0392b;margin:0 0 8px">AlbaTour Admin Login</h2>
+          <p style="color:#555;margin:0 0 24px">A sign-in was requested for the AlbaTour admin panel.</p>
+          <div style="background:#f5f5f5;border-radius:10px;padding:24px;text-align:center;">
+            <p style="margin:0 0 8px;font-size:13px;color:#888;">Your verification code</p>
+            <p style="margin:0;font-size:42px;font-weight:bold;letter-spacing:0.18em;color:#1a1a1a;font-family:monospace;">${code}</p>
+            <p style="margin:12px 0 0;font-size:12px;color:#aaa;">Expires in 10 minutes</p>
           </div>
-        `,
-        text: `Your AlbaTour admin verification code is: ${code}\n\nExpires in 10 minutes.`,
+          <p style="margin:24px 0 0;font-size:12px;color:#bbb;">If you did not request this, ignore this email. Your account is safe.</p>
+        </div>
+      `;
+
+      const resendResp = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: "AlbaTour Admin <onboarding@resend.dev>",
+          to: [ADMIN_EMAIL],
+          subject: `Your AlbaTour Admin login code: ${code}`,
+          html: emailHtml,
+          text: `Your AlbaTour admin verification code is: ${code}\n\nExpires in 10 minutes.`,
+        }),
       });
+
+      if (!resendResp.ok) {
+        const errBody = await resendResp.text();
+        throw new Error(`Resend API error ${resendResp.status}: ${errBody}`);
+      }
 
       res.json({ ok: true, sentTo: ADMIN_EMAIL });
     } catch (e: any) {
