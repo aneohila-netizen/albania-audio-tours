@@ -5,6 +5,7 @@ import fs from "fs";
 import { execFile, execFileSync } from "child_process";
 import { promisify } from "util";
 import { createHmac, randomBytes as cryptoRandomBytes } from "crypto";
+import QRCode from "qrcode";
 
 // Resolve ffmpeg binary: system PATH first, then ffmpeg-static npm package
 function resolveFfmpeg(): string {
@@ -1075,6 +1076,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // ── Subscription Plans ────────────────────────────────────────────────────────────
 
+  // Public: generate QR code PNG for a given URL — used in activation emails
+  // /api/qr?data=<url-encoded-string>  → image/png
+  app.get('/api/qr', async (req, res) => {
+    try {
+      const data = String(req.query.data || '').slice(0, 2048);
+      if (!data) return res.status(400).send('Missing data param');
+      const png = await QRCode.toBuffer(data, { width: 220, margin: 2, color: { dark: '#1a1a1a', light: '#ffffff' } });
+      res.set('Content-Type', 'image/png');
+      res.set('Cache-Control', 'public, max-age=86400'); // cache 24h
+      res.send(png);
+    } catch (e: any) { res.status(500).send(e.message); }
+  });
+
   // Public: get active plans for the pricing page
   app.get('/api/plans', async (_req, res) => {
     try { res.json(await storage.getActivePlans()); }
@@ -1493,18 +1507,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             ? expiresAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
             : expiresAt.toISOString().slice(0,10);
 
-          // Fetch QR code as base64 so it embeds inline — never blocked by email clients
-          let qrBase64 = '';
-          try {
-            const qrResp = await fetch(
-              `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=${encodeURIComponent(activateUrl)}`
-            );
-            const qrBuf = await qrResp.arrayBuffer();
-            qrBase64 = Buffer.from(qrBuf).toString('base64');
-          } catch { /* skip QR if fetch fails */ }
-          const qrImgTag = qrBase64
-            ? `<img src="data:image/png;base64,${qrBase64}" width="180" height="180" alt="Scan to activate" style="border-radius:8px;border:4px solid #c0392b;display:block;margin:0 auto;" />`
-            : `<p style="font-size:12px;color:#aaa;">(QR code unavailable — use the button or code above)</p>`;
+          // QR served from Railway — avoids Gmail's block on data: URIs and external image services
+          const qrEndpointUrl = `https://albania-audio-tours-production.up.railway.app/api/qr?data=${encodeURIComponent(activateUrl)}`;
+          const qrImgTag = `<img src="${qrEndpointUrl}" width="180" height="180" alt="Scan to activate" style="border-radius:8px;border:4px solid #c0392b;display:block;margin:0 auto;" />`;
 
           const deviceNote = deviceLimit > 1
             ? `Share this code with up to <strong>${deviceLimit - 1}</strong> travel companion${deviceLimit > 2 ? 's' : ''} — each opens the app and enters the same code.`
@@ -1765,16 +1770,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const expiryStr = expiresAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
       const activateUrl = `https://albania-audio-tours-production.up.railway.app/#/activate?order_id=${orderId}&email=${encodeURIComponent(email)}`;
 
-      // Fetch QR as base64
-      let qrBase64 = '';
-      try {
-        const qrResp = await fetch(`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=${encodeURIComponent(activateUrl)}`);
-        const qrBuf = await qrResp.arrayBuffer();
-        qrBase64 = Buffer.from(qrBuf).toString('base64');
-      } catch {}
-      const qrImgTag = qrBase64
-        ? `<img src="data:image/png;base64,${qrBase64}" width="180" height="180" alt="Scan to activate" style="border-radius:8px;border:4px solid #c0392b;display:block;margin:0 auto;" />`
-        : `<p style="font-size:12px;color:#aaa;">(Open the link below to activate)</p>`;
+      // QR served from Railway — works in all email clients including Gmail
+      const qrEndpointUrl = `https://albania-audio-tours-production.up.railway.app/api/qr?data=${encodeURIComponent(activateUrl)}`;
+      const qrImgTag = `<img src="${qrEndpointUrl}" width="180" height="180" alt="Scan to activate" style="border-radius:8px;border:4px solid #c0392b;display:block;margin:0 auto;" />`;
       const deviceNote = deviceLimit > 1
         ? `Share this code with up to <strong>${deviceLimit - 1}</strong> travel companion${deviceLimit > 2 ? 's' : ''} — each opens the app and enters the same code.`
         : 'This code activates on 1 device.';
