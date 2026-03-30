@@ -86,7 +86,10 @@ export default function GallerySlideshow({
   const containerStyle = heightClass
     ? undefined
     : { aspectRatio: "16 / 9" };
-  const containerClass = `relative rounded-2xl overflow-hidden bg-muted ${heightClass || ""} ${className}`;
+  // Only include default rounded-2xl when no className override is given
+  // (callers may pass responsive rounding like "rounded-none sm:rounded-2xl")
+  const hasCustomClass = className.trim().length > 0;
+  const containerClass = `relative overflow-hidden bg-muted ${!hasCustomClass ? "rounded-2xl" : ""} ${heightClass || ""} ${className}`;
 
   if (allImages.length === 0) {
     // No images — render placeholder

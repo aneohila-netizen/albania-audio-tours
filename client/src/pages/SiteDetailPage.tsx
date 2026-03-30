@@ -96,26 +96,32 @@ export default function SiteDetailPage() {
   const isVisited = visitedSiteIds.has(site.id);
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6" data-testid="site-detail">
-      {/* Back button */}
-      <button
-        data-testid="back-btn"
-        onClick={() => navigate("/sites")}
-        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft size={16} />
-        {t.backToMap}
-      </button>
+    <div className="pb-28" data-testid="site-detail">
+      {/* Back button — constrained */}
+      <div className="max-w-2xl mx-auto px-4 pt-6 pb-2">
+        <button
+          data-testid="back-btn"
+          onClick={() => navigate("/sites")}
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft size={16} />
+          {t.backToMap}
+        </button>
+      </div>
 
-      {/* Hero — 16:9 slideshow */}
+      {/* Hero — full width, 16:9 */}
       {((site as any).images?.length > 0 || site.imageUrl) && (
         <GallerySlideshow
           imageUrl={site.imageUrl}
           images={(site as any).images || []}
           alt={name}
           interval={5000}
+          className="rounded-none sm:rounded-2xl sm:mx-4 sm:max-w-[calc(100%-2rem)] md:mx-auto md:max-w-2xl"
         />
       )}
+
+      {/* Content — constrained */}
+      <div className="max-w-2xl mx-auto px-4 space-y-6 mt-6">
 
       {/* Header */}
       <div>
@@ -231,6 +237,8 @@ export default function SiteDetailPage() {
       {showModal && (
         <VisitModal site={site} onClose={() => setShowModal(false)} />
       )}
+
+      </div> {/* end max-w-2xl content wrapper */}
     </div>
   );
 }

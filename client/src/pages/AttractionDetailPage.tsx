@@ -135,33 +135,39 @@ export default function AttractionDetailPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6" data-testid="attraction-detail">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-1.5 text-sm text-muted-foreground flex-wrap">
-        <button onClick={() => navigate("/sites")} className="hover:text-foreground transition-colors">
-          Destinations
-        </button>
-        <ChevronRight size={13} />
-        <button onClick={() => navigate(`/sites/${params?.dest}`)} className="hover:text-foreground transition-colors">
-          {destName}
-        </button>
-        <ChevronRight size={13} />
-        <span className="text-foreground font-medium truncate max-w-[140px]">{aName}</span>
+    <div className="pb-28" data-testid="attraction-detail">
+      {/* Breadcrumb — constrained */}
+      <div className="max-w-2xl mx-auto px-4 pt-6 pb-2">
+        <div className="flex items-center gap-1.5 text-sm text-muted-foreground flex-wrap">
+          <button onClick={() => navigate("/sites")} className="hover:text-foreground transition-colors">
+            Destinations
+          </button>
+          <ChevronRight size={13} />
+          <button onClick={() => navigate(`/sites/${params?.dest}`)} className="hover:text-foreground transition-colors">
+            {destName}
+          </button>
+          <ChevronRight size={13} />
+          <span className="text-foreground font-medium truncate max-w-[140px]">{aName}</span>
+        </div>
       </div>
 
-      {/* Hero — auto-advancing gallery slideshow */}
+      {/* Hero — full width, 16:9 */}
       {(attraction.imageUrl || ((attraction as any).images?.length > 0)) ? (
         <GallerySlideshow
           imageUrl={attraction.imageUrl}
           images={(attraction as any).images || []}
           alt={aName}
           interval={5000}
+          className="rounded-none sm:rounded-2xl sm:mx-4 sm:max-w-[calc(100%-2rem)] md:mx-auto md:max-w-2xl"
         />
       ) : (
-        <div className="rounded-2xl h-48 bg-muted flex items-center justify-center">
+        <div className="mx-4 rounded-2xl h-48 bg-muted flex items-center justify-center">
           <span className="text-4xl">{CATEGORY_EMOJI[attraction.category] || "📍"}</span>
         </div>
       )}
+
+      {/* Content — constrained */}
+      <div className="max-w-2xl mx-auto px-4 space-y-6 mt-6">
 
       {/* Header */}
       <div>
@@ -254,6 +260,8 @@ export default function AttractionDetailPage() {
       </button>
 
       {showModal && <VisitModal site={siteCompat} onClose={() => setShowModal(false)} />}
+
+      </div> {/* end max-w-2xl content wrapper */}
     </div>
   );
 }

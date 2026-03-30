@@ -84,20 +84,23 @@ export default function DestinationPage() {
   const totalAttrPoints = attractions.reduce((s, a) => s + a.points, 0);
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-      {/* Back */}
-      <button data-testid="back-btn" onClick={() => navigate("/sites")}
-        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft size={16} />
-        All Destinations
-      </button>
+    <div className="pb-28">
+      {/* Back button — constrained */}
+      <div className="max-w-3xl mx-auto px-4 pt-6 pb-2">
+        <button data-testid="back-btn" onClick={() => navigate("/sites")}
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft size={16} />
+          All Destinations
+        </button>
+      </div>
 
-      {/* Hero — auto-advancing gallery slideshow (hero image + gallery images) */}
+      {/* Hero — FULL WIDTH on all screen sizes, 16:9 aspect ratio */}
       <GallerySlideshow
         imageUrl={dest.imageUrl}
         images={(dest as any).images || []}
         alt={name}
         interval={5000}
+        className="rounded-none sm:rounded-2xl sm:mx-4 sm:max-w-[calc(100%-2rem)] md:mx-auto md:max-w-3xl"
       >
         {/* Overlay: title, tagline, badges */}
         <div className="absolute bottom-0 left-0 right-0 p-5 pointer-events-none">
@@ -119,6 +122,9 @@ export default function DestinationPage() {
           </span>
         </div>
       </GallerySlideshow>
+
+      {/* All content below hero — constrained */}
+      <div className="max-w-3xl mx-auto px-4 space-y-6 mt-6">
 
       {/* Progress */}
       {attractions.length > 0 && (
@@ -244,6 +250,8 @@ export default function DestinationPage() {
           {`Get Directions to ${name}`}
         </a>
       </div>
+
+      </div> {/* end max-w-3xl content wrapper */}
     </div>
   );
 }
