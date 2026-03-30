@@ -7,7 +7,7 @@ import type { Destination, Attraction } from "@/lib/staticData";
 import VisitModal from "@/components/VisitModal";
 import { apiRequest } from "@/lib/queryClient";
 import { getSessionId } from "@/lib/session";
-import { MapPin, X, Layers, Locate, LocateFixed, Headphones } from "lucide-react";
+import { MapPin, X, Layers, Locate, LocateFixed, Headphones, ChevronRight, ArrowRight } from "lucide-react";
 // Leaflet marker cluster — groups overlapping pins into numbered bubbles
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
@@ -87,6 +87,21 @@ export default function MapPage() {
   // 10-second idle popup — shown once per session, dismissed permanently on close
   const [showExplorePopup, setShowExplorePopup] = useState(false);
   const [popupDismissed, setPopupDismissed] = useState(false);
+
+  // ── Onboarding tooltip tour ─────────────────────────────────────────────────
+  // Shown once per session (sessionStorage), dismissed before Explore Nearby popup
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try { return !sessionStorage.getItem("alb_onboarded"); } catch { return true; }
+  });
+  const [onboardStep, setOnboardStep] = useState(0);
+
+  function dismissOnboarding() {
+    try { sessionStorage.setItem("alb_onboarded", "1"); } catch {}
+    setShowOnboarding(false);
+  }
+
+  // ── Destinations list panel ───────────────────────────────────────────────
+  const [showDestPanel, setShowDestPanel] = useState(false);
 
   // ── GPS blue dot state ────────────────────────────────────────────
   const [autoCenter, setAutoCenter] = useState(false);
@@ -272,16 +287,16 @@ export default function MapPage() {
   }
 
   // ── 10-second idle prompt — show "Explore nearby" popup if user hasn't acted ─
+  // Only fires after onboarding tooltip is dismissed, to avoid overlap
   useEffect(() => {
     if (popupDismissed || autoCenter || heroDismissed) return;
     const timer = setTimeout(() => {
-      // Only show if user is still idle (no pin selected, GPS not active)
-      if (!autoCenter && !heroDismissed) {
+      if (!autoCenter && !heroDismissed && !showOnboarding) {
         setShowExplorePopup(true);
       }
     }, 10000);
     return () => clearTimeout(timer);
-  }, []); // runs once on mount
+  }, [showOnboarding]); // re-evaluates when onboarding dismisses
 
   // Hide popup once GPS is activated (user acted through other means)
   useEffect(() => {
@@ -890,7 +905,7 @@ export default function MapPage() {
       <div className="absolute top-3 right-3 z-[1000]">
         <div className="flex items-center gap-1 rounded-xl border border-border bg-card/95 backdrop-blur p-1 shadow-md">
           <button
-            onClick={() => setLayerMode("attractions")}
+            onClick={() => { setLayerMode("attractions"); setShowDestPanel(false); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               layerMode === "attractions"
                 ? "bg-primary text-primary-foreground"
@@ -900,7 +915,7 @@ export default function MapPage() {
             <MapPin size={12} /> Attractions
           </button>
           <button
-            onClick={() => setLayerMode("destinations")}
+            onClick={() => { setLayerMode("destinations"); setShowDestPanel(true); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               layerMode === "destinations"
                 ? "bg-primary text-primary-foreground"
@@ -1048,6 +1063,177 @@ export default function MapPage() {
           onClose={() => setShowVisitModal(false)}
         />
       )}
+
+      {/* ── Onboarding Tooltip Tour ─────────────────────────────────────────
+           Shown once per session. 4 steps, each pointing at a key UI element.
+           Appears before the Explore Nearby popup. Dismissed on Skip or step 4 Next. */}
+      {showOnboarding && (() => {
+        const STEPS = [
+          {
+            emoji: "📍",
+            title: "Tap any map pin",
+            body: "Each pin is a real place with an audio story. Tap it to hear the guide and see details.",
+            hint: "Try tapping a red or green pin on the map",
+          },
+          {
+            emoji: "🔍",
+            title: "Search a specific place",
+            body: "Looking for Berat or Skanderbeg Square? Use the search icon in the top bar to jump there directly.",
+            hint: "Search icon is in the top navigation bar",
+          },
+          {
+            emoji: "🏖️",
+            title: "Browse all destinations",
+            body: "Tap \u201cTour Sites\u201d in the nav to see all 43 destinations with audio tours, sorted by region.",
+            hint: "\u201cTour Sites\u201d tab is in the top navigation bar",
+          },
+          {
+            emoji: "📱",
+            title: "Find your nearest tour",
+            body: "Allow location access once and the map instantly shows what\u2019s closest to you \u2014 perfect for on-the-go exploration.",
+            hint: "Tap \u201cShare Location\u201d at the top-left of the map",
+          },
+        ];
+        const step = STEPS[onboardStep];
+        const isLast = onboardStep === STEPS.length - 1;
+        return (
+          <div
+            className="absolute inset-0 z-[1060] flex items-end justify-center pb-28 px-4 pointer-events-none"
+            aria-live="polite"
+          >
+            {/* Card */}
+            <div
+              className="pointer-events-auto w-full max-w-sm rounded-2xl bg-card border border-border shadow-2xl overflow-hidden"
+              style={{ animation: "popup-in 0.3s cubic-bezier(0.34,1.56,0.64,1) both" }}
+              role="dialog"
+              aria-label="Quick start guide"
+            >
+              {/* Progress bar */}
+              <div className="flex h-1">
+                {STEPS.map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex-1 transition-all duration-300"
+                    style={{
+                      background: i <= onboardStep ? "hsl(var(--primary))" : "hsl(var(--muted))",
+                      marginRight: i < STEPS.length - 1 ? 2 : 0,
+                    }}
+                  />
+                ))}
+              </div>
+
+              <div className="px-5 pt-4 pb-5 space-y-3">
+                {/* Header */}
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl" aria-hidden="true">{step.emoji}</span>
+                    <div>
+                      <p className="font-bold text-sm leading-tight" style={{ fontFamily: "var(--font-display)" }}>
+                        {step.title}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        Step {onboardStep + 1} of {STEPS.length}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={dismissOnboarding}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors shrink-0 -mt-0.5 -mr-1"
+                    aria-label="Skip guide"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <p className="text-sm text-muted-foreground leading-relaxed">{step.body}</p>
+
+                {/* Hint chip */}
+                <div className="flex items-center gap-1.5 bg-primary/8 rounded-lg px-3 py-1.5">
+                  <span className="text-[10px] text-primary font-medium">→ {step.hint}</span>
+                </div>
+
+                {/* Navigation */}
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    onClick={dismissOnboarding}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
+                  >
+                    Skip guide
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (isLast) {
+                        dismissOnboarding();
+                      } else {
+                        setOnboardStep(s => s + 1);
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-colors"
+                    style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                  >
+                    {isLast ? "Got it" : "Next"}
+                    {!isLast && <ArrowRight size={12} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Destinations List Panel ─────────────────────────────────────────
+           Slides in from the left when the Destinations layer is active.
+           Lists all destinations by name; tap any to fly the map to that pin. */}
+      {showDestPanel && layerMode === "destinations" && (
+        <div
+          className="absolute top-14 left-2 z-[1000] w-56 max-h-[calc(100vh-8rem)] overflow-y-auto rounded-2xl bg-card/96 backdrop-blur border border-border shadow-xl"
+          style={{ animation: "slide-in-left 0.25s ease both" }}
+          role="complementary"
+          aria-label="Destinations list"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-3 py-2.5 border-b border-border sticky top-0 bg-card/96 backdrop-blur rounded-t-2xl">
+            <span className="text-xs font-semibold text-foreground">All Destinations</span>
+            <button
+              onClick={() => setShowDestPanel(false)}
+              className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+              aria-label="Close destinations list"
+            >
+              <X size={12} />
+            </button>
+          </div>
+
+          {/* Destination rows */}
+          <div className="py-1">
+            {DESTINATIONS.map(dest => {
+              const dName = destName(dest);
+              return (
+                <button
+                  key={dest.slug}
+                  onClick={() => {
+                    // Fly map to this destination
+                    const map = mapInstanceRef.current;
+                    if (map) map.flyTo([dest.lat, dest.lng], 13, { duration: 1 });
+                    setShowDestPanel(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/60 transition-colors text-left group"
+                >
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ background: "#C0392B" }}
+                  />
+                  <span className="text-xs text-foreground leading-tight flex-1 truncate group-hover:text-primary transition-colors">
+                    {dName}
+                  </span>
+                  <ChevronRight size={10} className="text-muted-foreground/50 group-hover:text-primary shrink-0 transition-colors" />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
