@@ -1,37 +1,93 @@
 /**
- * LaunchBanner — slim top-of-page announcement bar.
- * Visibility is controlled via Admin → Settings → Launch Banner toggle.
- * The state is stored in the DB (app_settings table) so it persists across deploys.
- * Falls back to visible if the API is unreachable, ensuring new deploys always show it.
+ * LaunchBanner (CountdownBanner) — top-of-page ribbon.
+ *
+ * Reads three settings from the DB:
+ *   launch_banner_enabled  — legacy toggle (kept for compatibility)
+ *   countdown_enabled      — shows countdown mode when true
+ *   free_until             — ISO date: countdown target / auto-lock date
+ *
+ * Modes:
+ *   1. countdown_enabled=true + free_until set  → live countdown timer
+ *   2. launch_banner_enabled=true               → original launch text (no timer)
+ *   3. Neither                                  → hidden
  */
 
-import { useState, useEffect } from "react";
-import { X, Sparkles } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, Sparkles, Clock } from "lucide-react";
+import { Link } from "wouter";
 
 const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
 
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return "0d 0h 0m 0s";
+  const totalSec = Math.floor(ms / 1000);
+  const d = Math.floor(totalSec / 86400);
+  const h = Math.floor((totalSec % 86400) / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (d > 0) return `${d}d ${h}h ${m}m ${s}s`;
+  return `${h}h ${m}m ${s}s`;
+}
+
 export default function LaunchBanner() {
-  const [enabled, setEnabled] = useState<boolean | null>(null); // null = loading
+  const [launchEnabled, setLaunchEnabled] = useState<boolean | null>(null);
+  const [countdownEnabled, setCountdownEnabled] = useState(false);
+  const [freeUntil, setFreeUntil] = useState<Date | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number>(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    fetch(`${RAILWAY_URL}/api/settings/launch_banner_enabled`)
-      .then(r => r.json())
-      .then(({ value }: { value: string | null }) => {
-        // Default true if key missing; false only when explicitly set to "false"
-        setEnabled(value !== "false");
-      })
-      .catch(() => setEnabled(true)); // fail-open: show banner if API is down
+    async function loadSettings() {
+      try {
+        const [launchRes, cdRes, fuRes] = await Promise.all([
+          fetch(`${RAILWAY_URL}/api/settings/launch_banner_enabled`),
+          fetch(`${RAILWAY_URL}/api/settings/countdown_enabled`),
+          fetch(`${RAILWAY_URL}/api/settings/free_until`),
+        ]);
+        const launchData = await launchRes.json();
+        const cdData = await cdRes.json();
+        const fuData = await fuRes.json();
+
+        setLaunchEnabled(launchData.value !== "false");
+        setCountdownEnabled(cdData.value === "true");
+        if (fuData.value) {
+          const d = new Date(fuData.value);
+          if (!isNaN(d.getTime())) setFreeUntil(d);
+        }
+      } catch {
+        setLaunchEnabled(true);
+      }
+    }
+    loadSettings();
   }, []);
 
-  // Don't render until we know the state, or if dismissed this session, or turned off
-  if (enabled === null || !enabled || dismissed) return null;
+  // Tick the countdown every second
+  useEffect(() => {
+    if (!countdownEnabled || !freeUntil) return;
+    const tick = () => setTimeLeft(Math.max(0, freeUntil.getTime() - Date.now()));
+    tick();
+    timerRef.current = setInterval(tick, 1000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [countdownEnabled, freeUntil]);
+
+  if (launchEnabled === null || dismissed) return null;
+
+  const showCountdown = countdownEnabled && freeUntil && freeUntil > new Date();
+  const showLaunch = !showCountdown && launchEnabled;
+  if (!showCountdown && !showLaunch) return null;
+
+  const freeUntilFormatted = freeUntil
+    ? freeUntil.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
+    : "";
 
   return (
     <div
       className="relative flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium text-white"
       style={{
-        background: "linear-gradient(90deg, #1a1a2e 0%, #c0392b 50%, #1a1a2e 100%)",
+        background: showCountdown
+          ? "linear-gradient(90deg, #1a1a2e 0%, #b45309 50%, #1a1a2e 100%)"
+          : "linear-gradient(90deg, #1a1a2e 0%, #c0392b 50%, #1a1a2e 100%)",
         minHeight: "36px",
       }}
     >
@@ -46,15 +102,39 @@ export default function LaunchBanner() {
         }}
       />
 
-      <Sparkles size={12} className="shrink-0 opacity-80" />
-
-      <span className="text-center leading-snug relative">
-        <span className="font-semibold">Free during launch</span>
-        <span className="opacity-70 mx-1">—</span>
-        <span className="opacity-90">
-          Albania Audio Tours is currently free as we launch. A subscription plan will follow — early explorers enjoy full access now.
-        </span>
-      </span>
+      {showCountdown ? (
+        <>
+          <Clock size={12} className="shrink-0 opacity-80 relative" />
+          <span className="text-center leading-snug relative">
+            <span className="font-semibold">Free access ends in </span>
+            <span
+              className="font-black tracking-wide px-1.5 py-0.5 rounded"
+              style={{ background: "rgba(255,255,255,0.15)" }}
+            >
+              {formatCountdown(timeLeft)}
+            </span>
+            {freeUntilFormatted && (
+              <span className="opacity-70 ml-1.5">— free until {freeUntilFormatted}</span>
+            )}
+            <Link href="/subscriptions">
+              <a className="ml-2 underline font-semibold opacity-90 hover:opacity-100 relative">
+                View plans →
+              </a>
+            </Link>
+          </span>
+        </>
+      ) : (
+        <>
+          <Sparkles size={12} className="shrink-0 opacity-80 relative" />
+          <span className="text-center leading-snug relative">
+            <span className="font-semibold">Free during launch</span>
+            <span className="opacity-70 mx-1">—</span>
+            <span className="opacity-90">
+              Albania Audio Tours is currently free as we launch. A subscription plan will follow — early explorers enjoy full access now.
+            </span>
+          </span>
+        </>
+      )}
 
       <button
         onClick={() => setDismissed(true)}

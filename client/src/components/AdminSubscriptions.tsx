@@ -2,6 +2,7 @@
  * AdminSubscriptions — manage subscription plans + view leads in admin panel.
  * Plans: create, edit price/features/Shopify URL, toggle active, reorder.
  * Leads: view all email signups with plan interest.
+ * Paywall Control: global activate/deactivate + free_until date + countdown ribbon.
  */
 
 import { useState, useEffect } from "react";
@@ -9,6 +10,7 @@ import {
   Plus, Pencil, Trash2, ArrowLeft, Save, CheckCircle2,
   AlertTriangle, Users, CreditCard, ExternalLink, Star,
   Eye, EyeOff, Building2, Zap, Mail, Download,
+  Lock, LockOpen, Clock, CalendarDays, Bell, BellOff, RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,8 +108,78 @@ export default function AdminSubscriptions() {
     if (data.success) loadSubscribers();
   }
 
+  // ── Paywall global settings ─────────────────────────────────────────────────
+  const [paywallActive, setPaywallActive] = useState<boolean | null>(null);
+  const [freeUntil, setFreeUntil] = useState<string>(""); // ISO date string or ""
+  const [countdownEnabled, setCountdownEnabled] = useState<boolean>(false);
+  const [paywallSaving, setPaywallSaving] = useState(false);
+  const [paywallMsg, setPaywallMsg] = useState("");
+  const [paywallErr, setPaywallErr] = useState("");
+
+  async function loadPaywallSettings() {
+    try {
+      const res = await fetch(`${RAILWAY_URL}/api/admin/settings`, { headers: { "x-admin-token": token } });
+      if (!res.ok) return;
+      const all: Array<{ key: string; value: string }> = await res.json();
+      const pw = all.find(s => s.key === "paywall_active");
+      const fu = all.find(s => s.key === "free_until");
+      const cd = all.find(s => s.key === "countdown_enabled");
+      setPaywallActive(pw ? pw.value === "true" : false);
+      setFreeUntil(fu ? fu.value : "");
+      setCountdownEnabled(cd ? cd.value === "true" : false);
+    } catch {}
+  }
+
+  async function savePaywallSetting(key: string, value: string) {
+    await fetch(`${RAILWAY_URL}/api/admin/settings/${key}`, {
+      method: "PUT", headers,
+      body: JSON.stringify({ value }),
+    });
+  }
+
+  async function applyPaywall(active: boolean) {
+    setPaywallSaving(true); setPaywallMsg(""); setPaywallErr("");
+    try {
+      await savePaywallSetting("paywall_active", String(active));
+      // If activating, clear free_until so it doesn't override
+      if (active) {
+        await savePaywallSetting("free_until", "");
+        setFreeUntil("");
+      }
+      setPaywallActive(active);
+      setPaywallMsg(active ? "Paywall activated — audio content is now locked." : "Paywall deactivated — all content is free.");
+      setTimeout(() => setPaywallMsg(""), 4000);
+    } catch { setPaywallErr("Save failed. Please try again."); }
+    finally { setPaywallSaving(false); }
+  }
+
+  async function applyFreeUntil() {
+    if (!freeUntil) { setPaywallErr("Please select a date."); return; }
+    setPaywallSaving(true); setPaywallMsg(""); setPaywallErr("");
+    try {
+      await savePaywallSetting("free_until", freeUntil);
+      // Deactivate the hard paywall so free_until takes effect
+      await savePaywallSetting("paywall_active", "false");
+      setPaywallActive(false);
+      setPaywallMsg(`Free access set until ${new Date(freeUntil).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} — paywall auto-activates after.`);
+      setTimeout(() => setPaywallMsg(""), 5000);
+    } catch { setPaywallErr("Save failed."); }
+    finally { setPaywallSaving(false); }
+  }
+
+  async function toggleCountdown(val: boolean) {
+    setCountdownEnabled(val);
+    await savePaywallSetting("countdown_enabled", String(val));
+    setPaywallMsg(val ? "Countdown ribbon enabled." : "Countdown ribbon hidden.");
+    setTimeout(() => setPaywallMsg(""), 3000);
+  }
+
+  // Compute effective lock state: paywall_active=true, OR free_until is in the past
+  const effectiveLocked = paywallActive === true ||
+    (!!freeUntil && new Date(freeUntil) < new Date());
+
   const [loaded, setLoaded] = useState(false);
-  if (!loaded) { setLoaded(true); loadPlans(); loadLeads(); loadSubscribers(); }
+  if (!loaded) { setLoaded(true); loadPlans(); loadLeads(); loadSubscribers(); loadPaywallSettings(); }
 
   // ── Save ────────────────────────────────────────────────────────────────────
   async function savePlan() {
@@ -192,6 +264,158 @@ export default function AdminSubscriptions() {
         </div>
 
         {error && <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs"><AlertTriangle size={13} />{error}</div>}
+
+        {/* ── PAYWALL CONTROL PANEL ────────────────────────────────── */}
+        <div className={`rounded-2xl border-2 p-4 space-y-4 ${
+          effectiveLocked
+            ? "border-red-300 bg-red-50"
+            : freeUntil && new Date(freeUntil) > new Date()
+              ? "border-amber-300 bg-amber-50"
+              : "border-green-300 bg-green-50"
+        }`}>
+          {/* Status header */}
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              {effectiveLocked
+                ? <Lock size={16} className="text-red-600" />
+                : <LockOpen size={16} className="text-green-600" />}
+              <span className="font-bold text-sm">
+                {effectiveLocked ? "Paywall Active — Content Locked" : "Content Free — Paywall Inactive"}
+              </span>
+            </div>
+            <button
+              onClick={loadPaywallSettings}
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+            >
+              <RefreshCw size={11} /> Refresh
+            </button>
+          </div>
+
+          {/* Status detail */}
+          {paywallActive === null ? (
+            <p className="text-xs text-muted-foreground">Loading paywall status…</p>
+          ) : (
+            <p className="text-xs leading-relaxed"
+              style={{ color: effectiveLocked ? "#b91c1c" : freeUntil && new Date(freeUntil) > new Date() ? "#92400e" : "#166534" }}>
+              {effectiveLocked
+                ? "Audio tours are locked. Only subscribed users can access audio content."
+                : freeUntil && new Date(freeUntil) > new Date()
+                  ? `Free until ${new Date(freeUntil).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} — paywall activates automatically after that date.`
+                  : "All audio content is currently free for everyone."}
+            </p>
+          )}
+
+          {paywallMsg && (
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-green-100 border border-green-200 text-green-800 text-xs">
+              <CheckCircle2 size={12} /> {paywallMsg}
+            </div>
+          )}
+          {paywallErr && (
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-red-100 border border-red-200 text-red-700 text-xs">
+              <AlertTriangle size={12} /> {paywallErr}
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => applyPaywall(true)}
+              disabled={paywallSaving || effectiveLocked}
+              className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-semibold transition-colors ${
+                effectiveLocked
+                  ? "bg-red-200 text-red-700 cursor-default"
+                  : "bg-red-500 hover:bg-red-600 text-white"
+              } disabled:opacity-60`}
+            >
+              <Lock size={12} />
+              {effectiveLocked ? "Currently Locked" : "Activate Paywall"}
+            </button>
+            <button
+              onClick={() => applyPaywall(false)}
+              disabled={paywallSaving || (!effectiveLocked && !freeUntil)}
+              className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-semibold transition-colors ${
+                !effectiveLocked && !freeUntil
+                  ? "bg-green-200 text-green-700 cursor-default"
+                  : "bg-green-500 hover:bg-green-600 text-white"
+              } disabled:opacity-60`}
+            >
+              <LockOpen size={12} />
+              {!effectiveLocked && !freeUntil ? "Currently Free" : "Deactivate Paywall"}
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-px bg-black/10" />
+            <span className="text-xs font-medium text-muted-foreground">Schedule free access window</span>
+            <div className="flex-1 h-px bg-black/10" />
+          </div>
+
+          {/* Free Until date picker */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium flex items-center gap-1.5">
+              <CalendarDays size={12} /> Free Until Date
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={freeUntil ? freeUntil.slice(0, 10) : ""}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={e => {
+                  setFreeUntil(e.target.value ? e.target.value + "T23:59:59.000Z" : "");
+                  setPaywallErr("");
+                }}
+                className="flex-1 h-8 px-3 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+              <button
+                onClick={applyFreeUntil}
+                disabled={paywallSaving || !freeUntil}
+                className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold disabled:opacity-50 flex items-center gap-1"
+              >
+                <Clock size={11} /> Set
+              </button>
+              {freeUntil && (
+                <button
+                  onClick={async () => {
+                    setFreeUntil("");
+                    await savePaywallSetting("free_until", "");
+                    setPaywallMsg("Free window cleared.");
+                    setTimeout(() => setPaywallMsg(""), 3000);
+                  }}
+                  className="px-2 py-1.5 rounded-lg border border-border bg-white hover:bg-muted text-xs text-muted-foreground"
+                  title="Clear date"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Content stays free until this date, then locks automatically. Leave blank for manual control.
+            </p>
+          </div>
+
+          {/* Countdown ribbon toggle */}
+          <div className="flex items-center justify-between p-3 rounded-xl border border-black/10 bg-white/60">
+            <div className="flex items-center gap-2">
+              {countdownEnabled ? <Bell size={13} className="text-amber-600" /> : <BellOff size={13} className="text-muted-foreground" />}
+              <div>
+                <p className="text-xs font-semibold">Countdown Ribbon</p>
+                <p className="text-xs text-muted-foreground">Shows a live countdown timer at the top of the page</p>
+              </div>
+            </div>
+            <button
+              onClick={() => toggleCountdown(!countdownEnabled)}
+              className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${
+                countdownEnabled ? "bg-amber-500" : "bg-muted-foreground/30"
+              }`}
+            >
+              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                countdownEnabled ? "translate-x-5" : "translate-x-0.5"
+              }`} />
+            </button>
+          </div>
+        </div>
+        {/* ── END PAYWALL CONTROL PANEL ──────────────────────────────── */}
 
         {/* Shopify setup callout */}
         <div className="p-4 rounded-xl border border-blue-200 bg-blue-50 text-xs space-y-1">
