@@ -843,6 +843,7 @@ class PgStorage implements IStorage {
       priceEur: parseFloat(r.price_eur), billingPeriod: r.billing_period,
       features: r.features || '[]', isPopular: r.is_popular || false,
       isActive: r.is_active || true, sortOrder: r.sort_order || 0,
+      deviceLimit: r.device_limit || 2,
       shopifyVariantId: r.shopify_variant_id || '',
       shopifyCheckoutUrl: r.shopify_checkout_url || '',
       ctaLabel: r.cta_label || 'Get Started', notes: r.notes || '',
@@ -865,13 +866,15 @@ class PgStorage implements IStorage {
   }
   async createPlan(data: InsertSubscriptionPlan): Promise<SubscriptionPlan> {
     await this.ready;
+    await this.pool.query(`ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS device_limit integer NOT NULL DEFAULT 2`).catch(()=>{});
     const { rows } = await this.pool.query(
-      `INSERT INTO subscription_plans (slug,tier,name,tagline,price_eur,billing_period,features,is_popular,is_active,sort_order,shopify_variant_id,shopify_checkout_url,cta_label,notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+      `INSERT INTO subscription_plans (slug,tier,name,tagline,price_eur,billing_period,features,is_popular,is_active,sort_order,device_limit,shopify_variant_id,shopify_checkout_url,cta_label,notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
       [data.slug,data.tier||'individual',data.name,data.tagline||'',data.priceEur,
        data.billingPeriod||'year',data.features||'[]',data.isPopular??false,
-       data.isActive??true,data.sortOrder??0,data.shopifyVariantId||'',
-       data.shopifyCheckoutUrl||'',data.ctaLabel||'Get Started',data.notes||'']
+       data.isActive??true,data.sortOrder??0,(data as any).deviceLimit||2,
+       data.shopifyVariantId||'',data.shopifyCheckoutUrl||'',
+       data.ctaLabel||'Get Started',data.notes||'']
     );
     return this.rowToPlan(rows[0]);
   }
@@ -880,7 +883,8 @@ class PgStorage implements IStorage {
     const map: Record<string,string> = {
       slug:'slug',tier:'tier',name:'name',tagline:'tagline',priceEur:'price_eur',
       billingPeriod:'billing_period',features:'features',isPopular:'is_popular',
-      isActive:'is_active',sortOrder:'sort_order',shopifyVariantId:'shopify_variant_id',
+      isActive:'is_active',sortOrder:'sort_order',deviceLimit:'device_limit',
+      shopifyVariantId:'shopify_variant_id',
       shopifyCheckoutUrl:'shopify_checkout_url',ctaLabel:'cta_label',notes:'notes',
     };
     const fields: string[] = []; const vals: any[] = []; let i = 1;
@@ -980,7 +984,9 @@ class PgStorage implements IStorage {
       email:'email', planSlug:'plan_slug', planName:'plan_name',
       shopifyOrderId:'shopify_order_id', priceEur:'price_eur',
       startsAt:'starts_at', expiresAt:'expires_at', isActive:'is_active',
-      deviceCount:'device_count', devices:'devices', sessionToken:'session_token', notes:'notes',
+      deviceCount:'device_count', deviceLimit:'device_limit',
+      devices:'devices', sessionToken:'session_token',
+      accessCode:'access_code', notes:'notes',
     };
     const fields: string[] = []; const vals: any[] = []; let i = 1;
     for (const [k, col] of Object.entries(map)) {

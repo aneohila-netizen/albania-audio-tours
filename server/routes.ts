@@ -1669,6 +1669,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+
+  // ── Admin: patch a subscription (set accessCode, deviceLimit, notes) ──────
+  app.put('/api/admin/subscriptions/:id/patch', requireAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const allowed = ['accessCode', 'deviceLimit', 'notes'];
+      const patch: Record<string, any> = {};
+      for (const key of allowed) { if (key in req.body) patch[key] = req.body[key]; }
+      if (!Object.keys(patch).length) return res.status(400).json({ error: 'No valid fields' });
+      const updated = await storage.updateSubscription(id, patch as any);
+      if (!updated) return res.status(404).json({ error: 'Subscription not found' });
+      res.json(updated);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // ── Admin: revoke a subscription ───────────────────────────────────────
   app.put('/api/admin/subscriptions/:id/revoke', requireAdmin, async (req, res) => {
     try {
