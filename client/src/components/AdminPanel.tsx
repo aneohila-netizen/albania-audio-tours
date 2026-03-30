@@ -1578,7 +1578,7 @@ function ImageGalleryCard({
           <div className="relative rounded-xl overflow-hidden border border-border/60 bg-muted" style={{aspectRatio:"16/9"}}>
             <img
               src={allImages[slideIdx]}
-              alt={`Image \${slideIdx + 1}`}
+              alt={`Image ${slideIdx + 1}`}
               className="w-full h-full object-cover"
               onError={e => { (e.target as HTMLImageElement).style.opacity = "0.2"; }}
             />
@@ -1607,7 +1607,7 @@ function ImageGalleryCard({
             {/* Label */}
             <div className="absolute top-2 left-2">
               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-black/50 text-white">
-                {slideIdx === 0 ? "Hero (first)" : `Slide ${slideIdx + 1}`} · \${slideIdx + 1}/\${allImages.length}
+                {slideIdx === 0 ? "Hero (first)" : `Slide ${slideIdx + 1}`} · {slideIdx + 1}/{allImages.length}
               </span>
             </div>
             {/* Remove button */}
