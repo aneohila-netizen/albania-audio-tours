@@ -1547,9 +1547,9 @@ function ImageGalleryCard({
   // Remove gallery image — HARDCODED: requires x-confirm-delete header (media safety rule)
   async function removeImage(idx: number) {
     if (!entityId) return;
-    if (!window.confirm(\`Remove image \${idx + 1}? This cannot be undone.\`)) return;
+    if (!window.confirm(`Remove image ${idx + 1}? This cannot be undone.`)) return;
     try {
-      await adminFetch(\`/api/admin/\${entityType}/\${entityId}/gallery/\${idx}\`, {
+      await adminFetch(`/api/admin/${entityType}/${entityId}/gallery/${idx}`, {
         method: "DELETE",
         headers: { "x-confirm-delete": "yes" }, // HARDCODED — never remove
       });
@@ -1601,13 +1601,13 @@ function ImageGalleryCard({
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
               {allImages.map((_, i) => (
                 <button key={i} type="button" onClick={() => setSlideIdx(i)}
-                  className={\`rounded-full transition-all \${i === slideIdx ? "w-4 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/50"}\`} />
+                  className={`rounded-full transition-all ${i === slideIdx ? "w-4 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/50"}`} />
               ))}
             </div>
             {/* Label */}
             <div className="absolute top-2 left-2">
               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-black/50 text-white">
-                {slideIdx === 0 ? "Hero (first)" : \`Slide \${slideIdx + 1}\`} · \${slideIdx + 1}/\${allImages.length}
+                {slideIdx === 0 ? "Hero (first)" : `Slide ${slideIdx + 1}`} · \${slideIdx + 1}/\${allImages.length}
               </span>
             </div>
             {/* Remove button */}
@@ -1629,9 +1629,9 @@ function ImageGalleryCard({
             {allImages.map((img, i) => (
               <div key={i}
                 onClick={() => setSlideIdx(i)}
-                className={\`relative shrink-0 cursor-pointer rounded-lg overflow-hidden border-2 transition-all \${i === slideIdx ? "border-primary" : "border-transparent"}\`}
+                className={`relative shrink-0 cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${i === slideIdx ? "border-primary" : "border-transparent"}`}
                 style={{width:56, height:56}}>
-                <img src={img} alt={\`\${i+1}\`} className="w-full h-full object-cover" />
+                <img src={img} alt={`${i+1}`} className="w-full h-full object-cover" />
                 {i === 0 && (
                   <div className="absolute bottom-0 left-0 right-0 bg-primary/80 text-[8px] text-white text-center font-bold py-0.5">HERO</div>
                 )}
@@ -1846,8 +1846,12 @@ function EditorView({
       } catch { /* keep data URI as fallback */ }
     }
 
+    // NEVER include images in the PUT payload — gallery images are managed
+    // exclusively via /api/admin/sites/:id/gallery endpoints, not via PUT.
+    // Including serve URLs here would overwrite data URIs in the DB.
+    const { images: _excludeImages, ...formWithoutImages } = form as any;
     const payload = {
-      ...form,
+      ...formWithoutImages,
       lat: parseFloat(form.lat),
       lng: parseFloat(form.lng),
       points: parseInt(form.points) || 100,
@@ -2377,6 +2381,8 @@ function AttrEditorView({
       } catch { /* keep data URI as fallback */ }
     }
 
+    // NEVER include images in PUT payload
+    const { images: _excludeAttrImages, ...attrFormWithoutImages } = form as any;
     const payload = {
       slug: form.slug,
       destinationSlug,

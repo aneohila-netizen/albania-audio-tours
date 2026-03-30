@@ -311,6 +311,22 @@ class PgStorage implements IStorage {
       await this.pool.query(sql).catch(() => {}); // ignore if already exists
     }
 
+    // DATA REPAIR: Clear any images arrays that contain serve URLs instead of data URIs.
+    // This happened when handleSave incorrectly sent serve URLs back via PUT.
+    // Safe to run every startup — only clears rows where images contains '/api/images/db/'.
+    await this.pool.query(`
+      UPDATE tour_sites
+      SET images = NULL
+      WHERE images IS NOT NULL
+        AND images LIKE '%/api/images/db/%'
+    `).catch(() => {});
+    await this.pool.query(`
+      UPDATE attractions
+      SET images = NULL
+      WHERE images IS NOT NULL
+        AND images LIKE '%/api/images/db/%'
+    `).catch(() => {});
+
     // Subscription plans table
     await this.pool.query(`
       CREATE TABLE IF NOT EXISTS subscription_plans (

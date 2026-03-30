@@ -468,9 +468,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.put("/api/admin/attractions/:id", requireAdmin, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
-    // Strip audioUrl fields — audio is managed via dedicated upload/TTS endpoints.
-    // If we allow the form to overwrite them with serve-URLs, audio gets corrupted.
-    const { audioUrlEn, audioUrlAl, audioUrlGr, audioUrlIt, audioUrlEs, audioUrlDe, audioUrlFr, audioUrlAr, audioUrlSl, audioUrlPt, audioUrlCn, ...safeBody } = req.body;
+    // Strip audioUrl and images fields — managed via dedicated endpoints only.
+    // Never allow PUT to overwrite gallery images with serve-URLs.
+    const { audioUrlEn, audioUrlAl, audioUrlGr, audioUrlIt, audioUrlEs, audioUrlDe, audioUrlFr, audioUrlAr, audioUrlSl, audioUrlPt, audioUrlCn, images: _imgA, ...safeBody } = req.body;
     const updated = await storage.updateAttraction(id, safeBody);
     if (!updated) return res.status(404).json({ error: "Not found" });
     res.json(stripAudioData(updated, 'attraction'));
@@ -760,8 +760,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.put("/api/admin/sites/:id", requireAdmin, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
-    // Strip audioUrl fields — audio managed via dedicated upload/TTS endpoints.
-    const { audioUrlEn, audioUrlAl, audioUrlGr, audioUrlIt, audioUrlEs, audioUrlDe, audioUrlFr, audioUrlAr, audioUrlSl, audioUrlPt, audioUrlCn, ...safeBody } = req.body;
+    // Strip audioUrl and images fields — managed via dedicated endpoints only.
+    // Never allow PUT to overwrite gallery images with serve-URLs.
+    const { audioUrlEn, audioUrlAl, audioUrlGr, audioUrlIt, audioUrlEs, audioUrlDe, audioUrlFr, audioUrlAr, audioUrlSl, audioUrlPt, audioUrlCn, images: _imgS, ...safeBody } = req.body;
     const updated = await storage.updateSite(id, safeBody);
     if (!updated) return res.status(404).json({ error: "Not found" });
     res.json(stripAudioData(updated, 'site'));
