@@ -17,6 +17,7 @@ import {
   MapPin, Globe, Music, Image, Info, ArrowLeft, Save,
   Upload, Play, Pause, Loader2, X, Link, CheckCircle2,
   LayoutList, Star, Route, FileText, Settings, Megaphone, Power, PowerOff,
+  Phone, Mail, ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -176,6 +177,93 @@ function BackendStatusBanner() {
 // Step 2: 6-digit OTP emailed to book@albanianeagletours.com — verified server-side
 const ADMIN_OTP_EMAIL = "book@albanianeagletours.com";
 
+// ─── Forgot Password modal ───────────────────────────────────────────────────
+function ForgotPasswordModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm bg-card rounded-2xl shadow-2xl border border-border p-6 space-y-5"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="font-bold text-base text-foreground">Account Recovery</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Contact via one of the recovery options below
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Recovery options */}
+        <div className="space-y-3">
+          {/* Primary email */}
+          <a
+            href="mailto:book@albanianeagletours.com?subject=AlbaTour%20Admin%20Password%20Recovery"
+            className="flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-muted/60 transition-colors group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <Mail size={15} className="text-primary" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-foreground">Primary email</p>
+              <p className="text-xs text-muted-foreground truncate">book@albanianeagletours.com</p>
+            </div>
+            <ExternalLink size={12} className="ml-auto text-muted-foreground/50 group-hover:text-muted-foreground shrink-0" />
+          </a>
+
+          {/* Phone (WhatsApp / call) */}
+          <a
+            href="https://wa.me/355682060901"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-muted/60 transition-colors group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
+              <Phone size={15} className="text-green-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-foreground">Phone / WhatsApp</p>
+              <p className="text-xs text-muted-foreground">+355 68 206 0901</p>
+            </div>
+            <ExternalLink size={12} className="ml-auto text-muted-foreground/50 group-hover:text-muted-foreground shrink-0" />
+          </a>
+
+          {/* Secondary email */}
+          <a
+            href="mailto:aneo.hila@gmail.com?subject=AlbaTour%20Admin%20Password%20Recovery"
+            className="flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-muted/60 transition-colors group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
+              <Mail size={15} className="text-blue-500" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-foreground">Secondary email</p>
+              <p className="text-xs text-muted-foreground">aneo.hila@gmail.com</p>
+            </div>
+            <ExternalLink size={12} className="ml-auto text-muted-foreground/50 group-hover:text-muted-foreground shrink-0" />
+          </a>
+        </div>
+
+        <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
+          Send a recovery request from any of the above. A new password will be issued within 24 hours.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function LoginView({ onLogin }: { onLogin: () => void }) {
   const [step, setStep] = useState<"password" | "otp">("password");
   const [password, setPassword] = useState("");
@@ -185,6 +273,7 @@ function LoginView({ onLogin }: { onLogin: () => void }) {
   const [loading, setLoading] = useState(false);
   const [otpSentAt, setOtpSentAt] = useState<number | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [showForgot, setShowForgot] = useState(false);
 
   // Countdown timer for resend cooldown
   useEffect(() => {
@@ -320,6 +409,15 @@ function LoginView({ onLogin }: { onLogin: () => void }) {
                 <Button type="submit" className="w-full" disabled={loading || !password}>
                   {loading ? "Sending verification…" : "Continue →"}
                 </Button>
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgot(true)}
+                    className="text-xs text-muted-foreground hover:text-primary transition-colors underline underline-offset-2"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
               </form>
             )}
 
@@ -373,6 +471,9 @@ function LoginView({ onLogin }: { onLogin: () => void }) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Forgot Password modal */}
+      {showForgot && <ForgotPasswordModal onClose={() => setShowForgot(false)} />}
     </div>
   );
 }
