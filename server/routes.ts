@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import { execFile, execFileSync } from "child_process";
 import { promisify } from "util";
+import { createHmac, randomBytes as cryptoRandomBytes } from "crypto";
 
 // Resolve ffmpeg binary: system PATH first, then ffmpeg-static npm package
 function resolveFfmpeg(): string {
@@ -1407,11 +1408,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // ── Subscription System ────────────────────────────────────────────────────────────
-  import('crypto').then(({ createHmac }) => {
-    // ── Shopify orders/paid webhook ────────────────────────────────────────────
-    // Receives orders/paid from Shopify, verifies HMAC, creates subscription.
-    // Set SHOPIFY_WEBHOOK_SECRET in Railway env vars.
-    app.post('/api/webhooks/shopify/orders-paid', async (req: any, res) => {
+  // ── Shopify orders/paid webhook ────────────────────────────────────────────
+  // Receives orders/paid from Shopify, verifies HMAC, creates subscription.
+  // Set SHOPIFY_WEBHOOK_SECRET in Railway env vars.
+  app.post('/api/webhooks/shopify/orders-paid', async (req: any, res) => {
       try {
         // HMAC verification
         const secret = process.env.SHOPIFY_WEBHOOK_SECRET || '';
@@ -1454,8 +1454,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         else expiresAt.setFullYear(expiresAt.getFullYear() + 1); // year (default)
 
         // Generate session token (crypto random, 32 bytes hex)
-        const { randomBytes } = await import('crypto');
-        const sessionToken = randomBytes(32).toString('hex');
+        const sessionToken = cryptoRandomBytes(32).toString('hex');
 
         const sub = await storage.createSubscription({
           email,
@@ -1479,7 +1478,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         console.error('[webhook] Error:', e.message);
         res.status(500).json({ error: e.message });
       }
-    });
   });
 
   // ── Activate subscription (post-checkout page calls this) ────────────────
@@ -1564,17 +1562,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!email || !planSlug) return res.status(400).json({ error: 'email and planSlug required' });
       const plan = await storage.getPlanBySlug(planSlug);
       if (!plan) return res.status(404).json({ error: 'Plan not found' });
-      const { randomBytes } = await import('crypto');
       const now = new Date();
       const expiresAt = new Date(now);
       expiresAt.setDate(expiresAt.getDate() + daysFromNow);
       const sub = await storage.createSubscription({
         email: email.toLowerCase(), planSlug, planName: plan.name,
-        shopifyOrderId: `TEST-${randomBytes(8).toString('hex')}`,
+        shopifyOrderId: `TEST-${cryptoRandomBytes(8).toString('hex')}`,
         priceEur: plan.priceEur, startsAt: now.toISOString(),
         expiresAt: expiresAt.toISOString(), isActive: true,
         deviceCount: 0, devices: '[]',
-        sessionToken: randomBytes(32).toString('hex'),
+        sessionToken: cryptoRandomBytes(32).toString('hex'),
         notes: 'TEST ACTIVATION', createdAt: now.toISOString(),
       });
       res.json({ success: true, sub });
