@@ -200,14 +200,22 @@ const imageUpload = multer({
 
 const AUDIO_LANGS = ['En','Al','Gr','It','Es','De','Fr','Ar','Sl'] as const;
 
-// Replace imageUrl data URI with a lightweight serve URL
-// Also replace gallery data URIs with serve URLs for efficient delivery
+// Strip large data URIs and replace with lightweight serve URLs.
+// KEY RULE: gallery[0] is always the hero image shown to visitors.
+// imageUrl is kept for legacy compatibility but gallery takes precedence.
 function stripImageData(obj: any, type: 'attraction'|'site'): any {
   if (!obj) return obj;
   const out = { ...obj };
+
+  // Replace imageUrl data URI with serve URL
   if (out.imageUrl && out.imageUrl.startsWith('data:')) {
     out.imageUrl = `${RAILWAY_BASE}/api/images/db/${type}/${obj.id}`;
   }
+  // Clear broken self-referencing imageUrl values
+  if (out.imageUrl && (out.imageUrl.includes('/api/images/db/') || out.imageUrl.includes('railway.app'))) {
+    out.imageUrl = null;
+  }
+
   // Replace gallery data URIs with serve URLs
   if (Array.isArray(out.images) && out.images.length > 0) {
     out.images = out.images.map((img: string, idx: number) =>
@@ -215,7 +223,12 @@ function stripImageData(obj: any, type: 'attraction'|'site'): any {
         ? `${RAILWAY_BASE}/api/images/db/${type}/${obj.id}/gallery/${idx}`
         : img
     );
+    // gallery[0] is always the canonical hero image
+    if (!out.imageUrl) {
+      out.imageUrl = out.images[0];
+    }
   }
+
   return out;
 }
 
@@ -348,7 +361,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       return res.send(buf);
     }
-    // Fallback: redirect to external URL
+    // If the stored value is a self-referencing serve URL or any railway URL, return 404
+    // (prevents infinite redirect loops when imageUrl wasn't set via file upload)
+    if (imageData.includes("/api/images/db/") || imageData.includes("railway.app")) {
+      return res.status(404).json({ error: "Image not found — please re-upload via gallery" });
+    }
+    // Redirect to external URL (e.g. Unsplash)
     res.redirect(imageData);
   });
 

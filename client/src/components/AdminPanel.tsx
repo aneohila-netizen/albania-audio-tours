@@ -1476,10 +1476,9 @@ function AttractionPreviewCard({ form, destinationName }: { form: any; destinati
 
 // ─── IMAGE UPLOAD CARD ────────────────────────────────────────────────────────
 // ─── ImageGalleryCard ──────────────────────────────────────────────
-// Handles hero image + multi-image gallery for destinations and attractions.
-// Hero image: uploaded immediately via /api/admin/{entity}/{id}/image
-// Gallery:    uploaded immediately via /api/admin/{entity}/{id}/gallery
-// Both are stored as base64 in PostgreSQL — survive redeployments.
+// Simplified: gallery images only. gallery[0] is the hero image.
+// Images are uploaded directly to the DB and served via /api/images/db/...
+// MEDIA SAFETY: deletion requires server-side x-confirm-delete: yes header.
 function ImageGalleryCard({
   entityType, entityId, imageUrl, images, onUpdate,
 }: {
@@ -1489,274 +1488,166 @@ function ImageGalleryCard({
   images: string[];
   onUpdate: (imageUrl: string, images: string[]) => void;
 }) {
-  const [mode, setMode]             = useState<"url" | "upload">("upload");
-  const [urlInput, setUrlInput]     = useState(imageUrl);
   const [uploading, setUploading]   = useState(false);
-  const [galleryUp, setGalleryUp]   = useState(false);
   const [error, setError]           = useState("");
   const [slideIdx, setSlideIdx]     = useState(0);
-  const heroRef                     = useRef<HTMLInputElement>(null);
-  const galleryRef                  = useRef<HTMLInputElement>(null);
+  const fileRef                     = useRef<HTMLInputElement>(null);
 
-  // All images for slideshow preview: hero first, then gallery
-  const allImages = [imageUrl, ...images].filter(Boolean);
+  // All gallery images — gallery[0] IS the hero
+  const allImages = images.filter(Boolean);
 
-  useEffect(() => { setUrlInput(imageUrl); }, [imageUrl]);
   useEffect(() => {
     if (slideIdx >= allImages.length && allImages.length > 0) setSlideIdx(allImages.length - 1);
   }, [allImages.length]);
 
-  // Auto-advance slideshow every 4 seconds when there are multiple images
+  // Auto-advance preview every 4 seconds
   useEffect(() => {
     if (allImages.length <= 1) return;
-    const timer = setInterval(() => {
-      setSlideIdx(i => (i + 1) % allImages.length);
-    }, 4000);
+    const timer = setInterval(() => setSlideIdx(i => (i + 1) % allImages.length), 4000);
     return () => clearInterval(timer);
   }, [allImages.length]);
 
-  // Upload hero image via /api/admin/{entity}/{id}/image
-  async function uploadHero(file: File) {
+  // Upload gallery image — saved immediately to DB
+  async function uploadImage(file: File) {
     if (!entityId) {
-      // Entity not saved yet — store as data URI, will be uploaded on save
-      const reader = new FileReader();
-      reader.onload = e => { onUpdate(e.target?.result as string, images); };
-      reader.readAsDataURL(file);
+      setError("Save the record first, then add images.");
       return;
     }
-    setError(""); setUploading(true);
+    setError("");
+    setUploading(true);
     try {
-      const fd = new FormData(); fd.append("image", file);
-      const res = await adminUpload(`/api/admin/${entityType}/${entityId}/image`, fd);
-      if (!res.ok) throw new Error("Upload failed");
-      const { url } = await res.json();
-      onUpdate(url, images);
-    } catch { setError("Hero image upload failed. Please try again."); }
-    setUploading(false);
-  }
-
-  // Upload gallery image via /api/admin/{entity}/{id}/gallery
-  async function uploadGallery(file: File) {
-    if (!entityId) { setError("Save the destination first before adding gallery images."); return; }
-    setError(""); setGalleryUp(true);
-    try {
-      const fd = new FormData(); fd.append("image", file);
+      const fd = new FormData();
+      fd.append("image", file);
       const res = await adminUpload(`/api/admin/${entityType}/${entityId}/gallery`, fd);
       if (!res.ok) throw new Error("Upload failed");
       const data = await res.json();
-      // Use serve URLs from response (not data URIs)
       const updated: string[] = data.images || [];
-      onUpdate(imageUrl, updated);
-      setSlideIdx(allImages.length); // jump to new image
-    } catch { setError("Gallery upload failed. Please try again."); }
-    setGalleryUp(false);
+      // gallery[0] becomes the hero
+      onUpdate(updated[0] || "", updated);
+      setSlideIdx(updated.length - 1);
+    } catch {
+      setError("Upload failed. Please try again.");
+    }
+    setUploading(false);
   }
 
-  // Remove gallery image — REQUIRES x-confirm-delete header (admin data-safety rule)
-  async function removeGallery(idx: number) {
+  // Remove gallery image — HARDCODED: requires x-confirm-delete header (media safety rule)
+  async function removeImage(idx: number) {
     if (!entityId) return;
-    if (!window.confirm("Remove this gallery image? This cannot be undone.")) return;
+    if (!window.confirm(\`Remove image \${idx + 1}? This cannot be undone.\`)) return;
     try {
-      // x-confirm-delete: yes is HARDCODED here — required by server-side media protection
-      await adminFetch(`/api/admin/${entityType}/${entityId}/gallery/${idx}`, {
+      await adminFetch(\`/api/admin/\${entityType}/\${entityId}/gallery/\${idx}\`, {
         method: "DELETE",
-        headers: { "x-confirm-delete": "yes" },
+        headers: { "x-confirm-delete": "yes" }, // HARDCODED — never remove
       });
       const updated = images.filter((_, i) => i !== idx);
-      onUpdate(imageUrl, updated);
-      if (slideIdx > 0) setSlideIdx(s => Math.max(0, s - 1));
-    } catch { setError("Remove failed. Please try again."); }
-  }
-
-  function applyUrl() {
-    const val = urlInput.trim();
-    if (val && !val.startsWith("http") && !val.startsWith("data:")) {
-      setError("Please enter a valid URL starting with https://"); return;
+      onUpdate(updated[0] || "", updated);
+      setSlideIdx(s => Math.max(0, s - 1));
+    } catch {
+      setError("Remove failed. Please try again.");
     }
-    onUpdate(val, images);
-    setError("");
   }
 
   return (
     <Card className="border-border/60">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
-          <Image className="w-4 h-4 text-primary" /> Images & Gallery
+          <Image className="w-4 h-4 text-primary" /> Images
+          <span className="text-xs font-normal text-muted-foreground">
+            — first image is the hero · auto-slideshow for visitors
+          </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
 
         {/* Slideshow preview */}
-        {allImages.length > 0 && (
+        {allImages.length > 0 ? (
           <div className="relative rounded-xl overflow-hidden border border-border/60 bg-muted" style={{aspectRatio:"16/9"}}>
             <img
-              src={allImages[slideIdx] || allImages[0]}
-              alt={`Image ${slideIdx + 1}`}
+              src={allImages[slideIdx]}
+              alt={`Image \${slideIdx + 1}`}
               className="w-full h-full object-cover"
-              onError={e => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
+              onError={e => { (e.target as HTMLImageElement).style.opacity = "0.2"; }}
             />
-            {/* Navigation arrows */}
+            {/* Arrows */}
             {allImages.length > 1 && (
               <>
-                <button
-                  type="button"
+                <button type="button"
                   onClick={() => setSlideIdx(i => (i - 1 + allImages.length) % allImages.length)}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
-                  aria-label="Previous image"
-                >
-                  <ArrowLeft className="w-4 h-4" />
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center">
+                  <ArrowLeft className="w-3.5 h-3.5" />
                 </button>
-                <button
-                  type="button"
+                <button type="button"
                   onClick={() => setSlideIdx(i => (i + 1) % allImages.length)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
-                  aria-label="Next image"
-                >
-                  <ArrowLeft className="w-4 h-4 rotate-180" />
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center">
+                  <ArrowLeft className="w-3.5 h-3.5 rotate-180" />
                 </button>
-                {/* Dot indicators */}
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
-                  {allImages.map((_, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => setSlideIdx(i)}
-                      className={`w-2 h-2 rounded-full transition-all ${i === slideIdx ? "bg-white scale-125" : "bg-white/50"}`}
-                    />
-                  ))}
-                </div>
               </>
             )}
-            {/* Label badge */}
+            {/* Dots */}
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+              {allImages.map((_, i) => (
+                <button key={i} type="button" onClick={() => setSlideIdx(i)}
+                  className={\`rounded-full transition-all \${i === slideIdx ? "w-4 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/50"}\`} />
+              ))}
+            </div>
+            {/* Label */}
             <div className="absolute top-2 left-2">
               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-black/50 text-white">
-                {slideIdx === 0 ? "Hero" : `Gallery ${slideIdx}`} · {slideIdx + 1}/{allImages.length}
+                {slideIdx === 0 ? "Hero (first)" : \`Slide \${slideIdx + 1}\`} · \${slideIdx + 1}/\${allImages.length}
               </span>
             </div>
-            {/* Remove hero button */}
-            {slideIdx === 0 && imageUrl && (
-              <button
-                type="button"
-                onClick={() => onUpdate("", images)}
-                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-destructive text-white flex items-center justify-center"
-                aria-label="Remove hero image"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-            {/* Remove gallery image button */}
-            {slideIdx > 0 && (
-              <button
-                type="button"
-                onClick={() => removeGallery(slideIdx - 1)}
-                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-destructive text-white flex items-center justify-center"
-                aria-label="Remove this image"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
+            {/* Remove button */}
+            <button type="button" onClick={() => removeImage(slideIdx)}
+              className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-destructive text-white flex items-center justify-center">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <div className="rounded-xl border-2 border-dashed border-border/60 bg-muted/30 flex items-center justify-center text-muted-foreground text-xs"
+            style={{aspectRatio:"16/9"}}>
+            No images yet — upload below
           </div>
         )}
 
-        {/* Hero image section */}
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-            <Image className="w-3.5 h-3.5 text-primary" /> Hero Image
-            <span className="text-muted-foreground font-normal">(shown on destination card)</span>
-          </p>
-          <div className="flex gap-1 rounded-lg border border-border p-1 w-fit">
-            <button type="button" onClick={() => setMode("upload")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${mode === "upload" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-              <Upload className="w-3 h-3" /> Upload File
-            </button>
-            <button type="button" onClick={() => setMode("url")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${mode === "url" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-              <Link className="w-3 h-3" /> Paste URL
-            </button>
-          </div>
-
-          {mode === "upload" && (
-            <div
-              className="relative border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all border-border/60 hover:border-primary/40 hover:bg-primary/5"
-              onClick={() => heroRef.current?.click()}
-            >
-              {uploading ? (
-                <div className="flex flex-col items-center gap-1.5">
-                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                  <p className="text-xs text-muted-foreground">Uploading hero image…</p>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-1.5">
-                  <Upload className="w-6 h-6 text-primary/60" />
-                  <p className="text-xs font-medium">Click to upload hero image</p>
-                  <p className="text-xs text-muted-foreground/70">JPG, PNG, WebP · Saved immediately to DB</p>
-                </div>
-              )}
-              <input ref={heroRef} type="file" accept="image/*" className="hidden"
-                onChange={e => { const f = e.target.files?.[0]; if (f) uploadHero(f); e.target.value = ""; }} />
-            </div>
-          )}
-
-          {mode === "url" && (
-            <div className="flex gap-2">
-              <Input value={urlInput} onChange={e => setUrlInput(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") applyUrl(); }}
-                placeholder="https://images.unsplash.com/photo-xxx?w=800"
-                className="flex-1 text-sm" />
-              <Button type="button" size="sm" onClick={applyUrl} variant="secondary" className="shrink-0 gap-1.5 text-xs">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Apply
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {/* Gallery section */}
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-            <Plus className="w-3.5 h-3.5 text-primary" /> Gallery
-            <span className="text-muted-foreground font-normal">({images.length} images · shown as slideshow during audio tour)</span>
-          </p>
-
-          {/* Gallery thumbnail strip */}
-          {images.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {images.map((img, i) => (
-                <div key={i} className="relative shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-border/60 group cursor-pointer"
-                  onClick={() => setSlideIdx(i + 1)}>
-                  <img src={img} alt={`Gallery ${i + 1}`} className="w-full h-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={e => { e.stopPropagation(); removeGallery(i); }}
-                    className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
-                    aria-label="Remove"
-                  >
-                    <X className="w-4 h-4 text-white" />
-                  </button>
-                  <span className="absolute bottom-0.5 right-0.5 text-[9px] text-white bg-black/60 px-1 rounded">{i + 1}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div
-            className="border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all border-border/60 hover:border-primary/40 hover:bg-primary/5"
-            onClick={() => galleryRef.current?.click()}
-          >
-            {galleryUp ? (
-              <div className="flex items-center justify-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                <p className="text-xs text-muted-foreground">Adding to gallery…</p>
+        {/* Thumbnail strip */}
+        {allImages.length > 1 && (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {allImages.map((img, i) => (
+              <div key={i}
+                onClick={() => setSlideIdx(i)}
+                className={\`relative shrink-0 cursor-pointer rounded-lg overflow-hidden border-2 transition-all \${i === slideIdx ? "border-primary" : "border-transparent"}\`}
+                style={{width:56, height:56}}>
+                <img src={img} alt={\`\${i+1}\`} className="w-full h-full object-cover" />
+                {i === 0 && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-primary/80 text-[8px] text-white text-center font-bold py-0.5">HERO</div>
+                )}
               </div>
-            ) : (
-              <div className="flex items-center justify-center gap-2">
-                <Plus className="w-4 h-4 text-primary/60" />
-                <p className="text-xs font-medium">Add gallery image</p>
-                <p className="text-xs text-muted-foreground/70">(saved immediately)</p>
-              </div>
-            )}
-            <input ref={galleryRef} type="file" accept="image/*" className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) uploadGallery(f); e.target.value = ""; }} />
+            ))}
           </div>
+        )}
+
+        {/* Upload button */}
+        <div
+          className="border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all border-border/60 hover:border-primary/40 hover:bg-primary/5"
+          onClick={() => fileRef.current?.click()}
+        >
+          {uploading ? (
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              <p className="text-xs text-muted-foreground">Uploading…</p>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-2">
+              <Upload className="w-4 h-4 text-primary/60" />
+              <p className="text-xs font-medium">
+                {allImages.length === 0 ? "Upload first image (becomes hero)" : "Add another image"}
+              </p>
+              <p className="text-xs text-muted-foreground/70">— saved immediately</p>
+            </div>
+          )}
+          <input ref={fileRef} type="file" accept="image/*" className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f); e.target.value = ""; }} />
         </div>
 
         {error && (
@@ -1766,12 +1657,13 @@ function ImageGalleryCard({
         )}
 
         <p className="text-xs text-muted-foreground">
-          Images are stored permanently in the database and survive server restarts.
+          First image = hero card. All images cycle as slideshow for visitors. Stored permanently in DB.
         </p>
       </CardContent>
     </Card>
   );
 }
+
 
 // ─── SHARED FIELD WRAPPER ─────────────────────────────────────────────────────
 function Field({ label, required, error, children }: { label: string; required?: boolean; error?: string; children: React.ReactNode }) {

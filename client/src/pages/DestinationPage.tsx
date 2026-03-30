@@ -97,7 +97,6 @@ export default function DestinationPage() {
         imageUrl={dest.imageUrl}
         images={(dest as any).images || []}
         alt={name}
-        heightClass="h-64"
         interval={5000}
       >
         {/* Overlay: title, tagline, badges */}

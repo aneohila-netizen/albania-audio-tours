@@ -155,7 +155,6 @@ export default function AttractionDetailPage() {
           imageUrl={attraction.imageUrl}
           images={(attraction as any).images || []}
           alt={aName}
-          heightClass="h-64"
           interval={5000}
         />
       ) : (

@@ -18,7 +18,7 @@ interface GallerySlideshowProps {
   images?: string[];
   alt?: string;
   className?: string;
-  /** Height class, default h-64 */
+  /** Height class — if not set, uses 16:9 aspect ratio (industry standard) */
   heightClass?: string;
   /** Auto-advance interval in ms, default 5000 */
   interval?: number;
@@ -38,8 +38,12 @@ export default function GallerySlideshow({
   showControls = true,
   children,
 }: GallerySlideshowProps) {
-  // Combine hero + gallery, filter out empty strings
-  const allImages = [imageUrl, ...images].filter(Boolean) as string[];
+  // gallery[0] is always the hero. imageUrl is a fallback if gallery is empty.
+  // Priority: gallery images first, then imageUrl as last resort.
+  const galleryImages = images.filter(Boolean) as string[];
+  const allImages = galleryImages.length > 0
+    ? galleryImages
+    : [imageUrl].filter(Boolean) as string[];
   const [activeIdx, setActiveIdx] = useState(0);
   const [paused, setPaused] = useState(false);
 
@@ -78,10 +82,16 @@ export default function GallerySlideshow({
     setTimeout(() => setPaused(false), 8000);
   }, []);
 
+  // Use 16:9 aspect ratio (industry standard) unless caller forces a height class
+  const containerStyle = heightClass
+    ? undefined
+    : { aspectRatio: "16 / 9" };
+  const containerClass = `relative rounded-2xl overflow-hidden bg-muted ${heightClass || ""} ${className}`;
+
   if (allImages.length === 0) {
     // No images — render placeholder
     return (
-      <div className={`relative rounded-2xl overflow-hidden ${heightClass} bg-muted ${className}`}>
+      <div className={containerClass} style={containerStyle}>
         {children}
       </div>
     );
@@ -89,7 +99,8 @@ export default function GallerySlideshow({
 
   return (
     <div
-      className={`relative rounded-2xl overflow-hidden ${heightClass} bg-muted ${className}`}
+      className={containerClass}
+      style={containerStyle}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
