@@ -1456,6 +1456,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         // Generate session token (crypto random, 32 bytes hex)
         const sessionToken = cryptoRandomBytes(32).toString('hex');
 
+        // Generate short human-readable access code: ALB-XXXX (4 uppercase alphanumeric chars)
+        const codeChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I ambiguity
+        const accessCode = 'ALB-' + Array.from({ length: 4 }, () =>
+          codeChars[Math.floor(Math.random() * codeChars.length)]
+        ).join('');
+
+        // Read device limit from plan (with fallback)
+        const deviceLimit = (matchedPlan as any).deviceLimit || 2;
+
         const sub = await storage.createSubscription({
           email,
           planSlug: matchedPlan.slug,
@@ -1470,9 +1479,78 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           sessionToken,
           notes: '',
           createdAt: now.toISOString(),
-        });
+          ...(({ deviceLimit, accessCode } as any)),
+        } as any);
 
-        console.log(`[webhook] Subscription created: ${email} → ${matchedPlan.name} expires ${expiresAt.toISOString()}`);
+        console.log(`[webhook] Subscription created: ${email} → ${matchedPlan.name} code=${accessCode} expires ${expiresAt.toISOString()}`);
+
+        // ── Send activation email via Resend ──────────────────────────────────
+        const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+        const RESEND_FROM_ADDR = process.env.RESEND_FROM || 'noreply@albanianeagletours.com';
+        if (RESEND_API_KEY && email) {
+          const activateUrl = `https://albania-audio-tours-production.up.railway.app/#/activate?order_id=${orderId}&email=${encodeURIComponent(email)}`;
+          const expiryStr = expiresAt.toLocaleDateString ? expiresAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : expiresAt.toISOString().slice(0,10);
+          // QR code image via Google Charts API (no dependency needed)
+          const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(activateUrl)}`;
+
+          const emailHtml = `
+<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px;background:#fff;">
+  <div style="text-align:center;margin-bottom:24px;">
+    <img src="https://albania-audio-tours-production.up.railway.app/icon-192.png" width="56" height="56" style="border-radius:12px;" alt="AlbaTour" />
+    <h1 style="color:#c0392b;font-size:22px;margin:12px 0 4px;">Your AlbaTour is ready!</h1>
+    <p style="color:#555;font-size:14px;margin:0;">Thank you for subscribing — here's how to activate on your device.</p>
+  </div>
+
+  <div style="background:#fafafa;border-radius:12px;padding:20px;margin-bottom:20px;border:1px solid #eee;">
+    <p style="margin:0 0 4px;font-size:12px;color:#888;text-transform:uppercase;letter-spacing:.06em;">Plan</p>
+    <p style="margin:0 0 16px;font-size:16px;font-weight:700;color:#1a1a1a;">${matchedPlan.name}</p>
+    <p style="margin:0 0 4px;font-size:12px;color:#888;text-transform:uppercase;letter-spacing:.06em;">Access Until</p>
+    <p style="margin:0 0 16px;font-size:16px;font-weight:700;color:#1a1a1a;">${expiryStr}</p>
+    <p style="margin:0 0 4px;font-size:12px;color:#888;text-transform:uppercase;letter-spacing:.06em;">Devices Allowed</p>
+    <p style="margin:0;font-size:16px;font-weight:700;color:#1a1a1a;">${deviceLimit} device${deviceLimit > 1 ? 's' : ''}</p>
+  </div>
+
+  <!-- Primary CTA: big button -->
+  <div style="text-align:center;margin-bottom:24px;">
+    <a href="${activateUrl}" style="display:inline-block;background:#c0392b;color:#fff;padding:14px 32px;border-radius:10px;font-weight:700;text-decoration:none;font-size:16px;">Tap to Activate Now</a>
+  </div>
+
+  <!-- Access Code -->
+  <div style="background:#fff8f0;border:2px dashed #f39c12;border-radius:12px;padding:20px;text-align:center;margin-bottom:24px;">
+    <p style="margin:0 0 8px;font-size:13px;color:#92400e;font-weight:600;">Your Access Code</p>
+    <p style="margin:0 0 4px;font-size:36px;font-weight:900;letter-spacing:.2em;color:#1a1a1a;font-family:monospace;">${accessCode}</p>
+    <p style="margin:8px 0 0;font-size:12px;color:#92400e;">Enter this code on any device at <strong>albaniaaudiotours.com/#/activate</strong></p>
+    ${deviceLimit > 1 ? `<p style="margin:6px 0 0;font-size:12px;color:#92400e;">Share this code with up to ${deviceLimit - 1} travel companion${deviceLimit > 2 ? 's' : ''} in your group.</p>` : ''}
+  </div>
+
+  <!-- QR Code -->
+  <div style="text-align:center;margin-bottom:24px;">
+    <p style="font-size:13px;color:#555;margin-bottom:12px;">Or scan this QR code with any device:</p>
+    <img src="${qrUrl}" width="160" height="160" alt="Activation QR Code" style="border-radius:8px;border:3px solid #eee;" />
+    <p style="font-size:11px;color:#aaa;margin-top:8px;">Screenshot and share with travel companions</p>
+  </div>
+
+  <div style="border-top:1px solid #eee;padding-top:16px;">
+    <p style="font-size:12px;color:#999;text-align:center;margin:0;">
+      Purchased by ${email} · Order #${orderId}<br/>
+      Questions? Email <a href="mailto:book@albanianeagletours.com" style="color:#c0392b;">book@albanianeagletours.com</a>
+    </p>
+  </div>
+</body></html>`;
+
+          await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              from: `AlbaTour <${RESEND_FROM_ADDR}>`,
+              to: [email],
+              subject: `Your AlbaTour Access Code: ${accessCode}`,
+              html: emailHtml,
+              text: `Your AlbaTour subscription is active!\n\nPlan: ${matchedPlan.name}\nAccess until: ${expiryStr}\nDevices: ${deviceLimit}\n\nAccess Code: ${accessCode}\n\nActivate at: ${activateUrl}\n\nOr visit albaniaaudiotours.com/#/activate and enter your code.`,
+            }),
+          }).catch(e => console.error('[webhook] Activation email failed:', e.message));
+        }
+
         res.status(200).json({ ok: true, subscriptionId: sub.id });
       } catch (e: any) {
         console.error('[webhook] Error:', e.message);
@@ -1495,14 +1573,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const now = new Date().toISOString();
       if (sub.expiresAt < now) return res.status(403).json({ error: 'Subscription has expired.' });
 
-      // Register device (max 2)
+      // Register device — limit from plan (defaults to 2 if not set)
+      const deviceLimit = (sub as any).deviceLimit || 2;
       const deviceFingerprint = req.headers['x-device-id'] as string || req.ip || 'unknown';
       const devices: string[] = JSON.parse(sub.devices || '[]');
       if (!devices.includes(deviceFingerprint)) {
-        if (devices.length >= 2) {
+        if (devices.length >= deviceLimit) {
           return res.status(403).json({
-            error: 'Device limit reached. This subscription allows 2 devices. Manage your devices at /subscriptions.',
-            code: 'DEVICE_LIMIT'
+            error: `Device limit reached. This subscription allows ${deviceLimit} device${deviceLimit > 1 ? 's' : ''}. Contact support to manage devices.`,
+            code: 'DEVICE_LIMIT',
+            deviceLimit,
           });
         }
         devices.push(deviceFingerprint);
@@ -1517,6 +1597,49 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         planSlug: sub.planSlug,
         expiresAt: sub.expiresAt,
         deviceCount: devices.length,
+        deviceLimit,
+        accessCode: (sub as any).accessCode || '',
+      });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Activate by access code (family / shared code flow) ────────────────────
+  app.post('/api/subscription/activate-by-code', async (req, res) => {
+    try {
+      const { code } = req.body as { code: string };
+      if (!code) return res.status(400).json({ error: 'Access code required' });
+
+      const sub = await storage.getSubscriptionByCode(code.trim().toUpperCase());
+      if (!sub) return res.status(404).json({ error: 'Access code not found. Check the code and try again.' });
+      if (!sub.isActive) return res.status(403).json({ error: 'This subscription has been revoked.' });
+      const now = new Date().toISOString();
+      if (sub.expiresAt < now) return res.status(403).json({ error: 'This subscription has expired.' });
+
+      const deviceLimit = (sub as any).deviceLimit || 2;
+      const deviceFingerprint = req.headers['x-device-id'] as string || req.ip || 'unknown';
+      const devices: string[] = JSON.parse(sub.devices || '[]');
+
+      if (!devices.includes(deviceFingerprint)) {
+        if (devices.length >= deviceLimit) {
+          return res.status(403).json({
+            error: `All ${deviceLimit} device slot${deviceLimit > 1 ? 's' : ''} are used. Contact support to reset.`,
+            code: 'DEVICE_LIMIT',
+            deviceLimit,
+          });
+        }
+        devices.push(deviceFingerprint);
+        await storage.updateSubscription(sub.id, { devices: JSON.stringify(devices), deviceCount: devices.length });
+      }
+
+      res.json({
+        ok: true,
+        token: sub.sessionToken,
+        email: sub.email,
+        planName: sub.planName,
+        planSlug: sub.planSlug,
+        expiresAt: sub.expiresAt,
+        deviceCount: devices.length,
+        deviceLimit,
       });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });

@@ -206,6 +206,7 @@ export const subscriptionPlans = pgTable("subscription_plans", {
   isPopular:     boolean("is_popular").notNull().default(false),
   isActive:      boolean("is_active").notNull().default(true),
   sortOrder:     integer("sort_order").notNull().default(0),
+  deviceLimit:   integer("device_limit").notNull().default(2), // max devices per subscription
   shopifyVariantId: text("shopify_variant_id").default(""), // Shopify product variant ID for Buy Button
   shopifyCheckoutUrl: text("shopify_checkout_url").default(""), // Direct checkout URL
   ctaLabel:      text("cta_label").notNull().default("Get Started"),
@@ -243,8 +244,10 @@ export const userSubscriptions = pgTable("user_subscriptions", {
   expiresAt:    text("expires_at").notNull(),  // ISO date — checked on every audio request
   isActive:     boolean("is_active").notNull().default(true),  // admin can revoke
   deviceCount:  integer("device_count").notNull().default(0),
-  devices:      text("devices").notNull().default("[]"), // JSON array of device fingerprints (max 2)
-  sessionToken: text("session_token").default(""),  // opaque token issued to client
+  deviceLimit:  integer("device_limit").notNull().default(2),  // copied from plan at purchase time
+  devices:      text("devices").notNull().default("[]"), // JSON array of device fingerprints
+  sessionToken: text("session_token").default(""),  // opaque token issued to first activating device
+  accessCode:   text("access_code").default(""),    // short human-readable code e.g. ALB-7X2K
   notes:        text("notes").default(""),
   createdAt:    text("created_at").notNull(),
 });

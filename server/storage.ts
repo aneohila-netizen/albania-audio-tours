@@ -57,6 +57,7 @@ export interface IStorage {
   createSubscription(data: InsertUserSubscription): Promise<UserSubscription>;
   getSubscriptionByOrderId(orderId: string): Promise<UserSubscription | undefined>;
   getSubscriptionByToken(token: string): Promise<UserSubscription | undefined>;
+  getSubscriptionByCode(code: string): Promise<UserSubscription | undefined>;
   getActiveSubscriptionByEmail(email: string): Promise<UserSubscription | undefined>;
   getAllSubscriptions(): Promise<UserSubscription[]>;
   updateSubscription(id: number, data: Partial<InsertUserSubscription>): Promise<UserSubscription | undefined>;
@@ -918,21 +919,35 @@ class PgStorage implements IStorage {
       id: r.id, email: r.email, planSlug: r.plan_slug, planName: r.plan_name,
       shopifyOrderId: r.shopify_order_id, priceEur: parseFloat(r.price_eur)||0,
       startsAt: r.starts_at, expiresAt: r.expires_at, isActive: r.is_active,
-      deviceCount: r.device_count||0, devices: r.devices||'[]',
-      sessionToken: r.session_token||'', notes: r.notes||'', createdAt: r.created_at,
+      deviceCount: r.device_count||0, deviceLimit: r.device_limit||2,
+      devices: r.devices||'[]', sessionToken: r.session_token||'',
+      accessCode: r.access_code||'', notes: r.notes||'', createdAt: r.created_at,
     };
   }
   async createSubscription(data: InsertUserSubscription): Promise<UserSubscription> {
     await this.ready;
+    // Run DB migrations for new columns (idempotent)
+    await this.pool.query(`ALTER TABLE user_subscriptions ADD COLUMN IF NOT EXISTS device_limit integer NOT NULL DEFAULT 2`).catch(()=>{});
+    await this.pool.query(`ALTER TABLE user_subscriptions ADD COLUMN IF NOT EXISTS access_code text DEFAULT ''`).catch(()=>{});
+    await this.pool.query(`ALTER TABLE subscription_plans ADD COLUMN IF NOT EXISTS device_limit integer NOT NULL DEFAULT 2`).catch(()=>{});
     const { rows } = await this.pool.query(
       `INSERT INTO user_subscriptions (email,plan_slug,plan_name,shopify_order_id,price_eur,
-        starts_at,expires_at,is_active,device_count,devices,session_token,notes,created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+        starts_at,expires_at,is_active,device_count,device_limit,devices,session_token,access_code,notes,created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
       [data.email, data.planSlug, data.planName, data.shopifyOrderId, data.priceEur||0,
        data.startsAt, data.expiresAt, data.isActive??true, data.deviceCount||0,
-       data.devices||'[]', data.sessionToken||'', data.notes||'', data.createdAt]
+       (data as any).deviceLimit||2, data.devices||'[]', data.sessionToken||'',
+       (data as any).accessCode||'', data.notes||'', data.createdAt]
     );
     return this.rowToSub(rows[0]);
+  }
+  async getSubscriptionByCode(code: string): Promise<UserSubscription | undefined> {
+    await this.ready;
+    if (!code) return undefined;
+    const { rows } = await this.pool.query(
+      'SELECT * FROM user_subscriptions WHERE UPPER(access_code)=UPPER($1)', [code.trim()]
+    );
+    return rows[0] ? this.rowToSub(rows[0]) : undefined;
   }
   async getSubscriptionByOrderId(orderId: string): Promise<UserSubscription | undefined> {
     await this.ready;
@@ -1308,6 +1323,7 @@ export class MemStorage implements IStorage {
   }
   async getSubscriptionByOrderId(id: string) { return this._subs.find(s => s.shopifyOrderId === id); }
   async getSubscriptionByToken(token: string) { return this._subs.find(s => s.sessionToken === token); }
+  async getSubscriptionByCode(code: string) { return this._subs.find(s => s.accessCode?.toUpperCase() === code?.toUpperCase().trim()); }
   async getActiveSubscriptionByEmail(email: string) {
     const now = new Date().toISOString();
     return this._subs.find(s => s.email === email.toLowerCase() && s.isActive && s.expiresAt > now);

@@ -39,7 +39,8 @@ interface Subscriber {
   id: number; email: string; planSlug: string; planName: string;
   shopifyOrderId: string; priceEur: number;
   startsAt: string; expiresAt: string;
-  isActive: boolean; deviceCount: number; notes: string; createdAt: string;
+  isActive: boolean; deviceCount: number; deviceLimit: number;
+  accessCode: string; notes: string; createdAt: string;
 }
 
 type SubView = "plans" | "edit" | "new" | "leads" | "subscribers" | "test";
@@ -727,8 +728,13 @@ export default function AdminSubscriptions() {
                       {sub.notes?.includes("TEST") && <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700">Test</span>}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {isLive ? `Expires: ${expDate}` : `Expired: ${expDate}`} · {sub.deviceCount} device(s) · €{sub.priceEur}
+                      {isLive ? `Expires: ${expDate}` : `Expired: ${expDate}`} · {sub.deviceCount}/{sub.deviceLimit || 2} devices · €{sub.priceEur}
                     </p>
+                    {sub.accessCode && (
+                      <p className="text-xs font-mono font-bold tracking-widest text-amber-700 mt-0.5 flex items-center gap-1">
+                        🔑 {sub.accessCode}
+                      </p>
+                    )}
                     <p className="text-xs font-mono text-muted-foreground opacity-60">{sub.shopifyOrderId}</p>
                   </div>
                   {isLive && (
