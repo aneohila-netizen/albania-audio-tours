@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { getAdminToken } from "@/lib/adminAuth";
 
-const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
+const RAILWAY_URL = "https://albaniaaudiotours.com";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface CmsPage {

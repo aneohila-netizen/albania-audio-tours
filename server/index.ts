@@ -30,6 +30,8 @@ app.use(cors({
   origin: [
     "https://www.perplexity.ai",
     "https://albania-audio-tours-production.up.railway.app",
+    "https://albaniaaudiotours.com",
+    "https://www.albaniaaudiotours.com",
     "https://albanianaudiotours.com",
     "https://audiotours.albanianeagletours.com",
     /\.perplexity\.ai$/,

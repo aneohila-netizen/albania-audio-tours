@@ -8,7 +8,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Check, Zap, Building2, Star, ArrowRight, Mail, X, AlertCircle } from "lucide-react";
 
-const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
+const RAILWAY_URL = "https://albaniaaudiotours.com";
 
 interface Plan {
   id: number;

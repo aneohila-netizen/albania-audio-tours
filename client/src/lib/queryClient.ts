@@ -1,6 +1,8 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-export const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
+// APP_URL: use custom domain in production, Railway URL as fallback
+export const RAILWAY_URL = "https://albaniaaudiotours.com";
+export const RAILWAY_URL_FALLBACK = "https://albania-audio-tours-production.up.railway.app";
 // Always use Railway URL directly — this frontend is statically hosted and always
 // calls the Railway backend regardless of where it's served from.
 const API_BASE = RAILWAY_URL;

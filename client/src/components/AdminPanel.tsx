@@ -113,7 +113,7 @@ type View =
   | { screen: "attr-editor"; attractionId: number | null; destinationSlug: string; destinationName: string };
 
 // ─── Admin fetch helper ────────────────────────────────────────────────────────
-const RAILWAY_API = "https://albania-audio-tours-production.up.railway.app";
+const RAILWAY_API = "https://albaniaaudiotours.com";
 
 function adminFetch(url: string, options?: RequestInit) {
   const token = getAdminToken() || "";
@@ -1348,7 +1348,7 @@ function AudioCard({
 
 // ─── PREVIEW CARDS ───────────────────────────────────────────────────────────
 function DestinationPreviewCard({ form }: { form: any }) {
-  const RAILWAY_BASE = "https://albania-audio-tours-production.up.railway.app";
+  const RAILWAY_BASE = "https://albaniaaudiotours.com";
   const frontendUrl = `${RAILWAY_BASE}/#/sites/${form.slug}`;
   const catColor = CATEGORY_COLORS[form.category] || "bg-gray-100 text-gray-800";
   return (
@@ -1420,7 +1420,7 @@ function DestinationPreviewCard({ form }: { form: any }) {
 }
 
 function AttractionPreviewCard({ form, destinationName }: { form: any; destinationName: string }) {
-  const RAILWAY_BASE = "https://albania-audio-tours-production.up.railway.app";
+  const RAILWAY_BASE = "https://albaniaaudiotours.com";
   const frontendUrl = `${RAILWAY_BASE}/#/attraction/${form.slug}`;
   const catColor = CATEGORY_COLORS[form.category] || "bg-gray-100 text-gray-800";
   return (

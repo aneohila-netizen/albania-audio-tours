@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useSubscription } from "@/lib/subscriptionContext";
 
-const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
+const RAILWAY_URL = "https://albaniaaudiotours.com";
 
 function getDeviceId(): string {
   const key = "alb_dev_id";

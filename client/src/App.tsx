@@ -90,7 +90,7 @@ function AppProviders({ children }: { children: React.ReactNode }) {
 }
 
 // ─── Dynamic footer — merges fixed links with CMS pages marked showInFooter ─
-const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
+const RAILWAY_URL = "https://albaniaaudiotours.com";
 
 interface CmsFooterPage { id: number; slug: string; title: string; }
 

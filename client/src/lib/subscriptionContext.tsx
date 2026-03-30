@@ -6,7 +6,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 
-const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
+const RAILWAY_URL = "https://albaniaaudiotours.com";
 const TOKEN_KEY = "alb_sub_token";
 
 export interface SubStatus {

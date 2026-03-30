@@ -127,7 +127,7 @@ function incrementListenCount(siteId: number) {
 const RAILWAY_BASE = process.env.RAILWAY_PUBLIC_DOMAIN
   ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
   : process.env.PUBLIC_URL
-  || "https://albania-audio-tours-production.up.railway.app";
+  || "https://albaniaaudiotours.com";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "AlbaTour2026!";
@@ -1287,7 +1287,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       resetStore.set(token, { email: recipientEmail, expires });
 
       // Build reset URL
-      const BASE_URL = process.env.APP_URL || "https://albania-audio-tours-production.up.railway.app";
+      const BASE_URL = process.env.APP_URL || "https://albaniaaudiotours.com";
       const resetUrl = `${BASE_URL}/#/reset-password?token=${token}`;
 
       // Send via Resend
@@ -1502,13 +1502,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
         const RESEND_FROM_ADDR = process.env.RESEND_FROM || 'noreply@albanianeagletours.com';
         if (RESEND_API_KEY && email) {
-          const activateUrl = `https://albania-audio-tours-production.up.railway.app/#/activate?order_id=${orderId}&email=${encodeURIComponent(email)}`;
+          const activateUrl = `https://albaniaaudiotours.com/#/activate?order_id=${orderId}&email=${encodeURIComponent(email)}`;
           const expiryStr = expiresAt.toLocaleDateString
             ? expiresAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
             : expiresAt.toISOString().slice(0,10);
 
           // QR served from Railway — avoids Gmail's block on data: URIs and external image services
-          const qrEndpointUrl = `https://albania-audio-tours-production.up.railway.app/api/qr?data=${encodeURIComponent(activateUrl)}`;
+          const qrEndpointUrl = `https://albaniaaudiotours.com/api/qr?data=${encodeURIComponent(activateUrl)}`;
           const qrImgTag = `<img src="${qrEndpointUrl}" width="180" height="180" alt="Scan to activate" style="border-radius:8px;border:4px solid #c0392b;display:block;margin:0 auto;" />`;
 
           const deviceNote = deviceLimit > 1
@@ -1768,10 +1768,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const deviceLimit = (sub as any).deviceLimit || 2;
       const expiresAt = new Date(sub.expiresAt);
       const expiryStr = expiresAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-      const activateUrl = `https://albania-audio-tours-production.up.railway.app/#/activate?order_id=${orderId}&email=${encodeURIComponent(email)}`;
+      const activateUrl = `https://albaniaaudiotours.com/#/activate?order_id=${orderId}&email=${encodeURIComponent(email)}`;
 
       // QR served from Railway — works in all email clients including Gmail
-      const qrEndpointUrl = `https://albania-audio-tours-production.up.railway.app/api/qr?data=${encodeURIComponent(activateUrl)}`;
+      const qrEndpointUrl = `https://albaniaaudiotours.com/api/qr?data=${encodeURIComponent(activateUrl)}`;
       const qrImgTag = `<img src="${qrEndpointUrl}" width="180" height="180" alt="Scan to activate" style="border-radius:8px;border:4px solid #c0392b;display:block;margin:0 auto;" />`;
       const deviceNote = deviceLimit > 1
         ? `Share this code with up to <strong>${deviceLimit - 1}</strong> travel companion${deviceLimit > 2 ? 's' : ''} — each opens the app and enters the same code.`

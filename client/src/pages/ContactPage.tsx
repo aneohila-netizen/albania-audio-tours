@@ -5,7 +5,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Mail, Phone, MapPin, MessageCircle } from "lucide-react";
 
-const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
+const RAILWAY_URL = "https://albaniaaudiotours.com";
 
 function HardcodedContact() {
   return (
