@@ -303,6 +303,9 @@ class PgStorage implements IStorage {
       "ALTER TABLE attractions ADD COLUMN IF NOT EXISTS audio_url_cn TEXT",
       "ALTER TABLE attractions ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT FALSE",
       "ALTER TABLE attractions ADD COLUMN IF NOT EXISTS shopify_url TEXT",
+      // Gallery images (JSON array of URLs)
+      "ALTER TABLE tour_sites ADD COLUMN IF NOT EXISTS images TEXT",
+      "ALTER TABLE attractions ADD COLUMN IF NOT EXISTS images TEXT",
     ];
     for (const sql of newLangCols) {
       await this.pool.query(sql).catch(() => {}); // ignore if already exists
@@ -486,7 +489,9 @@ class PgStorage implements IStorage {
       audioUrlFr: r.audio_url_fr||null, audioUrlAr: r.audio_url_ar||null, audioUrlSl: r.audio_url_sl||null, audioUrlPt: r.audio_url_pt||null, audioUrlCn: r.audio_url_cn||null,
       lat: parseFloat(r.lat), lng: parseFloat(r.lng),
       region: r.region, category: r.category, difficulty: r.difficulty,
-      points: r.points, imageUrl: r.image_url, visitDuration: r.visit_duration,
+      points: r.points, imageUrl: r.image_url,
+      images: r.images ? JSON.parse(r.images) : [],
+      visitDuration: r.visit_duration,
       isLocked: r.is_locked||false, shopifyUrl: r.shopify_url||null,
     } as any;
   }
@@ -510,7 +515,9 @@ class PgStorage implements IStorage {
       audioUrlFr: r.audio_url_fr||null, audioUrlAr: r.audio_url_ar||null, audioUrlSl: r.audio_url_sl||null, audioUrlPt: r.audio_url_pt||null, audioUrlCn: r.audio_url_cn||null,
       category: r.category, points: r.points,
       lat: parseFloat(r.lat), lng: parseFloat(r.lng),
-      imageUrl: r.image_url, visitDuration: r.visit_duration,
+      imageUrl: r.image_url,
+      images: r.images ? JSON.parse(r.images) : [],
+      visitDuration: r.visit_duration,
       isLocked: r.is_locked ?? false, shopifyUrl: r.shopify_url || null,
     } as any;
   }
@@ -570,6 +577,11 @@ class PgStorage implements IStorage {
     };
     for (const [key, col] of Object.entries(map)) {
       if (key in data) { fields.push(`${col}=$${i++}`); values.push((data as any)[key]); }
+    }
+    // images gallery: stored as JSON string
+    if ('images' in data) {
+      fields.push(`images=$${i++}`);
+      values.push(JSON.stringify((data as any).images || []));
     }
     if (!fields.length) return this.getSiteById(id);
     values.push(id);
@@ -653,6 +665,11 @@ class PgStorage implements IStorage {
     };
     for (const [key, col] of Object.entries(map)) {
       if (key in data) { fields.push(`${col}=$${i++}`); values.push((data as any)[key]); }
+    }
+    // images gallery: stored as JSON string
+    if ('images' in data) {
+      fields.push(`images=$${i++}`);
+      values.push(JSON.stringify((data as any).images || []));
     }
     if (!fields.length) return this.getAttractionById(id);
     values.push(id);

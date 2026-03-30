@@ -773,6 +773,61 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   );
 
+  // ── Admin: Gallery image add/remove for sites and attractions ─────────────────────
+  // POST /api/admin/sites/:id/gallery  — add an image to the gallery
+  app.post("/api/admin/sites/:id/gallery", requireAdmin, imageUpload.single("image"), async (req: any, res) => {
+    const id = parseInt(req.params.id);
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const mime = req.file.mimetype || "image/jpeg";
+    const b64 = (req.file.buffer ?? fs.readFileSync(req.file.path)).toString("base64");
+    const dataUri = `data:${mime};base64,${b64}`;
+    if (req.file.path) try { fs.unlinkSync(req.file.path); } catch (_) {}
+    const site = await storage.getSiteById(id);
+    if (!site) return res.status(404).json({ error: "Site not found" });
+    const existing: string[] = (site as any).images || [];
+    const updated = await storage.updateSite(id, { images: [...existing, dataUri] } as any);
+    res.json({ images: (updated as any)?.images || [] });
+  });
+
+  // DELETE /api/admin/sites/:id/gallery/:index — remove image at index
+  app.delete("/api/admin/sites/:id/gallery/:index", requireAdmin, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const idx = parseInt(req.params.index);
+    const site = await storage.getSiteById(id);
+    if (!site) return res.status(404).json({ error: "Site not found" });
+    const existing: string[] = [...((site as any).images || [])];
+    existing.splice(idx, 1);
+    const updated = await storage.updateSite(id, { images: existing } as any);
+    res.json({ images: (updated as any)?.images || [] });
+  });
+
+  // POST /api/admin/attractions/:id/gallery  — add an image to the gallery
+  app.post("/api/admin/attractions/:id/gallery", requireAdmin, imageUpload.single("image"), async (req: any, res) => {
+    const id = parseInt(req.params.id);
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const mime = req.file.mimetype || "image/jpeg";
+    const b64 = (req.file.buffer ?? fs.readFileSync(req.file.path)).toString("base64");
+    const dataUri = `data:${mime};base64,${b64}`;
+    if (req.file.path) try { fs.unlinkSync(req.file.path); } catch (_) {}
+    const attr = await storage.getAttractionById(id);
+    if (!attr) return res.status(404).json({ error: "Attraction not found" });
+    const existing: string[] = (attr as any).images || [];
+    const updated = await storage.updateAttraction(id, { images: [...existing, dataUri] } as any);
+    res.json({ images: (updated as any)?.images || [] });
+  });
+
+  // DELETE /api/admin/attractions/:id/gallery/:index — remove image at index
+  app.delete("/api/admin/attractions/:id/gallery/:index", requireAdmin, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const idx = parseInt(req.params.index);
+    const attr = await storage.getAttractionById(id);
+    if (!attr) return res.status(404).json({ error: "Attraction not found" });
+    const existing: string[] = [...((attr as any).images || [])];
+    existing.splice(idx, 1);
+    const updated = await storage.updateAttraction(id, { images: existing } as any);
+    res.json({ images: (updated as any)?.images || [] });
+  });
+
   // POST /api/admin/upload-image — generic image upload (returns data URI for immediate use)
   app.post(
     "/api/admin/upload-image",

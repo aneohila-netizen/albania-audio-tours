@@ -45,6 +45,7 @@ export const tourSites = pgTable("tour_sites", {
   difficulty: text("difficulty").notNull(),
   points: integer("points").notNull().default(100),
   imageUrl: text("image_url"),
+  images: text("images"), // JSON array of image URLs for gallery/slideshow
   visitDuration: integer("visit_duration").notNull().default(60),
   isLocked: boolean("is_locked").notNull().default(false),
   shopifyUrl: text("shopify_url"),
@@ -115,6 +116,7 @@ export const attractions = pgTable("attractions", {
   lat: real("lat").notNull().default(0),
   lng: real("lng").notNull().default(0),
   imageUrl: text("image_url"),
+  images: text("images"), // JSON array of image URLs for gallery/slideshow
   visitDuration: integer("visit_duration").notNull().default(30),
 });
 
