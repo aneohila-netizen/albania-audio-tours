@@ -1489,53 +1489,116 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const RESEND_FROM_ADDR = process.env.RESEND_FROM || 'noreply@albanianeagletours.com';
         if (RESEND_API_KEY && email) {
           const activateUrl = `https://albania-audio-tours-production.up.railway.app/#/activate?order_id=${orderId}&email=${encodeURIComponent(email)}`;
-          const expiryStr = expiresAt.toLocaleDateString ? expiresAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : expiresAt.toISOString().slice(0,10);
-          // QR code image via Google Charts API (no dependency needed)
-          const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(activateUrl)}`;
+          const expiryStr = expiresAt.toLocaleDateString
+            ? expiresAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+            : expiresAt.toISOString().slice(0,10);
 
-          const emailHtml = `
-<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px;background:#fff;">
-  <div style="text-align:center;margin-bottom:24px;">
-    <img src="https://albania-audio-tours-production.up.railway.app/icon-192.png" width="56" height="56" style="border-radius:12px;" alt="AlbaTour" />
-    <h1 style="color:#c0392b;font-size:22px;margin:12px 0 4px;">Your AlbaTour is ready!</h1>
-    <p style="color:#555;font-size:14px;margin:0;">Thank you for subscribing — here's how to activate on your device.</p>
-  </div>
+          // Fetch QR code as base64 so it embeds inline — never blocked by email clients
+          let qrBase64 = '';
+          try {
+            const qrResp = await fetch(
+              `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=${encodeURIComponent(activateUrl)}`
+            );
+            const qrBuf = await qrResp.arrayBuffer();
+            qrBase64 = Buffer.from(qrBuf).toString('base64');
+          } catch { /* skip QR if fetch fails */ }
+          const qrImgTag = qrBase64
+            ? `<img src="data:image/png;base64,${qrBase64}" width="180" height="180" alt="Scan to activate" style="border-radius:8px;border:4px solid #c0392b;display:block;margin:0 auto;" />`
+            : `<p style="font-size:12px;color:#aaa;">(QR code unavailable — use the button or code above)</p>`;
 
-  <div style="background:#fafafa;border-radius:12px;padding:20px;margin-bottom:20px;border:1px solid #eee;">
-    <p style="margin:0 0 4px;font-size:12px;color:#888;text-transform:uppercase;letter-spacing:.06em;">Plan</p>
-    <p style="margin:0 0 16px;font-size:16px;font-weight:700;color:#1a1a1a;">${matchedPlan.name}</p>
-    <p style="margin:0 0 4px;font-size:12px;color:#888;text-transform:uppercase;letter-spacing:.06em;">Access Until</p>
-    <p style="margin:0 0 16px;font-size:16px;font-weight:700;color:#1a1a1a;">${expiryStr}</p>
-    <p style="margin:0 0 4px;font-size:12px;color:#888;text-transform:uppercase;letter-spacing:.06em;">Devices Allowed</p>
-    <p style="margin:0;font-size:16px;font-weight:700;color:#1a1a1a;">${deviceLimit} device${deviceLimit > 1 ? 's' : ''}</p>
-  </div>
+          const deviceNote = deviceLimit > 1
+            ? `Share this code with up to <strong>${deviceLimit - 1}</strong> travel companion${deviceLimit > 2 ? 's' : ''} — each opens the app and enters the same code.`
+            : 'This code activates on 1 device.';
 
-  <!-- Primary CTA: big button -->
-  <div style="text-align:center;margin-bottom:24px;">
-    <a href="${activateUrl}" style="display:inline-block;background:#c0392b;color:#fff;padding:14px 32px;border-radius:10px;font-weight:700;text-decoration:none;font-size:16px;">Tap to Activate Now</a>
-  </div>
+          const emailHtml = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:24px 0;">
+<tr><td align="center">
+<table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;max-width:520px;width:100%;">
 
-  <!-- Access Code -->
-  <div style="background:#fff8f0;border:2px dashed #f39c12;border-radius:12px;padding:20px;text-align:center;margin-bottom:24px;">
-    <p style="margin:0 0 8px;font-size:13px;color:#92400e;font-weight:600;">Your Access Code</p>
-    <p style="margin:0 0 4px;font-size:36px;font-weight:900;letter-spacing:.2em;color:#1a1a1a;font-family:monospace;">${accessCode}</p>
-    <p style="margin:8px 0 0;font-size:12px;color:#92400e;">Enter this code on any device at <strong>albaniaaudiotours.com/#/activate</strong></p>
-    ${deviceLimit > 1 ? `<p style="margin:6px 0 0;font-size:12px;color:#92400e;">Share this code with up to ${deviceLimit - 1} travel companion${deviceLimit > 2 ? 's' : ''} in your group.</p>` : ''}
-  </div>
+  <!-- Header -->
+  <tr><td style="background:#c0392b;padding:24px 32px;text-align:center;">
+    <h1 style="color:#fff;font-size:22px;margin:0;letter-spacing:-0.5px;">&#127911; Your AlbaTour is Ready!</h1>
+    <p style="color:rgba(255,255,255,0.85);font-size:14px;margin:6px 0 0;">Thank you for subscribing — your audio tours are activated.</p>
+  </td></tr>
 
-  <!-- QR Code -->
-  <div style="text-align:center;margin-bottom:24px;">
-    <p style="font-size:13px;color:#555;margin-bottom:12px;">Or scan this QR code with any device:</p>
-    <img src="${qrUrl}" width="160" height="160" alt="Activation QR Code" style="border-radius:8px;border:3px solid #eee;" />
-    <p style="font-size:11px;color:#aaa;margin-top:8px;">Screenshot and share with travel companions</p>
-  </div>
+  <!-- Plan details -->
+  <tr><td style="padding:24px 32px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border-radius:10px;border:1px solid #eee;">
+      <tr>
+        <td style="padding:14px 20px;border-bottom:1px solid #eee;">
+          <span style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.06em;">Plan</span><br>
+          <strong style="font-size:16px;color:#1a1a1a;">${matchedPlan.name}</strong>
+        </td>
+        <td style="padding:14px 20px;border-bottom:1px solid #eee;text-align:right;">
+          <span style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.06em;">Access Until</span><br>
+          <strong style="font-size:16px;color:#1a1a1a;">${expiryStr}</strong>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" style="padding:14px 20px;">
+          <span style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.06em;">Devices</span><br>
+          <strong style="font-size:16px;color:#1a1a1a;">${deviceLimit} device${deviceLimit > 1 ? 's' : ''} allowed</strong>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
 
-  <div style="border-top:1px solid #eee;padding-top:16px;">
-    <p style="font-size:12px;color:#999;text-align:center;margin:0;">
-      Purchased by ${email} · Order #${orderId}<br/>
-      Questions? Email <a href="mailto:book@albanianeagletours.com" style="color:#c0392b;">book@albanianeagletours.com</a>
+  <!-- Step 1: QR Code -->
+  <tr><td style="padding:28px 32px 0;text-align:center;">
+    <p style="font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.08em;margin:0 0 12px;">Step 1 — Scan with your phone</p>
+    ${qrImgTag}
+    <p style="font-size:12px;color:#888;margin:10px 0 0;">Point your camera at the QR code — no app needed.</p>
+  </td></tr>
+
+  <!-- Divider -->
+  <tr><td style="padding:20px 32px;">
+    <table width="100%"><tr>
+      <td style="border-top:1px solid #eee;"></td>
+      <td style="padding:0 12px;white-space:nowrap;font-size:12px;color:#aaa;">OR</td>
+      <td style="border-top:1px solid #eee;"></td>
+    </tr></table>
+  </td></tr>
+
+  <!-- Step 2: Button -->
+  <tr><td style="padding:0 32px;text-align:center;">
+    <p style="font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.08em;margin:0 0 12px;">Step 2 — Tap the button</p>
+    <a href="${activateUrl}" style="display:inline-block;background:#c0392b;color:#ffffff;padding:16px 36px;border-radius:10px;font-size:16px;font-weight:700;text-decoration:none;letter-spacing:-.3px;">Activate My Subscription &rarr;</a>
+    <p style="font-size:12px;color:#888;margin:10px 0 0;">Opens the activation page on this device.</p>
+  </td></tr>
+
+  <!-- Divider -->
+  <tr><td style="padding:20px 32px;">
+    <table width="100%"><tr>
+      <td style="border-top:1px solid #eee;"></td>
+      <td style="padding:0 12px;white-space:nowrap;font-size:12px;color:#aaa;">OR</td>
+      <td style="border-top:1px solid #eee;"></td>
+    </tr></table>
+  </td></tr>
+
+  <!-- Step 3: Access Code -->
+  <tr><td style="padding:0 32px 28px;">
+    <p style="font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.08em;margin:0 0 12px;text-align:center;">Step 3 — Enter your access code</p>
+    <div style="background:#fff8f0;border:2px dashed #e67e22;border-radius:12px;padding:20px 24px;text-align:center;">
+      <p style="margin:0 0 6px;font-size:12px;color:#92400e;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Your Access Code</p>
+      <p style="margin:0;font-size:40px;font-weight:900;letter-spacing:.25em;color:#1a1a1a;font-family:'Courier New',monospace;line-height:1.1;">${accessCode}</p>
+      <p style="margin:12px 0 4px;font-size:13px;color:#92400e;">Go to <strong>albaniaaudiotours.com/#/activate</strong></p>
+      <p style="margin:0;font-size:12px;color:#b45309;">${deviceNote}</p>
+    </div>
+  </td></tr>
+
+  <!-- Footer -->
+  <tr><td style="background:#f9f9f9;border-top:1px solid #eee;padding:16px 32px;text-align:center;">
+    <p style="font-size:12px;color:#999;margin:0;line-height:1.6;">
+      Purchased by ${email} &middot; Order #${orderId}<br>
+      Need help? <a href="mailto:book@albanianeagletours.com" style="color:#c0392b;text-decoration:none;">book@albanianeagletours.com</a>
     </p>
-  </div>
+  </td></tr>
+
+</table>
+</td></tr></table>
 </body></html>`;
 
           await fetch('https://api.resend.com/emails', {
@@ -1544,9 +1607,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             body: JSON.stringify({
               from: `AlbaTour <${RESEND_FROM_ADDR}>`,
               to: [email],
-              subject: `Your AlbaTour Access Code: ${accessCode}`,
+              subject: `\u{1F511} Your AlbaTour Access Code: ${accessCode}`,
               html: emailHtml,
-              text: `Your AlbaTour subscription is active!\n\nPlan: ${matchedPlan.name}\nAccess until: ${expiryStr}\nDevices: ${deviceLimit}\n\nAccess Code: ${accessCode}\n\nActivate at: ${activateUrl}\n\nOr visit albaniaaudiotours.com/#/activate and enter your code.`,
+              text: `Your AlbaTour subscription is active!\n\nPlan: ${matchedPlan.name}\nAccess until: ${expiryStr}\nDevices: ${deviceLimit}\n\nACCESS CODE: ${accessCode}\n\nActivate by:\n1. Scan the QR code in the HTML version of this email\n2. Click: ${activateUrl}\n3. Go to albaniaaudiotours.com/#/activate and enter code: ${accessCode}\n\nQuestions? book@albanianeagletours.com`,
             }),
           }).catch(e => console.error('[webhook] Activation email failed:', e.message));
         }

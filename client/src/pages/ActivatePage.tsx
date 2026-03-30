@@ -51,8 +51,8 @@ export default function ActivatePage() {
 
   const hasAutoParams = !!(urlOrderId && urlEmail);
 
-  // Mode tabs — if URL params present, start in auto mode
-  const [mode, setMode] = useState<Mode>(hasAutoParams ? "auto" : "code");
+  // Mode tabs — start in code mode always (auto runs in background if params present)
+  const [mode, setMode] = useState<Mode>("code");
 
   // Shared state
   const [status, setStatus]     = useState<Status>(hasAutoParams ? "loading" : "idle");
@@ -116,8 +116,10 @@ export default function ActivatePage() {
         setError(`All ${data.deviceLimit || "available"} device slots are in use. Contact book@albanianeagletours.com to manage devices.`);
         setStatus("error");
       } else {
-        setError(data.error || "Activation failed. Please try your access code instead, or contact support.");
-        setStatus("error");
+        // Auto-activate failed — drop to the code entry form instead of showing a dead error screen
+        setStatus("idle");
+        setMode("code");
+        setError(data.error || "Couldn't activate automatically. Please enter your access code from the email, or use the Order + Email tab.");
       }
     } catch {
       if (attempt < 3) setTimeout(() => activateByOrder(orderId, email, attempt + 1), 3000);
