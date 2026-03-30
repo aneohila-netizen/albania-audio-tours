@@ -1674,7 +1674,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.put('/api/admin/subscriptions/:id/patch', requireAdmin, async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const allowed = ['accessCode', 'deviceLimit', 'notes'];
+      const allowed = ['accessCode', 'deviceLimit', 'devices', 'deviceCount', 'notes'];
       const patch: Record<string, any> = {};
       for (const key of allowed) { if (key in req.body) patch[key] = req.body[key]; }
       if (!Object.keys(patch).length) return res.status(400).json({ error: 'No valid fields' });
