@@ -1118,6 +1118,170 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+
+  // ── Password Reset System ──────────────────────────────────────────────────
+  // resetStore: token → { email, expires } — single-use, 1-hour TTL
+  const resetStore = new Map<string, { email: string; expires: number }>();
+
+  // POST /api/admin/forgot-password
+  // Body: { emailChoice: "primary"|"secondary", phone: string }
+  app.post("/api/admin/forgot-password", async (req, res) => {
+    try {
+      const { emailChoice, phone } = req.body as { emailChoice: string; phone: string };
+
+      // Verify phone — digits only, deliberate vague error to prevent enumeration
+      const RECOVERY_PHONE = (process.env.ADMIN_RECOVERY_PHONE || "0682060901").replace(/\D/g, "");
+      const submittedPhone = (phone || "").replace(/\D/g, "");
+      if (!submittedPhone || submittedPhone !== RECOVERY_PHONE) {
+        return res.status(401).json({ error: "Verification failed. Please check your details and try again." });
+      }
+
+      // Resolve recipient
+      const PRIMARY_EMAIL   = process.env.ADMIN_OTP_EMAIL       || "book@albanianeagletours.com";
+      const SECONDARY_EMAIL = process.env.ADMIN_SECONDARY_EMAIL || "aneo.hila@gmail.com";
+      const recipientEmail  = emailChoice === "secondary" ? SECONDARY_EMAIL : PRIMARY_EMAIL;
+
+      // Generate single-use 64-char hex token
+      const { randomBytes } = await import("crypto");
+      const token   = randomBytes(32).toString("hex");
+      const expires = Date.now() + 60 * 60 * 1000; // 1 hour
+      resetStore.set(token, { email: recipientEmail, expires });
+
+      // Build reset URL
+      const BASE_URL = process.env.APP_URL || "https://albania-audio-tours-production.up.railway.app";
+      const resetUrl = `${BASE_URL}/#/reset-password?token=${token}`;
+
+      // Send via Resend
+      const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+      if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY not configured");
+      const RESEND_FROM = process.env.RESEND_FROM || "noreply@albanianeagletours.com";
+
+      const emailHtml = `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;">
+          <h2 style="color:#c0392b;margin:0 0 8px">AlbaTour Admin — Password Reset</h2>
+          <p style="color:#555;margin:0 0 20px">A password reset was requested for the AlbaTour admin panel. If this was you, click below.</p>
+          <div style="text-align:center;margin:28px 0;">
+            <a href="${resetUrl}" style="background:#c0392b;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;display:inline-block;">Reset My Password</a>
+          </div>
+          <p style="color:#888;font-size:13px;">This link expires in <strong>1 hour</strong> and can only be used once.</p>
+          <p style="color:#888;font-size:12px;margin-top:16px;">If you did not request this, ignore this email — no changes have been made.</p>
+          <hr style="border:none;border-top:1px solid #eee;margin:24px 0;" />
+          <p style="color:#bbb;font-size:11px;">Direct link: ${resetUrl}</p>
+        </div>
+      `;
+
+      const resendResp = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from:    `AlbaTour Security <${RESEND_FROM}>`,
+          to:      [recipientEmail],
+          subject: "AlbaTour Admin — Password Reset Request",
+          html:    emailHtml,
+          text:    `Password reset link (expires 1 hour):\n${resetUrl}\n\nIf you did not request this, ignore this email.`,
+        }),
+      });
+      if (!resendResp.ok) {
+        const errText = await resendResp.text();
+        throw new Error(`Resend error ${resendResp.status}: ${errText}`);
+      }
+
+      console.log(`[RESET] Reset link sent to ${recipientEmail}`);
+      res.json({ ok: true, sentTo: recipientEmail });
+    } catch (e: any) {
+      console.error("[RESET] forgot-password error:", e.message);
+      res.status(500).json({ error: "Failed to send reset email. Please try again." });
+    }
+  });
+
+  // POST /api/admin/reset-password
+  // Body: { token: string, newPassword: string }
+  // Verifies token → updates ADMIN_PASSWORD on Railway → sends confirmation to both emails
+  app.post("/api/admin/reset-password", async (req, res) => {
+    try {
+      const { token, newPassword } = req.body as { token: string; newPassword: string };
+
+      if (!token || !newPassword) return res.status(400).json({ error: "Missing token or password." });
+      if (newPassword.length < 8)  return res.status(400).json({ error: "Password must be at least 8 characters." });
+
+      const stored = resetStore.get(token);
+      if (!stored) return res.status(400).json({ error: "Invalid or already-used reset link. Please request a new one." });
+      if (Date.now() > stored.expires) {
+        resetStore.delete(token);
+        return res.status(400).json({ error: "Reset link has expired. Please request a new one." });
+      }
+      resetStore.delete(token); // single-use
+
+      // Update ADMIN_PASSWORD on Railway via GraphQL API
+      const RAILWAY_TOKEN   = process.env.RAILWAY_API_TOKEN  || "";
+      const RAILWAY_PROJECT = process.env.RAILWAY_PROJECT_ID || "3a1b5074-2b27-4ea8-8d87-7d03d7772808";
+      const RAILWAY_ENV     = process.env.RAILWAY_ENV_ID     || "9ba4a494-fda8-4283-b519-dbddd6af2040";
+      const RAILWAY_SERVICE = process.env.RAILWAY_SERVICE_ID || "ded2fc5b-1a9e-46cd-bbf7-c875552be35d";
+
+      if (!RAILWAY_TOKEN) throw new Error("RAILWAY_API_TOKEN not configured.");
+
+      const gqlResp = await fetch("https://backboard.railway.com/graphql/v2", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${RAILWAY_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: "mutation variableUpsert($input: VariableUpsertInput!) { variableUpsert(input: $input) }",
+          variables: {
+            input: {
+              projectId:     RAILWAY_PROJECT,
+              environmentId: RAILWAY_ENV,
+              serviceId:     RAILWAY_SERVICE,
+              name:          "ADMIN_PASSWORD",
+              value:         newPassword,
+            },
+          },
+        }),
+      });
+
+      const gqlData = await gqlResp.json() as any;
+      if (gqlData.errors?.length) throw new Error(`Railway API: ${JSON.stringify(gqlData.errors[0]?.message || gqlData.errors)}`);
+
+      console.log("[RESET] ADMIN_PASSWORD updated on Railway — redeploy triggered automatically");
+
+      // Send confirmation to BOTH addresses
+      const RESEND_API_KEY  = process.env.RESEND_API_KEY       || "";
+      const RESEND_FROM     = process.env.RESEND_FROM          || "noreply@albanianeagletours.com";
+      const PRIMARY_EMAIL   = process.env.ADMIN_OTP_EMAIL      || "book@albanianeagletours.com";
+      const SECONDARY_EMAIL = process.env.ADMIN_SECONDARY_EMAIL || "aneo.hila@gmail.com";
+
+      const confirmHtml = `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;">
+          <h2 style="color:#27ae60;margin:0 0 8px">✅ AlbaTour Admin Password Changed</h2>
+          <p style="color:#555;">Your AlbaTour admin password was successfully updated.</p>
+          <p style="color:#555;">Railway will automatically redeploy in <strong>2–3 minutes</strong>. Your new password will be active after that.</p>
+          <p style="color:#888;font-size:13px;margin-top:20px;">If you did not make this change, contact support immediately at book@albanianeagletours.com</p>
+        </div>
+      `;
+
+      if (RESEND_API_KEY) {
+        const sendConfirm = (to: string) =>
+          fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              from:    `AlbaTour Security <${RESEND_FROM}>`,
+              to:      [to],
+              subject: "✅ AlbaTour Admin — Password Successfully Changed",
+              html:    confirmHtml,
+              text:    "Your AlbaTour admin password was successfully updated. Railway will redeploy in 2-3 minutes.",
+            }),
+          }).catch(err => console.error(`[RESET] Confirm email to ${to} failed:`, err.message));
+
+        sendConfirm(PRIMARY_EMAIL);
+        sendConfirm(SECONDARY_EMAIL);
+      }
+
+      res.json({ ok: true, message: "Password updated. Railway will redeploy in 2–3 minutes. You can then log in with your new password." });
+    } catch (e: any) {
+      console.error("[RESET] reset-password error:", e.message);
+      res.status(500).json({ error: e.message || "Failed to reset password. Please try again." });
+    }
+  });
+
   // ── Subscription System ────────────────────────────────────────────────────────────
   import('crypto').then(({ createHmac }) => {
     // ── Shopify orders/paid webhook ────────────────────────────────────────────

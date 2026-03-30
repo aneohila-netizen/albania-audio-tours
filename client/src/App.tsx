@@ -24,6 +24,7 @@ import RefundPage from "@/pages/RefundPage";
 import BlogPage from "@/pages/BlogPage";
 import SubscriptionsPage from "@/pages/SubscriptionsPage";
 import ActivatePage from "@/pages/ActivatePage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import CmsPageRenderer from "@/pages/CmsPageRenderer";
 import AdminPanel from "@/components/AdminPanel";
 import NavBar from "@/components/NavBar";
@@ -172,6 +173,7 @@ function AppRoutes() {
               <Route path="/blog" component={BlogPage} />
               <Route path="/subscriptions" component={SubscriptionsPage} />
               <Route path="/activate" component={ActivatePage} />
+              <Route path="/reset-password" component={ResetPasswordPage} />
               <Route path="/p/:slug" component={CmsPageRenderer} />
                 </Switch>
               </main>
