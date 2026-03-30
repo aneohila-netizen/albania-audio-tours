@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { TourSite, Attraction } from "@shared/schema";
 import { railwayFetch } from "@/lib/queryClient";
 import AudioPlayer from "@/components/AudioPlayer";
+import GallerySlideshow from "@/components/GallerySlideshow";
 import PaywallGate from "@/components/PaywallGate";
 import BookWithGuide from "@/components/BookWithGuide";
 import StarRatingDisplay from "@/components/StarRatingDisplay";
@@ -148,14 +149,16 @@ export default function AttractionDetailPage() {
         <span className="text-foreground font-medium truncate max-w-[140px]">{aName}</span>
       </div>
 
-      {/* Hero image */}
-      {attraction.imageUrl && (
-        <div className="rounded-2xl overflow-hidden h-64 bg-muted">
-          <img src={attraction.imageUrl} alt={aName} className="w-full h-full object-cover"
-            onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-        </div>
-      )}
-      {!attraction.imageUrl && (
+      {/* Hero — auto-advancing gallery slideshow */}
+      {(attraction.imageUrl || ((attraction as any).images?.length > 0)) ? (
+        <GallerySlideshow
+          imageUrl={attraction.imageUrl}
+          images={(attraction as any).images || []}
+          alt={aName}
+          heightClass="h-64"
+          interval={5000}
+        />
+      ) : (
         <div className="rounded-2xl h-48 bg-muted flex items-center justify-center">
           <span className="text-4xl">{CATEGORY_EMOJI[attraction.category] || "📍"}</span>
         </div>

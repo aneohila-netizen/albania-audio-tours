@@ -201,11 +201,20 @@ const imageUpload = multer({
 const AUDIO_LANGS = ['En','Al','Gr','It','Es','De','Fr','Ar','Sl'] as const;
 
 // Replace imageUrl data URI with a lightweight serve URL
+// Also replace gallery data URIs with serve URLs for efficient delivery
 function stripImageData(obj: any, type: 'attraction'|'site'): any {
   if (!obj) return obj;
   const out = { ...obj };
   if (out.imageUrl && out.imageUrl.startsWith('data:')) {
     out.imageUrl = `${RAILWAY_BASE}/api/images/db/${type}/${obj.id}`;
+  }
+  // Replace gallery data URIs with serve URLs
+  if (Array.isArray(out.images) && out.images.length > 0) {
+    out.images = out.images.map((img: string, idx: number) =>
+      img && img.startsWith('data:')
+        ? `${RAILWAY_BASE}/api/images/db/${type}/${obj.id}/gallery/${idx}`
+        : img
+    );
   }
   return out;
 }
@@ -340,6 +349,33 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       return res.send(buf);
     }
     // Fallback: redirect to external URL
+    res.redirect(imageData);
+  });
+
+  // GET /api/images/db/site/:id/gallery/:index  — serve gallery image by index
+  // GET /api/images/db/attraction/:id/gallery/:index
+  app.get("/api/images/db/:type/:id/gallery/:index", async (req, res) => {
+    const { type, id, index } = req.params;
+    const numId  = parseInt(id);
+    const numIdx = parseInt(index);
+    let entity: any = null;
+    if (type === "site") {
+      entity = await storage.getSiteById(numId);
+    } else if (type === "attraction") {
+      entity = await storage.getAttractionById(numId);
+    }
+    const gallery: string[] = entity?.images || [];
+    const imageData = gallery[numIdx] || null;
+    if (!imageData) return res.status(404).json({ error: "Gallery image not found" });
+    if (imageData.startsWith("data:")) {
+      const mimeMatch = imageData.match(/^data:([^;]+);base64,/);
+      const mime = mimeMatch ? mimeMatch[1] : "image/jpeg";
+      const b64  = imageData.split(",")[1];
+      const buf  = Buffer.from(b64, "base64");
+      res.setHeader("Content-Type", mime);
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      return res.send(buf);
+    }
     res.redirect(imageData);
   });
 
@@ -786,11 +822,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!site) return res.status(404).json({ error: "Site not found" });
     const existing: string[] = (site as any).images || [];
     const updated = await storage.updateSite(id, { images: [...existing, dataUri] } as any);
-    res.json({ images: (updated as any)?.images || [] });
+    // Return serve URLs (not data URIs) so the frontend renders efficiently
+    const newIndex = existing.length;
+    const serveUrl = `${RAILWAY_BASE}/api/images/db/site/${id}/gallery/${newIndex}`;
+    const serveImages = ((updated as any)?.images || []).map((_: any, idx: number) =>
+      `${RAILWAY_BASE}/api/images/db/site/${id}/gallery/${idx}`
+    );
+    res.json({ images: serveImages, newUrl: serveUrl });
   });
 
   // DELETE /api/admin/sites/:id/gallery/:index — remove image at index
-  app.delete("/api/admin/sites/:id/gallery/:index", requireAdmin, async (req, res) => {
+  // HARDCODED: requireDeleteConfirmation is MANDATORY here — never remove it.
+  // This implements the admin data-safety rule: no media deleted without explicit confirmation.
+  app.delete("/api/admin/sites/:id/gallery/:index", requireAdmin, requireDeleteConfirmation, async (req, res) => {
     const id = parseInt(req.params.id);
     const idx = parseInt(req.params.index);
     const site = await storage.getSiteById(id);
@@ -813,11 +857,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!attr) return res.status(404).json({ error: "Attraction not found" });
     const existing: string[] = (attr as any).images || [];
     const updated = await storage.updateAttraction(id, { images: [...existing, dataUri] } as any);
-    res.json({ images: (updated as any)?.images || [] });
+    const newIndex = existing.length;
+    const serveUrl = `${RAILWAY_BASE}/api/images/db/attraction/${id}/gallery/${newIndex}`;
+    const serveImages = ((updated as any)?.images || []).map((_: any, idx: number) =>
+      `${RAILWAY_BASE}/api/images/db/attraction/${id}/gallery/${idx}`
+    );
+    res.json({ images: serveImages, newUrl: serveUrl });
   });
 
   // DELETE /api/admin/attractions/:id/gallery/:index — remove image at index
-  app.delete("/api/admin/attractions/:id/gallery/:index", requireAdmin, async (req, res) => {
+  // HARDCODED: requireDeleteConfirmation is MANDATORY here — never remove it.
+  app.delete("/api/admin/attractions/:id/gallery/:index", requireAdmin, requireDeleteConfirmation, async (req, res) => {
     const id = parseInt(req.params.id);
     const idx = parseInt(req.params.index);
     const attr = await storage.getAttractionById(id);

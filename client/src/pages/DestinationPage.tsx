@@ -11,6 +11,7 @@ import BookWithGuide from "@/components/BookWithGuide";
 import StarRatingDisplay from "@/components/StarRatingDisplay";
 import ItineraryCard from "@/components/ItineraryCard";
 import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb, Navigation } from "lucide-react";
+import GallerySlideshow from "@/components/GallerySlideshow";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLangText } from "@/lib/i18n";
 
@@ -91,20 +92,22 @@ export default function DestinationPage() {
         All Destinations
       </button>
 
-      {/* Hero */}
-      <div className="relative rounded-2xl overflow-hidden h-64 bg-muted">
-        {dest.imageUrl && (
-          <img src={dest.imageUrl} alt={name} className="w-full h-full object-cover"
-            onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-        <div className="absolute bottom-0 left-0 right-0 p-5">
+      {/* Hero — auto-advancing gallery slideshow (hero image + gallery images) */}
+      <GallerySlideshow
+        imageUrl={dest.imageUrl}
+        images={(dest as any).images || []}
+        alt={name}
+        heightClass="h-64"
+        interval={5000}
+      >
+        {/* Overlay: title, tagline, badges */}
+        <div className="absolute bottom-0 left-0 right-0 p-5 pointer-events-none">
           <h1 className="text-3xl font-bold text-white mb-1 leading-tight drop-shadow-lg" style={{ fontFamily: "var(--font-display)" }}>
             {name}
           </h1>
           <p className="text-sm text-white/80 italic">{tagline}</p>
         </div>
-        <div className="absolute top-3 right-3 flex flex-col gap-1.5 items-end">
+        <div className="absolute top-3 right-3 flex flex-col gap-1.5 items-end pointer-events-none">
           {totalAttrPoints > 0 && (
             <span className="points-badge">
               <Star size={9} fill="currentColor" />
@@ -116,7 +119,7 @@ export default function DestinationPage() {
             {dest.region}
           </span>
         </div>
-      </div>
+      </GallerySlideshow>
 
       {/* Progress */}
       {attractions.length > 0 && (

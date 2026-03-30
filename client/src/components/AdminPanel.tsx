@@ -1506,6 +1506,15 @@ function ImageGalleryCard({
     if (slideIdx >= allImages.length && allImages.length > 0) setSlideIdx(allImages.length - 1);
   }, [allImages.length]);
 
+  // Auto-advance slideshow every 4 seconds when there are multiple images
+  useEffect(() => {
+    if (allImages.length <= 1) return;
+    const timer = setInterval(() => {
+      setSlideIdx(i => (i + 1) % allImages.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [allImages.length]);
+
   // Upload hero image via /api/admin/{entity}/{id}/image
   async function uploadHero(file: File) {
     if (!entityId) {
@@ -1534,18 +1543,25 @@ function ImageGalleryCard({
       const fd = new FormData(); fd.append("image", file);
       const res = await adminUpload(`/api/admin/${entityType}/${entityId}/gallery`, fd);
       if (!res.ok) throw new Error("Upload failed");
-      const { images: updated } = await res.json();
+      const data = await res.json();
+      // Use serve URLs from response (not data URIs)
+      const updated: string[] = data.images || [];
       onUpdate(imageUrl, updated);
       setSlideIdx(allImages.length); // jump to new image
     } catch { setError("Gallery upload failed. Please try again."); }
     setGalleryUp(false);
   }
 
-  // Remove gallery image
+  // Remove gallery image — REQUIRES x-confirm-delete header (admin data-safety rule)
   async function removeGallery(idx: number) {
     if (!entityId) return;
+    if (!window.confirm("Remove this gallery image? This cannot be undone.")) return;
     try {
-      await adminFetch(`/api/admin/${entityType}/${entityId}/gallery/${idx}`, { method: "DELETE" });
+      // x-confirm-delete: yes is HARDCODED here — required by server-side media protection
+      await adminFetch(`/api/admin/${entityType}/${entityId}/gallery/${idx}`, {
+        method: "DELETE",
+        headers: { "x-confirm-delete": "yes" },
+      });
       const updated = images.filter((_, i) => i !== idx);
       onUpdate(imageUrl, updated);
       if (slideIdx > 0) setSlideIdx(s => Math.max(0, s - 1));
