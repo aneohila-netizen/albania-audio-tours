@@ -3,6 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { useApp } from "@/App";
 import type { TourSite } from "@shared/schema";
 import AudioPlayer from "@/components/AudioPlayer";
+import GallerySlideshow from "@/components/GallerySlideshow";
 import PaywallGate from "@/components/PaywallGate";
 import BookWithGuide from "@/components/BookWithGuide";
 import StarRatingDisplay from "@/components/StarRatingDisplay";
@@ -106,16 +107,14 @@ export default function SiteDetailPage() {
         {t.backToMap}
       </button>
 
-      {/* Hero image */}
-      {site.imageUrl && (
-        <div className="rounded-2xl overflow-hidden h-64 bg-muted">
-          <img
-            src={site.imageUrl}
-            alt={name}
-            className="w-full h-full object-cover"
-            onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-          />
-        </div>
+      {/* Hero — 16:9 slideshow */}
+      {((site as any).images?.length > 0 || site.imageUrl) && (
+        <GallerySlideshow
+          imageUrl={site.imageUrl}
+          images={(site as any).images || []}
+          alt={name}
+          interval={5000}
+        />
       )}
 
       {/* Header */}

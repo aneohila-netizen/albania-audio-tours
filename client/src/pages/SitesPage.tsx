@@ -146,16 +146,17 @@ export default function SitesPage() {
                 className="tour-card rounded-2xl border border-border bg-card overflow-hidden cursor-pointer group"
                 onClick={() => navigate(`/sites/${dest.slug}`)}
               >
-                <div className="relative h-48 bg-muted overflow-hidden">
-                  {dest.imageUrl && (
+                {/* 16:9 hero image — industry standard aspect ratio */}
+                <div className="relative overflow-hidden bg-muted" style={{ aspectRatio: "16/9" }}>
+                  {(dest as any).images?.[0] || dest.imageUrl ? (
                     <img
-                      src={dest.imageUrl}
+                      src={(dest as any).images?.[0] || dest.imageUrl}
                       alt={name(dest)}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       loading="lazy"
                       onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
                     />
-                  )}
+                  ) : null}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
                   <div className="absolute top-3 left-3">
                     <span

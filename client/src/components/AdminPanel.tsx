@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import GallerySlideshow from "@/components/GallerySlideshow";
 import {
   Lock, Eye, EyeOff, Plus, Pencil, Trash2, LogOut,
   MapPin, Globe, Music, Image, Info, ArrowLeft, Save,
@@ -1360,23 +1361,29 @@ function DestinationPreviewCard({ form }: { form: any }) {
         </a>
       </div>
       <div className="rounded-2xl border border-border/60 overflow-hidden shadow-sm max-w-sm">
-        {form.imageUrl ? (
-          <div className="relative h-44 bg-muted">
-            <img src={form.imageUrl} alt={form.nameEn} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display="none"; }} />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent" />
-            <div className="absolute bottom-3 left-3 right-3">
-              <h3 className="text-white font-semibold text-base leading-tight">{form.nameEn || "Destination Name"}</h3>
-              {form.region && <p className="text-white/70 text-xs mt-0.5">{form.region}</p>}
+        <GallerySlideshow
+          imageUrl={form.imageUrl || null}
+          images={form.images || []}
+          alt={form.nameEn || "Destination"}
+          showControls={(form.images || []).length > 0}
+        >
+          {((form.images || []).length > 0 || form.imageUrl) ? (
+            <>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent pointer-events-none" />
+              <div className="absolute bottom-3 left-3 right-3 pointer-events-none">
+                <h3 className="text-white font-semibold text-base leading-tight">{form.nameEn || "Destination Name"}</h3>
+                {form.region && <p className="text-white/70 text-xs mt-0.5">{form.region}</p>}
+              </div>
+            </>
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+              <div className="text-center">
+                <MapPin className="w-8 h-8 text-primary/40 mx-auto mb-2" />
+                <p className="text-sm font-medium text-foreground/60">{form.nameEn || "Destination Name"}</p>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="h-44 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-            <div className="text-center">
-              <MapPin className="w-8 h-8 text-primary/40 mx-auto mb-2" />
-              <p className="text-sm font-medium text-foreground/60">{form.nameEn || "Destination Name"}</p>
-            </div>
-          </div>
-        )}
+          )}
+        </GallerySlideshow>
         <div className="p-4 space-y-3 bg-card">
           <div className="flex items-center gap-2 flex-wrap">
             {form.category && <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${catColor}`}>{form.category}</span>}
@@ -1426,22 +1433,28 @@ function AttractionPreviewCard({ form, destinationName }: { form: any; destinati
         </a>
       </div>
       <div className="rounded-2xl border border-border/60 overflow-hidden shadow-sm max-w-sm">
-        {form.imageUrl ? (
-          <div className="relative h-36 bg-muted">
-            <img src={form.imageUrl} alt={form.nameEn} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display="none"; }} />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent" />
-            <div className="absolute bottom-2 left-3">
-              <h3 className="text-white font-semibold text-sm">{form.nameEn || "Attraction Name"}</h3>
+        <GallerySlideshow
+          imageUrl={form.imageUrl || null}
+          images={form.images || []}
+          alt={form.nameEn || "Attraction"}
+          showControls={(form.images || []).length > 0}
+        >
+          {((form.images || []).length > 0 || form.imageUrl) ? (
+            <>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent pointer-events-none" />
+              <div className="absolute bottom-2 left-3 pointer-events-none">
+                <h3 className="text-white font-semibold text-sm">{form.nameEn || "Attraction Name"}</h3>
+              </div>
+            </>
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+              <div className="text-center">
+                <Star className="w-7 h-7 text-primary/40 mx-auto mb-1" />
+                <p className="text-sm font-medium text-foreground/60">{form.nameEn || "Attraction Name"}</p>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="h-36 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-            <div className="text-center">
-              <Star className="w-7 h-7 text-primary/40 mx-auto mb-1" />
-              <p className="text-sm font-medium text-foreground/60">{form.nameEn || "Attraction Name"}</p>
-            </div>
-          </div>
-        )}
+          )}
+        </GallerySlideshow>
         <div className="p-4 space-y-3 bg-card">
           {form.category && <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${catColor}`}>{form.category}</span>}
           {form.descEn && <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">{form.descEn}</p>}
