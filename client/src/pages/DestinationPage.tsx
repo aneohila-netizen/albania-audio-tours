@@ -100,7 +100,7 @@ export default function DestinationPage() {
         images={(dest as any).images || []}
         alt={name}
         interval={5000}
-        className="rounded-none sm:rounded-2xl sm:mx-4 sm:max-w-[calc(100%-2rem)] md:mx-auto md:max-w-3xl"
+        className="rounded-none w-full"
       >
         {/* Overlay: title, tagline, badges */}
         <div className="absolute bottom-0 left-0 right-0 p-5 pointer-events-none">

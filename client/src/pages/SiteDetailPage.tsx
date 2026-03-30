@@ -116,7 +116,7 @@ export default function SiteDetailPage() {
           images={(site as any).images || []}
           alt={name}
           interval={5000}
-          className="rounded-none sm:rounded-2xl sm:mx-4 sm:max-w-[calc(100%-2rem)] md:mx-auto md:max-w-2xl"
+          className="rounded-none w-full"
         />
       )}
 

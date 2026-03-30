@@ -158,7 +158,7 @@ export default function AttractionDetailPage() {
           images={(attraction as any).images || []}
           alt={aName}
           interval={5000}
-          className="rounded-none sm:rounded-2xl sm:mx-4 sm:max-w-[calc(100%-2rem)] md:mx-auto md:max-w-2xl"
+          className="rounded-none w-full"
         />
       ) : (
         <div className="mx-4 rounded-2xl h-48 bg-muted flex items-center justify-center">
