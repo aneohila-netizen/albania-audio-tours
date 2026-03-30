@@ -1747,6 +1747,115 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // ── Admin: resend activation email for a subscription ──────────────────────
+  app.post('/api/admin/subscriptions/:id/resend-email', requireAdmin, async (req, res) => {
+    try {
+      const sub = await storage.getAllSubscriptions().then(all => all.find(s => s.id === Number(req.params.id)));
+      if (!sub) return res.status(404).json({ error: 'Subscription not found' });
+
+      const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+      const RESEND_FROM_ADDR = process.env.RESEND_FROM || 'noreply@albanianeagletours.com';
+      if (!RESEND_API_KEY) return res.status(500).json({ error: 'RESEND_API_KEY not configured' });
+
+      const orderId = sub.shopifyOrderId;
+      const email = sub.email;
+      const accessCode = (sub as any).accessCode || '';
+      const deviceLimit = (sub as any).deviceLimit || 2;
+      const expiresAt = new Date(sub.expiresAt);
+      const expiryStr = expiresAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      const activateUrl = `https://albania-audio-tours-production.up.railway.app/#/activate?order_id=${orderId}&email=${encodeURIComponent(email)}`;
+
+      // Fetch QR as base64
+      let qrBase64 = '';
+      try {
+        const qrResp = await fetch(`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=${encodeURIComponent(activateUrl)}`);
+        const qrBuf = await qrResp.arrayBuffer();
+        qrBase64 = Buffer.from(qrBuf).toString('base64');
+      } catch {}
+      const qrImgTag = qrBase64
+        ? `<img src="data:image/png;base64,${qrBase64}" width="180" height="180" alt="Scan to activate" style="border-radius:8px;border:4px solid #c0392b;display:block;margin:0 auto;" />`
+        : `<p style="font-size:12px;color:#aaa;">(Open the link below to activate)</p>`;
+      const deviceNote = deviceLimit > 1
+        ? `Share this code with up to <strong>${deviceLimit - 1}</strong> travel companion${deviceLimit > 2 ? 's' : ''} — each opens the app and enters the same code.`
+        : 'This code activates on 1 device.';
+
+      const emailHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:24px 0;"><tr><td align="center">
+<table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;max-width:520px;width:100%;">
+  <tr><td style="background:#c0392b;padding:24px 32px;text-align:center;">
+    <h1 style="color:#fff;font-size:22px;margin:0;">&#127911; Your AlbaTour is Ready!</h1>
+    <p style="color:rgba(255,255,255,0.85);font-size:14px;margin:6px 0 0;">Here are your activation details — 3 ways to get started.</p>
+  </td></tr>
+  <tr><td style="padding:24px 32px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border-radius:10px;border:1px solid #eee;">
+      <tr>
+        <td style="padding:14px 20px;border-bottom:1px solid #eee;">
+          <span style="font-size:11px;color:#888;text-transform:uppercase;">Plan</span><br>
+          <strong style="font-size:16px;color:#1a1a1a;">${sub.planName}</strong>
+        </td>
+        <td style="padding:14px 20px;border-bottom:1px solid #eee;text-align:right;">
+          <span style="font-size:11px;color:#888;text-transform:uppercase;">Access Until</span><br>
+          <strong style="font-size:16px;color:#1a1a1a;">${expiryStr}</strong>
+        </td>
+      </tr>
+      <tr><td colspan="2" style="padding:14px 20px;">
+        <span style="font-size:11px;color:#888;text-transform:uppercase;">Devices</span><br>
+        <strong style="font-size:16px;color:#1a1a1a;">${deviceLimit} device${deviceLimit > 1 ? 's' : ''} allowed</strong>
+      </td></tr>
+    </table>
+  </td></tr>
+  <tr><td style="padding:28px 32px 0;text-align:center;">
+    <p style="font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.08em;margin:0 0 12px;">Step 1 — Scan with your phone</p>
+    ${qrImgTag}
+    <p style="font-size:12px;color:#888;margin:10px 0 0;">Point your camera at the QR code — no app needed.</p>
+  </td></tr>
+  <tr><td style="padding:16px 32px;"><table width="100%"><tr>
+    <td style="border-top:1px solid #eee;"></td><td style="padding:0 12px;white-space:nowrap;font-size:12px;color:#aaa;">OR</td><td style="border-top:1px solid #eee;"></td>
+  </tr></table></td></tr>
+  <tr><td style="padding:0 32px;text-align:center;">
+    <p style="font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.08em;margin:0 0 12px;">Step 2 — Tap the button</p>
+    <a href="${activateUrl}" style="display:inline-block;background:#c0392b;color:#fff;padding:16px 36px;border-radius:10px;font-size:16px;font-weight:700;text-decoration:none;">Activate My Subscription &rarr;</a>
+    <p style="font-size:12px;color:#888;margin:10px 0 0;">Opens the activation page on this device.</p>
+  </td></tr>
+  <tr><td style="padding:16px 32px;"><table width="100%"><tr>
+    <td style="border-top:1px solid #eee;"></td><td style="padding:0 12px;white-space:nowrap;font-size:12px;color:#aaa;">OR</td><td style="border-top:1px solid #eee;"></td>
+  </tr></table></td></tr>
+  <tr><td style="padding:0 32px 28px;">
+    <p style="font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.08em;margin:0 0 12px;text-align:center;">Step 3 — Enter your access code</p>
+    <div style="background:#fff8f0;border:2px dashed #e67e22;border-radius:12px;padding:20px 24px;text-align:center;">
+      <p style="margin:0 0 6px;font-size:12px;color:#92400e;font-weight:600;text-transform:uppercase;">Your Access Code</p>
+      <p style="margin:0;font-size:40px;font-weight:900;letter-spacing:.25em;color:#1a1a1a;font-family:'Courier New',monospace;">${accessCode || 'N/A'}</p>
+      <p style="margin:12px 0 4px;font-size:13px;color:#92400e;">Go to <strong>albaniaaudiotours.com/#/activate</strong></p>
+      <p style="margin:0;font-size:12px;color:#b45309;">${deviceNote}</p>
+    </div>
+  </td></tr>
+  <tr><td style="background:#f9f9f9;border-top:1px solid #eee;padding:16px 32px;text-align:center;">
+    <p style="font-size:12px;color:#999;margin:0;line-height:1.6;">
+      Purchased by ${email} &middot; Order #${orderId}<br>
+      Need help? <a href="mailto:book@albanianeagletours.com" style="color:#c0392b;text-decoration:none;">book@albanianeagletours.com</a>
+    </p>
+  </td></tr>
+</table></td></tr></table></body></html>`;
+
+      const emailResp = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: `AlbaTour <${RESEND_FROM_ADDR}>`,
+          to: [email],
+          subject: `🔑 Your AlbaTour Access Code: ${accessCode}`,
+          html: emailHtml,
+          text: `Your AlbaTour subscription is active!\n\nPlan: ${sub.planName}\nAccess until: ${expiryStr}\nDevices: ${deviceLimit}\n\nACCESS CODE: ${accessCode}\n\nActivate:\n1. Click: ${activateUrl}\n2. Go to albaniaaudiotours.com/#/activate and enter: ${accessCode}`,
+        }),
+      });
+      const emailResult = await emailResp.json();
+      if (!emailResp.ok) return res.status(500).json({ error: 'Email send failed', details: emailResult });
+      res.json({ ok: true, emailId: emailResult.id, sentTo: email });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+
   // ── Admin: revoke a subscription ───────────────────────────────────────
   app.put('/api/admin/subscriptions/:id/revoke', requireAdmin, async (req, res) => {
     try {
