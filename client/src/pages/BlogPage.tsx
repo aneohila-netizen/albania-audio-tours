@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { BookOpen, Calendar, User, ArrowRight } from "lucide-react";
 
-const RAILWAY_URL = "https://albaniaaudiotours.com";
+const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
 
 interface CmsPage {
   id: number;

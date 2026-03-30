@@ -3,7 +3,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 
-const RAILWAY_URL = "https://albaniaaudiotours.com";
+const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
 
 export default function RefundPage() {
   const { data: page, isLoading, isError } = useQuery({

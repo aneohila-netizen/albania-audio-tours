@@ -20,7 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getAdminToken } from "@/lib/adminAuth";
 
-const RAILWAY_URL = "https://albaniaaudiotours.com";
+const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
 
 interface Plan {
   id: number; slug: string; tier: string; name: string; tagline: string;
@@ -856,7 +856,7 @@ function PlanRow({ plan, onEdit, onToggle, onDelete }: {
         <p className="text-xs text-muted-foreground truncate">{plan.tagline}</p>
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        <a href={`https://albaniaaudiotours.com/#/subscriptions`} target="_blank" rel="noopener noreferrer">
+        <a href={`https://albania-audio-tours-production.up.railway.app/#/subscriptions`} target="_blank" rel="noopener noreferrer">
           <Button variant="ghost" size="icon" className="h-7 w-7"><ExternalLink size={12} /></Button>
         </a>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onToggle} title={plan.isActive ? "Hide" : "Show"}>

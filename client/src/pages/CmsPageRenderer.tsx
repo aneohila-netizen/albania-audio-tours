@@ -10,7 +10,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { ArrowLeft, Calendar, User } from "lucide-react";
 import { Link } from "wouter";
 
-const RAILWAY_URL = "https://albaniaaudiotours.com";
+const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
 
 interface CmsPage {
   id: number;

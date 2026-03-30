@@ -16,7 +16,7 @@ import { useState, useEffect, useRef } from "react";
 import { X, Sparkles, Clock } from "lucide-react";
 import { Link } from "wouter";
 
-const RAILWAY_URL = "https://albaniaaudiotours.com";
+const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
 
 function formatCountdown(ms: number): string {
   if (ms <= 0) return "0d 0h 0m 0s";

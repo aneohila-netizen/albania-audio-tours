@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Eye, EyeOff, Lock, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 
-const RAILWAY_API = "https://albaniaaudiotours.com";
+const RAILWAY_API = "https://albania-audio-tours-production.up.railway.app";
 
 type Stage = "form" | "loading" | "success" | "error" | "invalid";
 
