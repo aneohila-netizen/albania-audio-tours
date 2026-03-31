@@ -1721,11 +1721,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!sub || !sub.isActive) return res.json({ active: false });
       const now = new Date().toISOString();
       if (sub.expiresAt < now) return res.json({ active: false, expired: true, expiresAt: sub.expiresAt });
+      // Deferred start: subscription not yet active if startsAt is in the future
+      if (sub.startsAt && sub.startsAt > now) return res.json({
+        active: false, pending: true, startsAt: sub.startsAt,
+        message: `Your tour access starts on ${new Date(sub.startsAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.`
+      });
       res.json({
         active: true,
         planName: sub.planName,
         planSlug: sub.planSlug,
         expiresAt: sub.expiresAt,
+        startsAt: sub.startsAt,
         email: sub.email,
       });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -1883,6 +1889,138 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         notes: 'TEST ACTIVATION', createdAt: now.toISOString(),
       });
       res.json({ success: true, sub });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Admin: manual code generator — creates a real subscription with access code + email ───────
+  // Body: { email, planId, startsAt? (ISO date), notes? }
+  app.post('/api/admin/subscriptions/generate-code', requireAdmin, async (req, res) => {
+    try {
+      const { email, planId, startsAt: startsAtInput, notes: adminNotes } =
+        req.body as { email: string; planId: number; startsAt?: string; notes?: string };
+      if (!email || !planId) return res.status(400).json({ error: 'email and planId required' });
+
+      // Load plan
+      const plans = await storage.getAllPlans();
+      const plan = plans.find(p => p.id === Number(planId));
+      if (!plan) return res.status(404).json({ error: 'Plan not found' });
+
+      // Calculate dates
+      const startsAt = startsAtInput ? new Date(startsAtInput) : new Date();
+      const expiresAt = new Date(startsAt);
+      if (plan.billingPeriod === '7-day')   expiresAt.setDate(expiresAt.getDate() + 7);
+      else if (plan.billingPeriod === 'month') expiresAt.setMonth(expiresAt.getMonth() + 1);
+      else expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+
+      // Generate code and token
+      const codeChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const accessCode = 'ALB-' + Array.from({ length: 4 }, () =>
+        codeChars[Math.floor(Math.random() * codeChars.length)]
+      ).join('');
+      const sessionToken = cryptoRandomBytes(32).toString('hex');
+      const orderId = `MANUAL-${cryptoRandomBytes(6).toString('hex').toUpperCase()}`;
+      const deviceLimit = (plan as any).deviceLimit || 2;
+
+      const sub = await storage.createSubscription({
+        email: email.toLowerCase(),
+        planSlug: plan.slug, planName: plan.name,
+        shopifyOrderId: orderId,
+        priceEur: plan.priceEur,
+        startsAt: startsAt.toISOString(),
+        expiresAt: expiresAt.toISOString(),
+        isActive: true, deviceCount: 0, devices: '[]',
+        sessionToken,
+        notes: `MANUAL${adminNotes ? ' — ' + adminNotes : ''}`,
+        createdAt: new Date().toISOString(),
+        ...(({ accessCode, deviceLimit } as any)),
+      } as any);
+
+      // Send activation email
+      const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+      const RESEND_FROM_ADDR = process.env.RESEND_FROM || 'noreply@albanianeagletours.com';
+      let emailSent = false;
+      if (RESEND_API_KEY) {
+        const activateUrl = `https://albania-audio-tours-production.up.railway.app/#/activate?order_id=${orderId}&email=${encodeURIComponent(email.toLowerCase())}`;
+        const startStr  = startsAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+        const expiryStr = expiresAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+        const qrUrl = `https://albania-audio-tours-production.up.railway.app/api/qr?data=${encodeURIComponent(activateUrl)}`;
+        const isPending = startsAt > new Date();
+        const deviceNote = deviceLimit > 1
+          ? `Share this code with up to <strong>${deviceLimit - 1}</strong> travel companion${deviceLimit > 2 ? 's' : ''} — each opens the app and enters the same code.`
+          : 'This code activates on 1 device.';
+
+        const emailHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:24px 0;"><tr><td align="center">
+<table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;max-width:520px;width:100%;">
+  <tr><td style="background:#c0392b;padding:24px 32px;text-align:center;">
+    <h1 style="color:#fff;font-size:22px;margin:0;">&#127911; Your AlbaTour Access Code</h1>
+    <p style="color:rgba(255,255,255,0.85);font-size:14px;margin:6px 0 0;">${isPending ? 'Your tour is booked — here are your activation details.' : 'Here are 3 ways to activate your audio tour access.'}</p>
+  </td></tr>
+  <tr><td style="padding:24px 32px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border-radius:10px;border:1px solid #eee;">
+      <tr>
+        <td style="padding:14px 20px;border-bottom:1px solid #eee;">
+          <span style="font-size:11px;color:#888;text-transform:uppercase;">Plan</span><br>
+          <strong style="font-size:16px;color:#1a1a1a;">${plan.name}</strong>
+        </td>
+        <td style="padding:14px 20px;border-bottom:1px solid #eee;text-align:right;">
+          <span style="font-size:11px;color:#888;text-transform:uppercase;">${isPending ? 'Tour Starts' : 'Access Until'}</span><br>
+          <strong style="font-size:16px;color:#1a1a1a;">${isPending ? startStr : expiryStr}</strong>
+        </td>
+      </tr>
+      ${isPending ? `<tr><td colspan="2" style="padding:14px 20px;border-bottom:1px solid #eee;">
+        <span style="font-size:11px;color:#888;text-transform:uppercase;">Access Until</span><br>
+        <strong style="font-size:16px;color:#1a1a1a;">${expiryStr}</strong>
+      </td></tr>` : ''}
+      <tr><td colspan="2" style="padding:14px 20px;">
+        <span style="font-size:11px;color:#888;text-transform:uppercase;">Devices</span><br>
+        <strong style="font-size:16px;color:#1a1a1a;">${deviceLimit} device${deviceLimit > 1 ? 's' : ''} allowed</strong>
+      </td></tr>
+    </table>
+    ${isPending ? `<div style="margin-top:16px;padding:14px 20px;background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;">
+      <p style="margin:0;font-size:13px;color:#92400e;">&#128197; <strong>Your code is ready now</strong> but audio tour access begins on <strong>${startStr}</strong>. Save this email and activate when your trip starts.</p>
+    </div>` : ''}
+  </td></tr>
+  <tr><td style="padding:28px 32px 0;text-align:center;">
+    <p style="font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.08em;margin:0 0 12px;">Step 1 — Scan with your phone</p>
+    <img src="${qrUrl}" width="180" height="180" alt="Scan to activate" style="border-radius:8px;border:4px solid #c0392b;display:block;margin:0 auto;" />
+    <p style="font-size:12px;color:#888;margin:10px 0 0;">Point your camera at the QR code — no app needed.</p>
+  </td></tr>
+  <tr><td style="padding:16px 32px;"><table width="100%"><tr><td style="border-top:1px solid #eee;"></td><td style="padding:0 12px;white-space:nowrap;font-size:12px;color:#aaa;">OR</td><td style="border-top:1px solid #eee;"></td></tr></table></td></tr>
+  <tr><td style="padding:0 32px;text-align:center;">
+    <p style="font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.08em;margin:0 0 12px;">Step 2 — Tap the button</p>
+    <a href="${activateUrl}" style="display:inline-block;background:#c0392b;color:#fff;padding:16px 36px;border-radius:10px;font-size:16px;font-weight:700;text-decoration:none;">Activate My Subscription &rarr;</a>
+  </td></tr>
+  <tr><td style="padding:16px 32px;"><table width="100%"><tr><td style="border-top:1px solid #eee;"></td><td style="padding:0 12px;white-space:nowrap;font-size:12px;color:#aaa;">OR</td><td style="border-top:1px solid #eee;"></td></tr></table></td></tr>
+  <tr><td style="padding:0 32px 28px;">
+    <p style="font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.08em;margin:0 0 12px;text-align:center;">Step 3 — Enter your access code</p>
+    <div style="background:#fff8f0;border:2px dashed #e67e22;border-radius:12px;padding:20px 24px;text-align:center;">
+      <p style="margin:0 0 6px;font-size:12px;color:#92400e;font-weight:600;text-transform:uppercase;">Your Access Code</p>
+      <p style="margin:0;font-size:40px;font-weight:900;letter-spacing:.25em;color:#1a1a1a;font-family:'Courier New',monospace;">${accessCode}</p>
+      <p style="margin:12px 0 4px;font-size:13px;color:#92400e;">Go to <strong>albaniaaudiotours.com/#/activate</strong></p>
+      <p style="margin:0;font-size:12px;color:#b45309;">${deviceNote}</p>
+    </div>
+  </td></tr>
+  <tr><td style="background:#f9f9f9;border-top:1px solid #eee;padding:16px 32px;text-align:center;">
+    <p style="font-size:12px;color:#999;margin:0;line-height:1.6;">Issued by AlbaTour Admin &middot; Order ref: ${orderId}<br>Questions? <a href="mailto:book@albanianeagletours.com" style="color:#c0392b;text-decoration:none;">book@albanianeagletours.com</a></p>
+  </td></tr>
+</table></td></tr></table></body></html>`;
+
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: `AlbaTour <${RESEND_FROM_ADDR}>`,
+            to: [email.toLowerCase()],
+            subject: `\u{1F511} Your AlbaTour Access Code: ${accessCode}`,
+            html: emailHtml,
+            text: `Your AlbaTour access code is: ${accessCode}\n\nPlan: ${plan.name}\n${isPending ? 'Starts: ' + startStr + '\n' : ''}Expires: ${expiryStr}\n\nActivate at: ${activateUrl}\nOr go to albaniaaudiotours.com/#/activate and enter: ${accessCode}`,
+          }),
+        }).then(() => { emailSent = true; }).catch(e => console.error('[generate-code] Email failed:', e.message));
+      }
+
+      res.json({ success: true, sub, accessCode, emailSent });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 

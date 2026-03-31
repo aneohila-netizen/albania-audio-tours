@@ -11,6 +11,7 @@ import {
   AlertTriangle, Users, CreditCard, ExternalLink, Star,
   Eye, EyeOff, Building2, Zap, Mail, Download,
   Lock, LockOpen, Clock, CalendarDays, Bell, BellOff, RefreshCw,
+  KeyRound, Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -179,6 +180,44 @@ export default function AdminSubscriptions() {
   const effectiveLocked = paywallActive === true ||
     (!!freeUntil && new Date(freeUntil) < new Date());
 
+  // ── Manual code generator modal ─────────────────────────────────────────────
+  const [genPlan, setGenPlan] = useState<Plan | null>(null);
+  const [genEmail, setGenEmail] = useState("");
+  const [genStartDate, setGenStartDate] = useState(""); // "" = start today
+  const [genNotes, setGenNotes] = useState("");
+  const [genLoading, setGenLoading] = useState(false);
+  const [genResult, setGenResult] = useState<{ code: string; email: string; startsAt: string; expiresAt: string } | null>(null);
+  const [genError, setGenError] = useState("");
+
+  function openGenerateModal(plan: Plan) {
+    setGenPlan(plan); setGenEmail(""); setGenStartDate(""); setGenNotes("");
+    setGenResult(null); setGenError("");
+  }
+
+  async function submitGenerateCode() {
+    if (!genPlan || !genEmail) { setGenError("Email is required."); return; }
+    setGenLoading(true); setGenError(""); setGenResult(null);
+    try {
+      const body: any = { email: genEmail, planId: genPlan.id };
+      if (genStartDate) body.startsAt = new Date(genStartDate + "T00:00:00").toISOString();
+      if (genNotes) body.notes = genNotes;
+      const res = await fetch(`${RAILWAY_URL}/api/admin/subscriptions/generate-code`, {
+        method: "POST", headers,
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setGenResult({
+        code: data.accessCode,
+        email: data.sub.email,
+        startsAt: data.sub.startsAt,
+        expiresAt: data.sub.expiresAt,
+      });
+      loadSubscribers();
+    } catch (e: any) { setGenError(e.message); }
+    finally { setGenLoading(false); }
+  }
+
   const [loaded, setLoaded] = useState(false);
   if (!loaded) { setLoaded(true); loadPlans(); loadLeads(); loadSubscribers(); loadPaywallSettings(); }
 
@@ -241,6 +280,7 @@ export default function AdminSubscriptions() {
     const commercial = plans.filter(p => p.tier === "commercial");
 
     return (
+      <>
       <div className="space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -453,7 +493,7 @@ export default function AdminSubscriptions() {
                   <Zap size={11} /> Individual Plans
                 </div>
                 <div className="space-y-2">
-                  {individual.map(plan => <PlanRow key={plan.id} plan={plan} onEdit={() => { setEditPlan({...plan}); setView("edit"); setError(""); setSuccess(""); }} onToggle={() => toggleActive(plan)} onDelete={() => deletePlan(plan.id, plan.name)} />)}
+                  {individual.map(plan => <PlanRow key={plan.id} plan={plan} onEdit={() => { setEditPlan({...plan}); setView("edit"); setError(""); setSuccess(""); }} onToggle={() => toggleActive(plan)} onDelete={() => deletePlan(plan.id, plan.name)} onGenerateCode={openGenerateModal} />)}
                 </div>
               </div>
             )}
@@ -464,7 +504,7 @@ export default function AdminSubscriptions() {
                   <Building2 size={11} /> Commercial Licences
                 </div>
                 <div className="space-y-2">
-                  {commercial.map(plan => <PlanRow key={plan.id} plan={plan} onEdit={() => { setEditPlan({...plan}); setView("edit"); setError(""); setSuccess(""); }} onToggle={() => toggleActive(plan)} onDelete={() => deletePlan(plan.id, plan.name)} />)}
+                  {commercial.map(plan => <PlanRow key={plan.id} plan={plan} onEdit={() => { setEditPlan({...plan}); setView("edit"); setError(""); setSuccess(""); }} onToggle={() => toggleActive(plan)} onDelete={() => deletePlan(plan.id, plan.name)} onGenerateCode={openGenerateModal} />)}
                 </div>
               </div>
             )}
@@ -477,6 +517,103 @@ export default function AdminSubscriptions() {
           </>
         )}
       </div>
+
+      {/* ── Generate Code Modal (rendered inside fragment, outside scroll container) */}
+      {/* ── Generate Code Modal ─────────────────────────────────── */}
+      {genPlan && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
+          onClick={e => { if (e.target === e.currentTarget) { setGenPlan(null); } }}>
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+
+            {/* Header */}
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                <KeyRound size={15} className="text-amber-700" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm">Generate Access Code</h3>
+                <p className="text-xs text-muted-foreground">{genPlan.name} — €{genPlan.priceEur} / {genPlan.billingPeriod}</p>
+              </div>
+            </div>
+
+            {!genResult ? (
+              <>
+                {/* Email */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Customer Email *</label>
+                  <Input value={genEmail} onChange={e => { setGenEmail(e.target.value); setGenError(""); }}
+                    placeholder="customer@example.com" className="h-8 text-sm" type="email" />
+                </div>
+
+                {/* Start date */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <CalendarDays size={11} /> Tour Start Date <span className="font-normal">(leave blank = starts today)</span>
+                  </label>
+                  <input type="date"
+                    value={genStartDate}
+                    min={new Date().toISOString().slice(0,10)}
+                    onChange={e => setGenStartDate(e.target.value)}
+                    className="w-full h-8 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                  {genStartDate && (
+                    <p className="text-xs text-amber-700">
+                      Access activates on {new Date(genStartDate + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}. The customer receives the code now but tours unlock on that date.
+                    </p>
+                  )}
+                </div>
+
+                {/* Admin notes */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Admin Notes (internal)</label>
+                  <Input value={genNotes} onChange={e => setGenNotes(e.target.value)}
+                    placeholder="e.g. Refund replacement, comp for support issue…" className="h-8 text-sm" />
+                </div>
+
+                {genError && (
+                  <div className="flex items-center gap-1.5 p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs">
+                    <AlertTriangle size={12} /> {genError}
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-1">
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => setGenPlan(null)}>Cancel</Button>
+                  <Button size="sm" className="flex-1 bg-amber-600 hover:bg-amber-700" onClick={submitGenerateCode} disabled={genLoading || !genEmail}>
+                    {genLoading
+                      ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1" />Generating…</>
+                      : <><KeyRound size={13} className="mr-1" />Generate &amp; Send</>}
+                  </Button>
+                </div>
+                <p className="text-xs text-center text-muted-foreground">Code + QR will be emailed to the customer automatically.</p>
+              </>
+            ) : (
+              /* Success state */
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-green-50 border border-green-200">
+                  <CheckCircle2 size={16} className="text-green-600 shrink-0" />
+                  <div className="text-xs">
+                    <p className="font-semibold text-green-800">Code generated &amp; email sent!</p>
+                    <p className="text-green-700">Sent to {genResult.email}</p>
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl bg-amber-50 border-2 border-dashed border-amber-300 text-center">
+                  <p className="text-xs text-amber-800 font-semibold mb-1">Access Code</p>
+                  <p className="text-3xl font-black tracking-widest font-mono text-amber-900">{genResult.code}</p>
+                  <p className="text-xs text-amber-700 mt-2">
+                    {new Date(genResult.startsAt) > new Date()
+                      ? `Activates: ${new Date(genResult.startsAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
+                      : "Active now"}
+                    {" — "}
+                    Expires: {new Date(genResult.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                  </p>
+                </div>
+                <Button size="sm" className="w-full" onClick={() => setGenPlan(null)}>Done</Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      </>
     );
   }
 
@@ -833,11 +970,12 @@ export default function AdminSubscriptions() {
 }
 
 // ── Plan row component ────────────────────────────────────────────────────────
-function PlanRow({ plan, onEdit, onToggle, onDelete }: {
+function PlanRow({ plan, onEdit, onToggle, onDelete, onGenerateCode }: {
   plan: Plan;
   onEdit: () => void;
   onToggle: () => void;
   onDelete: () => void;
+  onGenerateCode: (plan: Plan) => void;
 }) {
   const period = { "7-day": "7-day pass", month: "/mo", year: "/yr" }[plan.billingPeriod] || plan.billingPeriod;
   return (
@@ -856,6 +994,13 @@ function PlanRow({ plan, onEdit, onToggle, onDelete }: {
         <p className="text-xs text-muted-foreground truncate">{plan.tagline}</p>
       </div>
       <div className="flex items-center gap-1 shrink-0">
+        {/* Generate Code button — manual access code for this plan */}
+        <Button variant="ghost" size="sm"
+          className="h-7 px-2 text-xs text-amber-700 hover:text-amber-800 hover:bg-amber-50 gap-1"
+          onClick={() => onGenerateCode(plan)}
+          title="Generate manual access code for this plan">
+          <Lock size={11} /> Code
+        </Button>
         <a href={`https://albania-audio-tours-production.up.railway.app/#/subscriptions`} target="_blank" rel="noopener noreferrer">
           <Button variant="ghost" size="icon" className="h-7 w-7"><ExternalLink size={12} /></Button>
         </a>

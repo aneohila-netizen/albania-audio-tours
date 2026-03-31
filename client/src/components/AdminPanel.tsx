@@ -1520,28 +1520,36 @@ function ImageGalleryCard({
     return () => clearInterval(timer);
   }, [allImages.length]);
 
-  // Upload gallery image — saved immediately to DB
-  async function uploadImage(file: File) {
-    if (!entityId) {
-      setError("Save the record first, then add images.");
-      return;
+  // Upload one or multiple gallery images — saved immediately to DB
+  const [uploadProgress, setUploadProgress] = useState("");
+
+  async function uploadImage(file: File): Promise<string[]> {
+    if (!entityId) { setError("Save the record first, then add images."); return []; }
+    const fd = new FormData();
+    fd.append("image", file);
+    const res = await adminUpload(`/api/admin/${entityType}/${entityId}/gallery`, fd);
+    if (!res.ok) throw new Error("Upload failed");
+    const data = await res.json();
+    return data.images || [];
+  }
+
+  async function handleFiles(files: FileList | File[]) {
+    if (!entityId) { setError("Save the record first, then add images."); return; }
+    const arr = Array.from(files).filter(f => f.type.startsWith("image/"));
+    if (!arr.length) return;
+    setError(""); setUploading(true);
+    let lastImages: string[] = [];
+    for (let i = 0; i < arr.length; i++) {
+      setUploadProgress(arr.length > 1 ? `Uploading ${i + 1} of ${arr.length}…` : "Uploading…");
+      try {
+        lastImages = await uploadImage(arr[i]);
+        onUpdate(lastImages[0] || "", lastImages);
+      } catch {
+        setError(`Failed on image ${i + 1}. Others may have uploaded.`);
+      }
     }
-    setError("");
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append("image", file);
-      const res = await adminUpload(`/api/admin/${entityType}/${entityId}/gallery`, fd);
-      if (!res.ok) throw new Error("Upload failed");
-      const data = await res.json();
-      const updated: string[] = data.images || [];
-      // gallery[0] becomes the hero
-      onUpdate(updated[0] || "", updated);
-      setSlideIdx(updated.length - 1);
-    } catch {
-      setError("Upload failed. Please try again.");
-    }
-    setUploading(false);
+    if (lastImages.length) setSlideIdx(lastImages.length - 1);
+    setUploadProgress(""); setUploading(false);
   }
 
   // Remove gallery image — HARDCODED: requires x-confirm-delete header (media safety rule)
@@ -1640,27 +1648,32 @@ function ImageGalleryCard({
           </div>
         )}
 
-        {/* Upload button */}
+        {/* Upload button — supports single or multiple files + drag-and-drop */}
         <div
           className="border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all border-border/60 hover:border-primary/40 hover:bg-primary/5"
           onClick={() => fileRef.current?.click()}
+          onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add("border-primary", "bg-primary/5"); }}
+          onDragLeave={e => { e.currentTarget.classList.remove("border-primary", "bg-primary/5"); }}
+          onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove("border-primary", "bg-primary/5"); if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); }}
         >
           {uploading ? (
             <div className="flex items-center justify-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin text-primary" />
-              <p className="text-xs text-muted-foreground">Uploading…</p>
+              <p className="text-xs text-muted-foreground">{uploadProgress || "Uploading…"}</p>
             </div>
           ) : (
-            <div className="flex items-center justify-center gap-2">
-              <Upload className="w-4 h-4 text-primary/60" />
-              <p className="text-xs font-medium">
-                {allImages.length === 0 ? "Upload first image (becomes hero)" : "Add another image"}
-              </p>
-              <p className="text-xs text-muted-foreground/70">— saved immediately</p>
+            <div className="space-y-1">
+              <div className="flex items-center justify-center gap-2">
+                <Upload className="w-4 h-4 text-primary/60" />
+                <p className="text-xs font-medium">
+                  {allImages.length === 0 ? "Upload images (first becomes hero)" : "Add more images"}
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground/70">Select multiple files or drag &amp; drop — saved immediately</p>
             </div>
           )}
-          <input ref={fileRef} type="file" accept="image/*" className="hidden"
-            onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f); e.target.value = ""; }} />
+          <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
+            onChange={e => { if (e.target.files?.length) handleFiles(e.target.files); e.target.value = ""; }} />
         </div>
 
         {error && (
