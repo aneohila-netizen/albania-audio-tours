@@ -328,6 +328,24 @@ class PgStorage implements IStorage {
         AND images LIKE '%/api/images/db/%'
     `).catch(() => {});
 
+    // DATA REPAIR: Clear stale imageUrl values that point to any domain-based serve URL.
+    // These get regenerated correctly from gallery[0] on next API response.
+    // Handles cases where imageUrl was stored with a domain that no longer serves images.
+    await this.pool.query(`
+      UPDATE tour_sites
+      SET image_url = NULL
+      WHERE image_url IS NOT NULL
+        AND image_url LIKE '%/api/images/db/%'
+        AND image_url NOT LIKE '%/gallery/%'
+    `).catch(() => {});
+    await this.pool.query(`
+      UPDATE attractions
+      SET image_url = NULL
+      WHERE image_url IS NOT NULL
+        AND image_url LIKE '%/api/images/db/%'
+        AND image_url NOT LIKE '%/gallery/%'
+    `).catch(() => {});
+
     // Subscription plans table
     await this.pool.query(`
       CREATE TABLE IF NOT EXISTS subscription_plans (
