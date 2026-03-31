@@ -124,10 +124,12 @@ function incrementListenCount(siteId: number) {
 // ─── Config ───────────────────────────────────────────────────────────────────
 // Absolute base URL used to form persistent media URLs stored in the DB.
 // On Railway this resolves to the public domain; locally it falls back to localhost.
+// RAILWAY_BASE: used ONLY for generating serve URLs for images and audio.
+// Must point to the Railway server directly (never through GoDaddy forwarding,
+// which strips paths and breaks API image/audio serving).
 const RAILWAY_BASE = process.env.RAILWAY_PUBLIC_DOMAIN
   ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-  : process.env.PUBLIC_URL
-  || "https://albaniaaudiotours.com";
+  : "https://albania-audio-tours-production.up.railway.app";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "AlbaTour2026!";
@@ -209,13 +211,22 @@ function stripImageData(obj: any, type: 'attraction'|'site'): any {
   if (!obj) return obj;
   const out = { ...obj };
 
-  // Replace imageUrl data URI with serve URL
+  // Replace imageUrl data URI with a proper serve URL
   if (out.imageUrl && out.imageUrl.startsWith('data:')) {
     out.imageUrl = `${RAILWAY_BASE}/api/images/db/${type}/${obj.id}`;
   }
-  // Clear broken self-referencing imageUrl values
-  if (out.imageUrl && (out.imageUrl.includes('/api/images/db/') || out.imageUrl.includes('railway.app'))) {
-    out.imageUrl = null;
+  // Clear ONLY stale self-referencing serve URLs that point to the legacy single-image endpoint
+  // (those are now superseded by gallery[0]). Keep gallery serve URLs — they are valid.
+  // A stale URL looks like: .../api/images/db/site/1  (no /gallery/ segment)
+  if (out.imageUrl) {
+    const hasGallery = out.imageUrl.includes('/gallery/');
+    const isServeUrl = out.imageUrl.includes('/api/images/db/');
+    const isLegacyRailway = out.imageUrl.includes('railway.app') && isServeUrl && !hasGallery;
+    if (isServeUrl && !hasGallery && !isLegacyRailway) {
+      // Stale single-image serve URL — clear it so gallery[0] takes over below
+      out.imageUrl = null;
+    }
+    // Note: gallery serve URLs (/api/images/db/.../gallery/N) are kept as-is
   }
 
   // Replace gallery data URIs with serve URLs
@@ -363,9 +374,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       return res.send(buf);
     }
-    // If the stored value is a self-referencing serve URL or any railway URL, return 404
-    // (prevents infinite redirect loops when imageUrl wasn't set via file upload)
-    if (imageData.includes("/api/images/db/") || imageData.includes("railway.app")) {
+    // Prevent infinite redirect loops for self-referencing serve URLs
+    if (imageData.includes("/api/images/db/")) {
       return res.status(404).json({ error: "Image not found — please re-upload via gallery" });
     }
     // Redirect to external URL (e.g. Unsplash)
@@ -395,6 +405,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.setHeader("Content-Type", mime);
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       return res.send(buf);
+    }
+    // Prevent redirect loops: if the stored gallery value is itself a serve URL,
+    // it means the image was stored incorrectly. Return 404.
+    if (imageData.includes("/api/images/db/")) {
+      return res.status(404).json({ error: "Gallery image not found — please re-upload" });
     }
     res.redirect(imageData);
   });

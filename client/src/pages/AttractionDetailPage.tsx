@@ -194,19 +194,17 @@ export default function AttractionDetailPage() {
       {/* Visitor rating average */}
       <StarRatingDisplay siteSlug={attraction.slug} />
 
+      {/* Audio player (premium) — gated behind subscription */}
       <PaywallGate
         isLocked={(attraction as any).isLocked || false}
         siteName={aName}
         shopifyUrl={(attraction as any).shopifyUrl}
       >
+        <AudioPlayer site={siteCompat} text={aDesc} onComplete={() => { if (!isVisited) handleMarkVisited(); }} />
+        <ItineraryCard siteSlug={attraction.slug} centerLat={attraction.lat} centerLng={attraction.lng} />
+      </PaywallGate>
 
-      {/* Audio player — primary focus: sits above description */}
-      <AudioPlayer site={siteCompat} text={aDesc} onComplete={() => { if (!isVisited) handleMarkVisited(); }} />
-
-      {/* Tour Itineraries — below audio, above description */}
-      <ItineraryCard siteSlug={attraction.slug} centerLat={attraction.lat} centerLng={attraction.lng} />
-
-      {/* Description — collapsed by default */}
+      {/* Description — FREE forever as promised */}
       <div>
         <p className={`text-base leading-relaxed text-foreground transition-all ${
           showFullDesc ? "" : "line-clamp-4"
@@ -219,7 +217,7 @@ export default function AttractionDetailPage() {
         </button>
       </div>
 
-      {/* Fun fact */}
+      {/* Fun fact — FREE forever */}
       {aFunFact && (
         <div className="rounded-xl border border-border bg-muted/50 p-4" data-testid="fun-fact">
           <div className="flex items-start gap-3">
@@ -232,7 +230,7 @@ export default function AttractionDetailPage() {
         </div>
       )}
 
-      {/* Mini-map */}
+      {/* Mini-map — FREE forever */}
       <div className="rounded-xl border border-border overflow-hidden" data-testid="mini-map">
         <MiniMap lat={attraction.lat} lng={attraction.lng} label={aName} />
         <a href={`https://www.google.com/maps?q=${attraction.lat},${attraction.lng}`} target="_blank" rel="noopener noreferrer"
@@ -244,8 +242,6 @@ export default function AttractionDetailPage() {
 
       {/* Book with a guide */}
       <BookWithGuide shopifyUrl={(attraction as any).shopifyUrl || ""} siteName={aName} />
-
-      </PaywallGate>
 
       {/* Mark visited */}
       <button data-testid="mark-visited-btn" onClick={handleMarkVisited} disabled={isVisited}

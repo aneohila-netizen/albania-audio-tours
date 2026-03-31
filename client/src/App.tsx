@@ -189,11 +189,12 @@ function AppRoutes() {
               title="Chat on WhatsApp"
               style={{
                 position: "fixed",
-                // Sits at bottom-LEFT so it never overlaps Leaflet zoom controls (bottom-right)
-                // Raised above the sticky audio player bar (~5rem)
-                bottom: "5.5rem",
-                left: "0.75rem",
-                right: "auto",
+                // RIGHT side, BELOW the Leaflet zoom controls.
+                // Zoom sits at margin-bottom:7rem with ~4.5rem height = top at ~11.5rem.
+                // WhatsApp at 12.5rem puts it just below zoom, clear of everything.
+                bottom: "12.5rem",
+                right: "0.75rem",
+                left: "auto",
                 zIndex: 1500,
                 width: "44px",
                 height: "44px",

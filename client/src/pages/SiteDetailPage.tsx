@@ -158,19 +158,17 @@ export default function SiteDetailPage() {
       {/* Visitor rating average */}
       <StarRatingDisplay siteSlug={site.slug} />
 
+      {/* Audio player (premium) — gated behind subscription */}
       <PaywallGate
         isLocked={(site as any).isLocked || false}
         siteName={name}
         shopifyUrl={(site as any).shopifyUrl}
       >
+        <AudioPlayer site={site} text={desc} onComplete={handleAudioComplete} />
+        <ItineraryCard siteSlug={site.slug} centerLat={site.lat} centerLng={site.lng} />
+      </PaywallGate>
 
-      {/* Audio player — primary focus: sits above description */}
-      <AudioPlayer site={site} text={desc} onComplete={handleAudioComplete} />
-
-      {/* Tour Itineraries — below audio, above description */}
-      <ItineraryCard siteSlug={site.slug} centerLat={site.lat} centerLng={site.lng} />
-
-      {/* Description — collapsed by default, expand on request */}
+      {/* Description — FREE forever as promised — collapsed by default */}
       <div>
         <p className={`text-base leading-relaxed text-muted-foreground transition-all ${
           showFullDesc ? "" : "line-clamp-4"
@@ -212,8 +210,6 @@ export default function SiteDetailPage() {
 
       {/* Book with a guide */}
       <BookWithGuide shopifyUrl={(site as any).shopifyUrl || ""} siteName={name} />
-
-      </PaywallGate>
 
       {/* Mark visited CTA */}
       <button
