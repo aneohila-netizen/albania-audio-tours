@@ -7,7 +7,7 @@ import type { Destination, Attraction } from "@/lib/staticData";
 import VisitModal from "@/components/VisitModal";
 import { apiRequest } from "@/lib/queryClient";
 import { getSessionId } from "@/lib/session";
-import { MapPin, X, Layers, Locate, LocateFixed, Headphones, ChevronRight, ArrowRight } from "lucide-react";
+import { MapPin, X, Layers, Locate, LocateFixed, Headphones, ChevronRight, ArrowRight, Search } from "lucide-react";
 // Leaflet marker cluster — groups overlapping pins into numbered bubbles
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
@@ -102,6 +102,7 @@ export default function MapPage() {
 
   // ── Destinations list panel ───────────────────────────────────────────────
   const [showDestPanel, setShowDestPanel] = useState(false);
+  const [destSearch, setDestSearch] = useState("");
 
   // ── GPS blue dot state ────────────────────────────────────────────
   const [autoCenter, setAutoCenter] = useState(false);
@@ -1193,43 +1194,71 @@ export default function MapPage() {
           aria-label="Destinations list"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-3 py-2.5 border-b border-border sticky top-0 bg-card/96 backdrop-blur rounded-t-2xl">
-            <span className="text-xs font-semibold text-foreground">All Destinations</span>
-            <button
-              onClick={() => setShowDestPanel(false)}
-              className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
-              aria-label="Close destinations list"
-            >
-              <X size={12} />
-            </button>
+          <div className="sticky top-0 bg-card/96 backdrop-blur rounded-t-2xl border-b border-border">
+            <div className="flex items-center justify-between px-3 py-2.5">
+              <span className="text-xs font-semibold text-foreground">All Destinations</span>
+              <button
+                onClick={() => { setShowDestPanel(false); setDestSearch(""); }}
+                className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+                aria-label="Close destinations list"
+              >
+                <X size={12} />
+              </button>
+            </div>
+            {/* Search box */}
+            <div className="px-2 pb-2">
+              <div className="relative">
+                <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  value={destSearch}
+                  onChange={e => setDestSearch(e.target.value)}
+                  placeholder="Search destinations…"
+                  className="w-full pl-7 pr-2 py-1.5 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  autoComplete="off"
+                />
+                {destSearch && (
+                  <button
+                    onClick={() => setDestSearch("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Destination rows */}
+          {/* Destination rows — sorted A–Z, filtered by search */}
           <div className="py-1">
-            {DESTINATIONS.map(dest => {
-              const dName = destName(dest);
-              return (
+            {[...DESTINATIONS]
+              .map(dest => ({ dest, dName: destName(dest) }))
+              .filter(({ dName }) =>
+                !destSearch || dName.toLowerCase().includes(destSearch.toLowerCase())
+              )
+              .sort((a, b) => a.dName.localeCompare(b.dName))
+              .map(({ dest, dName }) => (
                 <button
                   key={dest.slug}
                   onClick={() => {
-                    // Fly map to this destination
                     const map = mapInstanceRef.current;
                     if (map) map.flyTo([dest.lat, dest.lng], 13, { duration: 1 });
                     setShowDestPanel(false);
+                    setDestSearch("");
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/60 transition-colors text-left group"
                 >
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ background: "#C0392B" }}
-                  />
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: "#C0392B" }} />
                   <span className="text-xs text-foreground leading-tight flex-1 truncate group-hover:text-primary transition-colors">
                     {dName}
                   </span>
                   <ChevronRight size={10} className="text-muted-foreground/50 group-hover:text-primary shrink-0 transition-colors" />
                 </button>
-              );
-            })}
+              ))
+            }
+            {destSearch && !DESTINATIONS.some(d => destName(d).toLowerCase().includes(destSearch.toLowerCase())) && (
+              <p className="text-xs text-muted-foreground text-center py-4 px-3">No destinations match "{destSearch}"</p>
+            )}
           </div>
         </div>
       )}

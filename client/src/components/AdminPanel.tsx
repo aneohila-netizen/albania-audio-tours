@@ -1419,9 +1419,12 @@ function DestinationPreviewCard({ form }: { form: any }) {
   );
 }
 
-function AttractionPreviewCard({ form, destinationName }: { form: any; destinationName: string }) {
+function AttractionPreviewCard({ form, destinationName, destinationSlug }: { form: any; destinationName: string; destinationSlug?: string }) {
   const RAILWAY_BASE = "https://albania-audio-tours-production.up.railway.app";
-  const frontendUrl = `${RAILWAY_BASE}/#/attraction/${form.slug}`;
+  // Correct route: /#/sites/:destinationSlug/:attractionSlug
+  const frontendUrl = destinationSlug
+    ? `${RAILWAY_BASE}/#/sites/${destinationSlug}/${form.slug}`
+    : `${RAILWAY_BASE}/#/sites/${form.destinationSlug || ""}/${form.slug}`;
   const catColor = CATEGORY_COLORS[form.category] || "bg-gray-100 text-gray-800";
   return (
     <div className="space-y-4">
@@ -1879,6 +1882,8 @@ function EditorView({
       funFactFr: form.funFactFr || null,
       funFactAr: form.funFactAr || null,
       funFactSl: form.funFactSl || null,
+      funFactPt: form.funFactPt || null,
+      funFactCn: form.funFactCn || null,
       nameAl: form.nameAl || form.nameEn,
       nameGr: form.nameGr || form.nameEn,
       nameIt: form.nameIt || null,
@@ -2402,12 +2407,15 @@ function AttrEditorView({
       nameEn: form.nameEn, nameAl: form.nameAl || form.nameEn, nameGr: form.nameGr || form.nameEn,
       nameIt: form.nameIt || null, nameEs: form.nameEs || null, nameDe: form.nameDe || null,
       nameFr: form.nameFr || null, nameAr: form.nameAr || null, nameSl: form.nameSl || null,
+      namePt: form.namePt || null, nameCn: form.nameCn || null,
       descEn: form.descEn, descAl: form.descAl || form.descEn, descGr: form.descGr || form.descEn,
       descIt: form.descIt || null, descEs: form.descEs || null, descDe: form.descDe || null,
       descFr: form.descFr || null, descAr: form.descAr || null, descSl: form.descSl || null,
+      descPt: form.descPt || null, descCn: form.descCn || null,
       funFactEn: form.funFactEn || "", funFactAl: form.funFactAl || form.funFactEn || "", funFactGr: form.funFactGr || form.funFactEn || "",
       funFactIt: form.funFactIt || null, funFactEs: form.funFactEs || null, funFactDe: form.funFactDe || null,
       funFactFr: form.funFactFr || null, funFactAr: form.funFactAr || null, funFactSl: form.funFactSl || null,
+      funFactPt: form.funFactPt || null, funFactCn: form.funFactCn || null,
       category: form.category,
       points: parseInt(form.points) || 50,
       lat: parseFloat(form.lat),
@@ -2663,7 +2671,7 @@ function AttrEditorView({
 
           {/* Preview */}
           <TabsContent value="preview" className="space-y-5">
-            <AttractionPreviewCard form={form} destinationName={destinationName} />
+            <AttractionPreviewCard form={form} destinationName={destinationName} destinationSlug={destinationSlug} />
           </TabsContent>
         </Tabs>
 
