@@ -125,11 +125,10 @@ function incrementListenCount(siteId: number) {
 // Absolute base URL used to form persistent media URLs stored in the DB.
 // On Railway this resolves to the public domain; locally it falls back to localhost.
 // RAILWAY_BASE: used ONLY for generating serve URLs for images and audio.
-// Must point to the Railway server directly (never through GoDaddy forwarding,
-// which strips paths and breaks API image/audio serving).
-const RAILWAY_BASE = process.env.RAILWAY_PUBLIC_DOMAIN
-  ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-  : "https://albania-audio-tours-production.up.railway.app";
+// MUST always be the Railway direct URL — never albaniaaudiotours.com.
+// GoDaddy forwarding strips URL paths, breaking all /api/images/db/... requests.
+// Do NOT use RAILWAY_PUBLIC_DOMAIN here — that domain goes through forwarding.
+const RAILWAY_BASE = "https://albania-audio-tours-production.up.railway.app";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "AlbaTour2026!";
