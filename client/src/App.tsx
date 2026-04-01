@@ -189,10 +189,9 @@ function AppRoutes() {
               title="Chat on WhatsApp"
               style={{
                 position: "fixed",
-                // RIGHT side, BELOW the Leaflet zoom controls.
-                // Zoom sits at margin-bottom:7rem with ~4.5rem height = top at ~11.5rem.
-                // WhatsApp at 12.5rem puts it just below zoom, clear of everything.
-                bottom: "12.5rem",
+                // RIGHT side. Zoom is now on LEFT on mobile, so no overlap.
+                // On desktop zoom is right at ~11.5rem — WhatsApp at 8rem is below it.
+                bottom: "8rem",
                 right: "0.75rem",
                 left: "auto",
                 zIndex: 1500,

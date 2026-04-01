@@ -416,9 +416,32 @@
 }
 
 /* Push Leaflet zoom control above sticky audio player (approx 7rem) */
+/* Desktop: stays bottom-right, clear of WhatsApp */
 .leaflet-bottom.leaflet-right .leaflet-control-zoom {
   margin-bottom: 7rem;
   margin-right: 0.75rem;
+}
+
+/* Mobile: move zoom to bottom-LEFT so WhatsApp (bottom-right) never overlaps.
+   Leaflet places zoom in .leaflet-bottom.leaflet-right, so we reposition the
+   entire right-bottom corner and shift zoom left using negative right + left trick. */
+@media (max-width: 768px) {
+  /* Pull the zoom control out of the right corner and place it on the left */
+  .leaflet-bottom.leaflet-right .leaflet-control-zoom {
+    position: fixed !important;
+    right: auto !important;
+    left: 0.75rem !important;
+    bottom: 7rem !important;
+    margin: 0 !important;
+  }
+  /* Larger, finger-friendly touch targets */
+  .leaflet-control-zoom-in,
+  .leaflet-control-zoom-out {
+    width: 40px !important;
+    height: 40px !important;
+    line-height: 40px !important;
+    font-size: 20px !important;
+  }
 }
 
 /* Leaflet attribution — legally required, reduced size for visual comfort */
