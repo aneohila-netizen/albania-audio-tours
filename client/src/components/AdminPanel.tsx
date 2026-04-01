@@ -1591,30 +1591,40 @@ function ImageGalleryCard({
   }
 
   // ── Move selected image left or right ────────────────────────────────────
-  // Builds a new order array, calls /gallery/reorder, follows selected image.
+  // Re-orders the gallery by swapping the selected image one step left or right.
+  // Sends the new ordering to the server immediately.
   async function moveSelected(direction: -1 | 1) {
     if (selectedIdx === null || !entityId) return;
     const n = allImages.length;
     const newPos = selectedIdx + direction;
-    if (newPos < 0 || newPos >= n) return; // already at edge
-    // Build order: swap selectedIdx with neighbour
+    if (newPos < 0 || newPos >= n) return;
+
+    // Build the new visual order as an index permutation:
+    // order[i] = which old index goes to new position i
+    // We want to swap positions selectedIdx and newPos.
     const order = Array.from({ length: n }, (_, i) => i);
-    [order[selectedIdx], order[newPos]] = [order[newPos], order[selectedIdx]];
+    // Swap: position selectedIdx gets newPos's old item, and vice versa
+    order[selectedIdx] = newPos;
+    order[newPos] = selectedIdx;
+
     setMoving(true);
     setError("");
     try {
       const res = await adminFetch(`/api/admin/${entityType}/${entityId}/gallery/reorder`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ order }),
       });
-      if (!res.ok) throw new Error();
       const d = await res.json();
-      onUpdate(d.imageUrl || d.images?.[0] || "", d.images || []);
-      setSelectedIdx(newPos);    // follow the moved image
-      setSlideIdx(newPos);       // show it in the preview
-    } catch {
-      setError("Move failed. Please try again.");
+      if (!res.ok) {
+        setError(`Move failed: ${d?.error || res.status}`);
+        return;
+      }
+      const newImgs: string[] = d.images || [];
+      onUpdate(d.imageUrl || newImgs[0] || "", newImgs);
+      setSelectedIdx(newPos);
+      setSlideIdx(newPos);
+    } catch (e: any) {
+      setError(`Move failed: ${e?.message || "network error"}`);
     } finally {
       setMoving(false);
     }
@@ -1682,24 +1692,52 @@ function ImageGalleryCard({
           <div className="space-y-1.5">
             {/* Move controls — only shown when an image is selected */}
             {selectedIdx !== null && (
-              <div className="flex items-center gap-2 px-1">
-                <span className="text-[11px] text-amber-600 font-medium flex-1">
-                  Image {selectedIdx + 1} selected — use arrows to reposition{selectedIdx === 0 ? " (already hero)" : ""}
+              <div className="flex items-center gap-1.5 px-1 py-1 rounded-lg bg-amber-50 border border-amber-200">
+                <span className="text-[11px] text-amber-700 font-medium flex-1">
+                  {moving ? "Moving…" : `Image ${selectedIdx + 1} selected${selectedIdx === 0 ? " — already hero" : ""}`}
                 </span>
+                {/* Move to hero directly if not already hero */}
+                {selectedIdx > 0 && (
+                  <button type="button"
+                    onClick={async () => {
+                      // Build order that moves selectedIdx to position 0
+                      const order = Array.from({ length: allImages.length }, (_, i) => i);
+                      order.splice(selectedIdx, 1);
+                      order.unshift(selectedIdx);
+                      setMoving(true); setError("");
+                      try {
+                        const res = await adminFetch(`/api/admin/${entityType}/${entityId}/gallery/reorder`, {
+                          method: "PUT", body: JSON.stringify({ order }),
+                        });
+                        const d = await res.json();
+                        if (!res.ok) { setError(`Failed: ${d?.error || res.status}`); return; }
+                        onUpdate(d.imageUrl || d.images?.[0] || "", d.images || []);
+                        setSelectedIdx(0); setSlideIdx(0);
+                      } catch (e: any) { setError(`Failed: ${e?.message}`); }
+                      finally { setMoving(false); }
+                    }}
+                    disabled={moving}
+                    className="text-[10px] px-2 h-6 rounded bg-primary text-white hover:bg-primary/80 disabled:opacity-40 font-medium whitespace-nowrap">
+                    ★ Set Hero
+                  </button>
+                )}
                 <button type="button"
                   onClick={() => moveSelected(-1)}
                   disabled={selectedIdx === 0 || moving}
-                  className="w-7 h-7 rounded-lg bg-amber-100 hover:bg-amber-200 disabled:opacity-30 flex items-center justify-center text-amber-700">
+                  title="Move left"
+                  className="w-7 h-7 rounded-lg bg-amber-200 hover:bg-amber-300 disabled:opacity-30 flex items-center justify-center text-amber-800">
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 <button type="button"
                   onClick={() => moveSelected(1)}
                   disabled={selectedIdx === allImages.length - 1 || moving}
-                  className="w-7 h-7 rounded-lg bg-amber-100 hover:bg-amber-200 disabled:opacity-30 flex items-center justify-center text-amber-700">
+                  title="Move right"
+                  className="w-7 h-7 rounded-lg bg-amber-200 hover:bg-amber-300 disabled:opacity-30 flex items-center justify-center text-amber-800">
                   <ChevronRight className="w-4 h-4" />
                 </button>
                 <button type="button"
                   onClick={() => setSelectedIdx(null)}
+                  title="Deselect"
                   className="w-7 h-7 rounded-lg bg-muted hover:bg-muted/60 flex items-center justify-center text-muted-foreground">
                   <X className="w-3.5 h-3.5" />
                 </button>
