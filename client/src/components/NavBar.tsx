@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useApp } from "@/App";
 import { LANG_LABELS, LANG_NAMES, type Lang } from "@/lib/i18n";
-import { Map, List, Route, Trophy, Moon, Sun, Settings, ChevronDown, Search, X } from "lucide-react";
+import { MapPin, Compass, BookOpen, CreditCard, Moon, Sun, Settings, ChevronDown, Search, X } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useDestinations, useAttractions } from "@/lib/useApiData";
 import { getLangText } from "@/lib/i18n";
@@ -10,11 +10,20 @@ export default function NavBar() {
   const [location] = useLocation();
   const { t, lang, setLang, totalPoints, visitedSiteIds, dark, toggleDark } = useApp();
 
+  // Mobile nav: 4 clear tabs — Map, Destinations, My Journey, Subscribe
+  // Desktop nav keeps separate navItems with full labels (see below)
+  const mobileNavItems = [
+    { href: "/",             icon: MapPin,     label: "Map" },
+    { href: "/sites",        icon: Compass,    label: "Destinations" },
+    { href: "/passport",     icon: BookOpen,   label: "My Journey" },
+    { href: "/subscriptions",icon: CreditCard, label: "Subscribe" },
+  ];
+
   const navItems = [
-    { href: "/", icon: Map, label: t.exploreMap },
-    { href: "/sites", icon: List, label: t.tourSites },
-    { href: "/passport", icon: Route, label: t.myPassport },
-    { href: "/leaderboard", icon: Trophy, label: t.leaderboard },
+    { href: "/",             icon: MapPin,   label: t.exploreMap },
+    { href: "/sites",        icon: Compass,  label: t.tourSites },
+    { href: "/passport",     icon: BookOpen, label: t.myPassport },
+    { href: "/leaderboard",  icon: CreditCard, label: t.leaderboard },
   ];
 
   const allLangs: Lang[] = ["en", "al", "gr", "it", "es", "de", "fr", "ar", "sl", "pt", "cn"];
@@ -271,32 +280,33 @@ export default function NavBar() {
         </div>
       </div>
 
-      {/* Mobile bottom nav — full-width, 44px touch targets, full labels */}
-      <nav className="md:hidden flex border-t border-border bg-background">
-        {navItems.map(({ href, icon: Icon, label }) => {
+      {/* Mobile bottom nav — pill-style active tab, clear separation, better icons */}
+      <nav className="md:hidden flex items-center border-t border-border bg-background px-2 py-1.5 gap-1">
+        {mobileNavItems.map(({ href, icon: Icon, label }) => {
           const active = location === href || (href !== "/" && location.startsWith(href));
+          const isSubscribe = href === "/subscriptions";
           return (
             <Link key={href} href={href}>
               <a
-                data-testid={`mobile-nav-${href.replace("/", "") || "map"}`}
-                className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 transition-colors relative ${
-                  active ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                data-testid={`mobile-nav-${href.replace(/\//g, "") || "map"}`}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 px-1 transition-all select-none ${
+                  active
+                    ? isSubscribe
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-primary/10 text-primary"
+                    : isSubscribe
+                      ? "bg-primary/8 text-primary hover:bg-primary/15"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                 }`}
-                style={{ minHeight: 52 }}
+                style={{ minHeight: 48, minWidth: 0 }}
               >
-                {/* Active indicator bar at top */}
-                {active && (
-                  <span
-                    className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-primary"
-                    aria-hidden="true"
-                  />
-                )}
-                <Icon size={22} strokeWidth={active ? 2.2 : 1.8} />
+                <Icon
+                  size={20}
+                  strokeWidth={active ? 2.2 : 1.8}
+                />
                 <span
-                  className={`leading-none text-center font-medium ${
-                    active ? "font-semibold" : ""
-                  }`}
-                  style={{ fontSize: "11px" }}
+                  className="leading-none text-center font-medium whitespace-nowrap"
+                  style={{ fontSize: "10px" }}
                 >
                   {label}
                 </span>
