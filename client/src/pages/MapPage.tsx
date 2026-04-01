@@ -1196,7 +1196,10 @@ export default function MapPage() {
           {/* Header */}
           <div className="sticky top-0 bg-card/96 backdrop-blur rounded-t-2xl border-b border-border">
             <div className="flex items-center justify-between px-3 py-2.5">
-              <span className="text-xs font-semibold text-foreground">All Destinations</span>
+              <a href="/#/sites"
+                className="text-xs font-semibold text-primary hover:underline underline-offset-2"
+                onClick={() => { setShowDestPanel(false); setDestSearch(""); }}
+              >All Destinations</a>
               <button
                 onClick={() => { setShowDestPanel(false); setDestSearch(""); }}
                 className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
