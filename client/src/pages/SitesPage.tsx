@@ -37,7 +37,7 @@ export default function SitesPage() {
   const { lang } = useApp();
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("all");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
 
   const name = (d: Destination) => getLangText(d, "name", lang);
