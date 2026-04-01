@@ -30,9 +30,9 @@ const STAMP_COLORS: Record<string, string> = {
 export default function PassportPage() {
   const { t, lang, visitedSiteIds, totalPoints } = useApp();
 
-  const { data: sites = STATIC_SITES } = useQuery<TourSite[]>({
+  const { data: sites = [] } = useQuery<TourSite[]>({
     queryKey: ["/api/sites"],
-    initialData: STATIC_SITES,
+    // No initialData — don't seed Unsplash placeholder images
     retry: false,
   });
 

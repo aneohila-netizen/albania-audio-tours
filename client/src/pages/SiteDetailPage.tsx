@@ -35,13 +35,13 @@ export default function SiteDetailPage() {
   const { data: site, isLoading } = useQuery<TourSite>({
     queryKey: ["/api/sites", params?.slug],
     queryFn: async () => {
-      const staticSite = STATIC_SITES.find(s => s.slug === params?.slug);
-      if (staticSite) return staticSite;
+      // Always fetch from API — never use staticData as primary source
+      // staticData only has placeholder text; real images/audio come from DB
       const res = await fetch(`/api/sites/${params?.slug}`);
       if (!res.ok) throw new Error("Not found");
       return res.json();
     },
-    initialData: () => STATIC_SITES.find(s => s.slug === params?.slug),
+    // No initialData — we don't want Unsplash placeholder images to flash
     enabled: !!params?.slug,
     retry: false,
   });

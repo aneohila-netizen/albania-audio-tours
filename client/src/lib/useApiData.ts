@@ -8,7 +8,6 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import type { TourSite, Attraction as ApiAttraction } from "@shared/schema";
-import { DESTINATIONS, ATTRACTIONS } from "./staticData";
 import type { Destination, Attraction } from "./staticData";
 import { railwayFetch } from "./queryClient";
 
@@ -75,8 +74,8 @@ export function useDestinations(): Destination[] {
     return apiSites.map(siteToDestination);
   }
 
-  // Still loading or failed → fall back to static data
-  return DESTINATIONS;
+  // Still loading or failed → return empty (no Unsplash placeholders)
+  return [];
 }
 
 /** Returns attractions — API is authoritative, staticData is loading fallback */
@@ -93,15 +92,11 @@ export function useAttractions(destinationSlug?: string): Attraction[] {
     enabled: true,
   });
 
-  const staticFallback = destinationSlug
-    ? ATTRACTIONS.filter((a) => a.destinationSlug === destinationSlug)
-    : ATTRACTIONS;
-
   // API loaded → use it entirely (includes any admin-created attractions)
   if (apiAttrs && apiAttrs.length > 0) {
     return apiAttrs.map(apiAttrToAttraction);
   }
 
-  // Still loading or failed → fall back to static data
-  return staticFallback;
+  // Still loading or failed → return empty (no Unsplash placeholders)
+  return [];
 }

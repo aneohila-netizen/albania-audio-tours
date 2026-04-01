@@ -53,7 +53,7 @@ export const DESTINATIONS: Destination[] = [
     descEn: "Albania's capital packs a remarkable amount of history and personality into a compact centre. Skanderbeg Square is the beating heart — ringed by the National History Museum, the Et'hem Bey Mosque and the elegant Clock Tower. The communist era left a strange legacy: hundreds of thousands of bunkers, a dictator's former villa, and two underground bunker museums (BunkArt 1 & 2) that are among the most visited sites in the country. But Tirana is also young, colourful and full of energy. Walk the Grand Boulevard, explore the street art that coats its apartment blocks, and end the evening at one of the many bars along the Blloku neighbourhood — once reserved exclusively for the communist elite.",
     descAl: "Kryeqyteti i Shqipërisë mbledh një sasi të jashtëzakonshme historie dhe personaliteti në një qendër kompakte. Sheshi Skënderbej është zemra rrahëse — i rrethuar nga Muzeu Kombëtar i Historisë, Xhamia e Et'hem Beut dhe Kulla elegante e Sahatit. Era komuniste la një trashëgimi të çuditshme: qindra mijëra bunkerë, vila e ish-diktatorit dhe dy muzeutë nëntokësorë të bunkerëve që janë ndër vendet më të vizituara. Por Tirana është gjithashtu e re, me ngjyra dhe plot energji.",
     descGr: "Η πρωτεύουσα της Αλβανίας συγκεντρώνει μια αξιοσημείωτη ποσότητα ιστορίας και προσωπικότητας σε έναν συμπαγή κέντρο. Η Πλατεία Σκεντέρμπεη είναι η πηγή ζωής — περιτριγυρισμένη από το Εθνικό Ιστορικό Μουσείο, το Τζαμί Ετ'χεμ Μπέη και τον κομψό Πύργο του Ρολογιού.",
-    imageUrl: "https://images.unsplash.com/photo-1555990793-da11153b6d8b?w=800",
+    imageUrl: "",
     lat: 41.3275, lng: 19.8187, region: "Tirana", category: "city", totalPoints: 420,
   },
   {
@@ -65,7 +65,7 @@ export const DESTINATIONS: Destination[] = [
     descEn: "Founded around 627 BC by Greek colonists from Corinth and Corcyra, Durrës is one of the oldest continuously inhabited cities in the Balkans. It was called Epidamnos by the Greeks and Dyrrachium by the Romans, and served as the western terminus of the Via Egnatia — the great road that connected Rome to Constantinople. The centrepiece of a visit is the Roman amphitheatre, the largest in the Balkans, which once held 20,000 spectators. Most of it is still buried beneath the modern city.",
     descAl: "E themeluar rreth vitit 627 para Krishtit nga kolonistët grekë nga Korinthi dhe Korfuzi, Durrësi është një nga qytetet më të vjetra të banuara vazhdimisht në Ballkan. Quhej Epidamnos nga grekët dhe Dyrrachium nga romakët, dhe shërbente si terminali perëndimor i Via Egnatia.",
     descGr: "Ιδρύθηκε περίπου το 627 π.Χ. από Έλληνες αποικιστές από την Κόρινθο και την Κέρκυρα, το Δυρράχιο είναι μια από τις αρχαιότερες κατοικημένες πόλεις στα Βαλκάνια.",
-    imageUrl: "https://images.unsplash.com/photo-1549887534-1541e9326642?w=800",
+    imageUrl: "",
     lat: 41.3233, lng: 19.4414, region: "Durrës", category: "archaeology", totalPoints: 260,
   },
   {
@@ -77,7 +77,7 @@ export const DESTINATIONS: Destination[] = [
     descEn: "Krujë is inseparable from the name Gjergj Kastrioti — Skanderbeg — Albania's national hero. In the 15th century, this mountain town above the Adriatic plain became the headquarters of his resistance against the Ottoman Empire. Skanderbeg held off three major Ottoman sieges here, and the castle that bears his legacy still dominates the skyline at 600 metres. Below it, the old bazaar is one of the most charming in Albania — a living Ottoman street with wooden shop fronts, antiques, and handwoven kilims.",
     descAl: "Kruja është e pandashme nga emri Gjergj Kastrioti — Skënderbeu — heroi kombëtar i Shqipërisë. Në shekullin XV, kjo qytezë malore mbi rrafshin Adriatik u bë selia e rezistencës së tij kundër Perandorisë Osmane.",
     descGr: "Η Κρούγια είναι αχώριστη από το όνομα Γκέρτζ Κάστριοτι — Σκεντέρμπεης — ο εθνικός ήρωας της Αλβανίας. Τον 15ο αιώνα, αυτή η ορεινή πόλη πάνω από την αδριατική πεδιάδα έγινε η έδρα της αντίστασής του κατά της Οθωμανικής Αυτοκρατορίας.",
-    imageUrl: "https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?w=800",
+    imageUrl: "",
     lat: 41.5089, lng: 19.7956, region: "Durrës", category: "castle", totalPoints: 280,
   },
   {
@@ -89,7 +89,7 @@ export const DESTINATIONS: Destination[] = [
     descEn: "Lezha holds a place of profound importance in Albanian history. On 2 March 1444, Gjergj Kastrioti Skanderbeg summoned the Albanian lords here and forged the League of Lezha — the first unified Albanian military alliance — to resist the Ottoman advance. When Skanderbeg died on 17 January 1468, he was buried in the Church of St Nicholas in Lezha. The Ottomans reportedly dug up his grave in 1478 and wore pieces of his bones as amulets, believing they carried his legendary courage. The memorial built on the church's ruins is a moving pilgrimage for Albanians.",
     descAl: "Lezha ka një vend me rëndësi të thellë në historinë shqiptare. Më 2 Mars 1444, Gjergj Kastrioti Skënderbeu mblodhi zotërinjtë shqiptarë këtu dhe formoi Lidhjen e Lezhës — aleancën e parë ushtarake të unifikuar shqiptare — për të rezistuar kundër avancimit osman.",
     descGr: "Η Λέζα κατέχει μια θέση βαθιάς σημασίας στην αλβανική ιστορία. Στις 2 Μαρτίου 1444, ο Σκεντέρμπεης συγκάλεσε τους Αλβανούς άρχοντες εδώ και σχημάτισε τη Λίγκα της Λέζας.",
-    imageUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800",
+    imageUrl: "",
     lat: 41.7833, lng: 19.6500, region: "Lezha", category: "historic-town", totalPoints: 180,
   },
   {
@@ -101,7 +101,7 @@ export const DESTINATIONS: Destination[] = [
     descEn: "Shkodra is one of the oldest cities in the Balkans and has long been the cultural and artistic capital of northern Albania. It sits where the Buna and Drin rivers meet, looking out over Lake Shkodra — the largest lake in southern Europe. The city is dominated by the magnificent Rozafa Castle and its famous legend. Shkodra has a deeply Catholic tradition, a vibrant cafe culture, and is the gateway to the Albanian Alps — making it the natural starting point for the Theth and Valbona valleys.",
     descAl: "Shkodra është një nga qytetet më të vjetra në Ballkan dhe ka qenë gjatë kryeqyteti kulturor dhe artistik i Shqipërisë veriore. Ajo ndodhet ku bashkohen lumenjtë Buna dhe Drin, me pamje nga Liqeni i Shkodrës.",
     descGr: "Η Σκόδρα είναι μια από τις αρχαιότερες πόλεις στα Βαλκάνια και εδώ και καιρό αποτελεί την πολιτιστική και καλλιτεχνική πρωτεύουσα της βόρειας Αλβανίας.",
-    imageUrl: "https://images.unsplash.com/photo-1586348943529-beaae6c28db9?w=800",
+    imageUrl: "",
     lat: 42.0683, lng: 19.5126, region: "Shkodër", category: "historic-town", totalPoints: 310,
   },
   {
@@ -113,7 +113,7 @@ export const DESTINATIONS: Destination[] = [
     descEn: "The Albanian Alps — known locally as the Bjeshkët e Namuna, the Accursed Mountains — form one of Europe's last great wilderness frontiers. This is remote, rugged, spectacular country: limestone peaks above 2,600 metres, glacial rivers running impossibly blue, and traditional stone villages where families still live the highland way. Theth and Valbona are the two main villages, connected by a legendary day-long trek that crosses the Valbona Pass. The region is also part of the Peaks of the Balkans trail, a cross-border route through Albania, Kosovo and Montenegro.",
     descAl: "Alpet Shqiptare — të njohura vendas si Bjeshkët e Namuna — formojnë një nga kufijtë e fundit të mëdhenj të egërsisë së Europës. Ky është vend i largët, i ashpër, i mahnitshëm: maja gëlqerorë mbi 2,600 metra, lumenj glaçialë me ngjyrë të pamundur blu.",
     descGr: "Οι Αλβανικές Άλπεις — γνωστές τοπικά ως Bjeshkët e Namuna, τα Καταραμένα Βουνά — αποτελούν ένα από τα τελευταία μεγάλα σύνορα της άγριας Ευρώπης.",
-    imageUrl: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800",
+    imageUrl: "",
     lat: 42.3833, lng: 19.7833, region: "Shkodër", category: "nature", totalPoints: 380,
   },
   {
@@ -125,7 +125,7 @@ export const DESTINATIONS: Destination[] = [
     descEn: "The Albanian Riviera stretches along the Ionian coast from Vlorë south to Sarandë, and it is one of Europe's best-kept secrets. The road from Vlorë drops over the dramatic Llogara Pass at 1,027 metres, revealing a coastline of turquoise coves and pine-covered hillsides below. Villages like Dhermi, Palasë and Himara cling to the cliffs, with beaches that are cleaner and less crowded than anywhere on the Mediterranean. Ksamil, near Sarandë, is Albania's most famous beach — three small islands visible just offshore, the water a colour that seems exaggerated.",
     descAl: "Riviera Shqiptare shtrihet përgjatë bregdetit Jon nga Vlora në jug deri në Sarandë, dhe është një nga sekretet më të mbajtura të Europës. Rruga nga Vlora zbret nëpër Qafën dramatike të Llogarasë në 1,027 metra, duke zbuluar një bregdet me gjire dhe shpate kodrine të mbuluara me pisha.",
     descGr: "Η Αλβανική Ριβιέρα εκτείνεται κατά μήκος της Ιονίου ακτής από τη Βλόρα νότια μέχρι τη Σαράντα, και είναι ένα από τα πιο φυλαγμένα μυστικά της Ευρώπης.",
-    imageUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800",
+    imageUrl: "",
     lat: 40.0989, lng: 19.9989, region: "Vlorë", category: "beach", totalPoints: 280,
   },
   {
@@ -137,7 +137,7 @@ export const DESTINATIONS: Destination[] = [
     descEn: "Berat is one of Albania's great UNESCO cities, famous for the stacked rows of windows on its white Ottoman houses that inspired the nickname 'City of a Thousand Windows.' The castle — the Kala — sits on a rocky promontory above the Osum River and is remarkable because people still live inside its walls, as they have for centuries. Below, the Mangalem district spreads across the hillside in a wash of white plaster and dark wood. Across the old stone bridge is Gorica, a quieter mirror neighbourhood. The city holds a striking mix of Byzantine churches, Ottoman mosques, and layers of Illyrian, Roman, Byzantine and Ottoman history.",
     descAl: "Berati është një nga qytetet e mëdha UNESCO të Shqipërisë, i famshëm për rreshtat e dritareve të grumbulluara në shtëpitë e bardha osmane që frymëzuan nofkën 'Qyteti i Një Mijë Dritareve.' Kalaja ndodhet mbi një zgjatim shkëmbor mbi Lumin Osum dhe është e shquar sepse njerëzit ende jetojnë brenda mureve të saj.",
     descGr: "Το Μπεράτι είναι μια από τις μεγάλες πόλεις UNESCO της Αλβανίας, διάσημη για τις στοιβαγμένες σειρές παραθύρων στα λευκά οθωμανικά σπίτια που ενέπνευσαν το παρατσούκλι 'Πόλη με Χίλια Παράθυρα'.",
-    imageUrl: "https://images.unsplash.com/photo-1555217851-6141535bd771?w=800",
+    imageUrl: "",
     lat: 40.7058, lng: 19.9522, region: "Berat", category: "historic-town", totalPoints: 490,
   },
   {
@@ -149,7 +149,7 @@ export const DESTINATIONS: Destination[] = [
     descEn: "Elbasan sits in the heart of Albania, on the banks of the Shkumbin River, and is the geographic and cultural centre of the country. The city castle was built by Sultan Mehmed II in the 15th century and is one of the best-preserved Ottoman fortifications in Albania — still enclosing a living neighbourhood within its ancient walls. Inside you'll find St Mary's Byzantine church and the King's Mosque standing within metres of each other, a quiet testament to Elbasan's tradition of religious coexistence. The city is also known for the ancient pagan festival of Summer Day (Dita e Verës), celebrated on 14 March each year.",
     descAl: "Elbasani ndodhet në zemër të Shqipërisë, në brigjet e lumit Shkumbin, dhe është qendra gjeografike dhe kulturore e vendit. Kalaja e qytetit u ndërtua nga Sulltan Mehmed II në shekullin XV dhe është një nga fortifikimet osmane më të ruajtura mirë në Shqipëri.",
     descGr: "Το Ελμπασάν βρίσκεται στην καρδιά της Αλβανίας, στις όχθες του ποταμού Σκούμπι, και είναι το γεωγραφικό και πολιτιστικό κέντρο της χώρας.",
-    imageUrl: "https://images.unsplash.com/photo-1575936123452-b67c3203c357?w=800",
+    imageUrl: "",
     lat: 41.1125, lng: 20.0822, region: "Elbasan", category: "historic-town", totalPoints: 250,
   },
   {
@@ -161,7 +161,7 @@ export const DESTINATIONS: Destination[] = [
     descEn: "Lake Ohrid is one of the oldest lakes in the world — between two and five million years old — and Pogradec sits on its Albanian shore. The lake is so ancient that it has developed its own unique ecosystem: over 200 species of plants and animals found nowhere else on earth, including the Ohrid trout. The water is extraordinarily clear — visibility reaches 22 metres — and the lake has been a UNESCO World Heritage Site since 1979. The promenade along Pogradec's waterfront is one of Albania's most pleasant walks, best done at sunset when the mountains of North Macedonia glow across the water.",
     descAl: "Liqeni i Ohrit është një nga liqenet më të vjetra në botë — ndërmjet dy dhe pesë milionë vjeç — dhe Pogradeci ndodhet në bregun e tij shqiptar. Liqeni është aq i vjetër sa ka zhvilluar ekosistemit e vet unik: mbi 200 lloje bimësh dhe kafshësh që nuk gjenden askund tjetër në tokë.",
     descGr: "Η λίμνη Οχρίδα είναι μια από τις αρχαιότερες λίμνες στον κόσμο — δύο έως πέντε εκατομμύρια ετών — και το Ποgraduc βρίσκεται στην αλβανική ακτή της.",
-    imageUrl: "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=800",
+    imageUrl: "",
     lat: 40.9025, lng: 20.6525, region: "Korçë", category: "nature", totalPoints: 200,
   },
   {
@@ -173,7 +173,7 @@ export const DESTINATIONS: Destination[] = [
     descEn: "Korçë earned the nickname 'little Paris' in the early 20th century, when it was a cosmopolitan city with French-influenced schools, newspapers, and a thriving artistic community. The city opened Albania's first school in the modern Albanian alphabet in 1887 and was a centre of the National Awakening movement. Today it is famous for its Old Bazaar, its Neo-Byzantine Orthodox Cathedral, excellent local wine (particularly the dark Kallmet and Shesh i Zi), and a nightlife culture that runs later and livelier than almost anywhere else in Albania.",
     descAl: "Korça fitoi nofkën 'Parisi i vogël' në fillim të shekullit XX, kur ishte një qytet kozmopolit me shkolla me ndikim francez, gazeta dhe një komunitet artistik të lulëzuar. Qyteti hapi shkollën e parë të Shqipërisë në alfabetin modern shqiptar në 1887.",
     descGr: "Η Κορυτσά κέρδισε το παρατσούκλι 'μικρό Παρίσι' στις αρχές του 20ού αιώνα, όταν ήταν μια κοσμοπολίτικη πόλη με γαλλόφωνα σχολεία, εφημερίδες και ακμαία καλλιτεχνική κοινότητα.",
-    imageUrl: "https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?w=800",
+    imageUrl: "",
     lat: 40.6186, lng: 20.7808, region: "Korçë", category: "historic-town", totalPoints: 290,
   },
   {
@@ -185,7 +185,7 @@ export const DESTINATIONS: Destination[] = [
     descEn: "Përmet is a small, unhurried town in the Vjosa River valley in southern Albania, and it has more character than its size suggests. The Vjosa is Europe's last major wild river — undammed from its source in Greece all the way to the Adriatic, running free for 272 kilometres. The Albanian government declared it a National Park in 2023, in part due to international campaigning supported by figures including Leonardo DiCaprio. Near Bënjë, a medieval stone arch bridge crosses the river, and from the bank you can step straight into natural thermal pools where sulfurous water bubbles up from deep geothermal springs. Përmet is also known for its gliko — intensely sweet fruit preserves made from everything from walnuts to figs to rose petals.",
     descAl: "Permeti është një qytezë e vogël, e qetë në luginën e lumit Vjosë në Shqipërinë jugore, dhe ka më shumë karakter sesa sugjeron madhësia e saj. Vjosa është lumi i fundit i madh i egër i Europës — i parrethuar nga burimi i tij në Greqi deri në Adriatik.",
     descGr: "Το Περμέτ είναι μια μικρή, ανεπίσπευδη πόλη στην κοιλάδα του ποταμού Βγιόσα στη νότια Αλβανία, και έχει περισσότερο χαρακτήρα από ό,τι υποδηλώνει το μέγεθός του.",
-    imageUrl: "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=800",
+    imageUrl: "",
     lat: 40.2353, lng: 20.3536, region: "Gjirokastër", category: "nature", totalPoints: 220,
   },
   {
@@ -197,7 +197,7 @@ export const DESTINATIONS: Destination[] = [
     descEn: "Gjirokastër is one of the most dramatic cities in the Balkans — a UNESCO World Heritage Site where the whole town climbs a steep hillside beneath a vast castle. The 'City of Stone' gets its name from the massive grey limestone houses of the Ottoman period, with their distinctive fortified towers and overhanging upper floors. The castle is enormous and holds a military museum, a captured American U-2 spy plane (a relic of Cold War brinkmanship), and sweeping views over the Drino Valley. The old bazaar below is a compact tangle of cobbled lanes, 17th-century mosque, and artisan workshops. Gjirokastër was also the birthplace of dictator Enver Hoxha — and writer Ismail Kadare, two Albanians who shaped very different versions of what the country is.",
     descAl: "Gjirokastra është një nga qytetet më dramatike në Ballkan — një Vend i Trashëgimisë Botërore UNESCO ku i gjithë qyteti ngjit një shpat të pjerrët nën një kala të gjerë. 'Qyteti i Gurit' e merr emrin nga shtëpitë masive gëlqerore gri të periudhës osmane.",
     descGr: "Το Αργυρόκαστρο είναι μια από τις πιο δραματικές πόλεις στα Βαλκάνια — ένας Τόπος Παγκόσμιας Κληρονομιάς UNESCO όπου ολόκληρη η πόλη ανεβαίνει μια απότομη πλαγιά κάτω από ένα τεράστιο κάστρο.",
-    imageUrl: "https://images.unsplash.com/photo-1570197571499-166b36435e9f?w=800",
+    imageUrl: "",
     lat: 40.0757, lng: 20.1394, region: "Gjirokastër", category: "historic-town", totalPoints: 380,
   },
   {
@@ -209,7 +209,7 @@ export const DESTINATIONS: Destination[] = [
     descEn: "Sarandë is Albania's main southern resort town — a horseshoe bay of Ionian water, a busy promenade, and the Greek island of Corfu visible just 28 kilometres offshore on a clear day. Its greatest treasure is nearby: Butrint, a UNESCO World Heritage Site just 18 kilometres south. Few archaeological sites in the Mediterranean carry such an intense layering of history — Greek, Roman, Byzantine, Venetian, and Ottoman civilisations all built here, each leaving a different signature in stone. The Greek theatre, the Roman baptistery with its 6th-century floor mosaic, the Venetian tower, the Byzantine baptistery — all set in forest, on a peninsula between a lagoon and the Vivari Channel.",
     descAl: "Saranda është qyteza kryesore e kurortit jugor të Shqipërisë — një gji në formë patkoi ujit Jon, një shëtitore e ngarkuar dhe ishulli grek i Korfuzit i dukshëm vetëm 28 kilometra larg. Thesari i tij më i madh është afër: Butrinti, një Vend i Trashëgimisë Botërore UNESCO vetëm 18 kilometra në jug.",
     descGr: "Η Σαράντα είναι η κύρια νότια θέρετρη πόλη της Αλβανίας — ένας κόλπος σε σχήμα πετάλου από ιόνιο νερό, μια πολυσύχναστη παραλιακή λεωφόρος και το ελληνικό νησί της Κέρκυρας ορατό μόλις 28 χιλιόμετρα μακριά.",
-    imageUrl: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800",
+    imageUrl: "",
     lat: 39.8753, lng: 20.0044, region: "Sarandë", category: "archaeology", totalPoints: 360,
   },
   {
@@ -221,7 +221,7 @@ export const DESTINATIONS: Destination[] = [
     descEn: "Vlorë is the city where modern Albania was born. On 28 November 1912, Ismail Qemali raised the Albanian flag here and declared independence from the Ottoman Empire — after nearly 500 years. The Independence Monument and the National Museum of Independence are must-visits for anyone interested in Albanian history. Geographically, Vlorë sits at the point where the Adriatic and Ionian seas meet — you can actually see the colour difference in the water on a calm day. The Karaburun Peninsula to the south is one of Albania's last wild headlands, accessible only by boat.",
     descAl: "Vlora është qyteti ku lindi Shqipëria moderne. Më 28 Nëntor 1912, Ismail Qemali ngriti flamurin shqiptar këtu dhe shpalli pavarësinë nga Perandoria Osmane — pas pothuajse 500 vitesh. Gjeografikisht, Vlora ndodhet në pikën ku takohen detet Adriatik dhe Jon.",
     descGr: "Η Αυλώνα είναι η πόλη όπου γεννήθηκε η σύγχρονη Αλβανία. Στις 28 Νοεμβρίου 1912, ο Ισμαήλ Κεμάλι ύψωσε την αλβανική σημαία εδώ και κήρυξε την ανεξαρτησία από την Οθωμανική Αυτοκρατορία.",
-    imageUrl: "https://images.unsplash.com/photo-1549887534-1541e9326642?w=800",
+    imageUrl: "",
     lat: 40.4667, lng: 19.4833, region: "Vlorë", category: "historic-town", totalPoints: 240,
   },
 ];
@@ -240,7 +240,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Xhamia e Et'hem Beut u hap famshëm për lutje publike në 1991 — shërbimi i parë fetar i hapur gjatë epokës komuniste të Shqipërisë.",
     funFactGr: "Το Τζαμί Ετ'χεμ Μπέη άνοιξε για δημόσια προσευχή το 1991 — η πρώτη ανοιχτή θρησκευτική λειτουργία κατά την κομμουνιστική εποχή της Αλβανίας.",
     category: "landmark", points: 60, lat: 41.3281, lng: 19.8187, visitDuration: 45,
-    imageUrl: "https://images.unsplash.com/photo-1555990793-da11153b6d8b?w=800",
+    imageUrl: "",
   },
   {
     id: 102, slug: "bunkart", destinationSlug: "tirana",
@@ -252,7 +252,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Bunkerët kushtuan afërsisht sa ndërtimi i dy qyteteve të plota. Ata u projektuan për të rezistuar ndaj një goditjeje bërthamore.",
     funFactGr: "Τα μπούνκερ κόστισαν περίπου όσο η κατασκευή δύο ολόκληρων πόλεων.",
     category: "museum", points: 80, lat: 41.3456, lng: 19.7789, visitDuration: 90,
-    imageUrl: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800",
+    imageUrl: "",
   },
   {
     id: 103, slug: "national-history-museum", destinationSlug: "tirana",
@@ -264,7 +264,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Mozaiku i fasadës është 30 metra i gjerë dhe 12 metra i lartë — një nga mozaikët më të mëdhenj Realiste Socialiste në Europë.",
     funFactGr: "Το μωσαϊκό πρόσοψης είναι 30 μέτρα φαρδύ και 12 μέτρα ψηλό.",
     category: "museum", points: 70, lat: 41.3287, lng: 19.8176, visitDuration: 75,
-    imageUrl: "https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=800",
+    imageUrl: "",
   },
   {
     id: 104, slug: "blloku", destinationSlug: "tirana",
@@ -276,7 +276,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Çdo shqiptar që kapej duke hyrë në Bllok pa leje gjatë epokës komuniste rrezikonte vite burg ose kamp pune.",
     funFactGr: "Κάθε Αλβανός που συλλαμβανόταν να εισέρχεται στο Μπλλόκου χωρίς άδεια κατά τη διάρκεια της κομμουνιστικής εποχής κινδύνευε με χρόνια φυλάκισης.",
     category: "neighbourhood", points: 50, lat: 41.3183, lng: 19.8167, visitDuration: 60,
-    imageUrl: "https://images.unsplash.com/photo-1555990793-da11153b6d8b?w=800",
+    imageUrl: "",
   },
 
   // ── DURRËS ──────────────────────────────────────────────────────────────────
@@ -290,7 +290,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Amfiteatri ishte i varrosur plotësisht nën qytet për shekuj. U zbulua vetëm në 1966 — kur një familje vendase po gërmonte themelet për një shtëpi të re.",
     funFactGr: "Το αμφιθέατρο ήταν πλήρως θαμμένο κάτω από την πόλη για αιώνες. Ανακαλύφθηκε μόλις το 1966.",
     category: "archaeology", points: 90, lat: 41.3225, lng: 19.4386, visitDuration: 60,
-    imageUrl: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800",
+    imageUrl: "",
   },
   {
     id: 202, slug: "durres-promenade", destinationSlug: "durres",
@@ -302,7 +302,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Durrësi u themelua rreth 627 para Krishtit nga kolonistët nga Korinthi dhe Korfuzi, duke e bërë atë më të vjetër se Roma.",
     funFactGr: "Το Δυρράχιο ιδρύθηκε περίπου το 627 π.Χ. από αποίκους από την Κόρινθο και την Κέρκυρα, καθιστώντας το παλαιότερο από τη Ρώμη.",
     category: "beach", points: 50, lat: 41.3183, lng: 19.4289, visitDuration: 90,
-    imageUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800",
+    imageUrl: "",
   },
 
   // ── KRUJE ────────────────────────────────────────────────────────────────────
@@ -316,7 +316,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Helmetë e Skënderbeut — zbukuruar me kokën e artë të dhisë — u bë një simbol kaq i fuqishëm sa mbreti hungarez Matias Korvini dhe Papa Piu II e quajtën 'Atleti i Krishtit'.",
     funFactGr: "Το κράνος του Σκεντέρμπεη — στολισμένο με χρυσό κεφάλι κατσίκας — έγινε τόσο ισχυρό σύμβολο που ο Ούγγρος βασιλιάς Ματθίας Κορβίνος και ο Πάπας Πίος Β' τον αποκάλεσαν 'Αθλητή του Χριστού'.",
     category: "castle", points: 120, lat: 41.5089, lng: 19.7956, visitDuration: 90,
-    imageUrl: "https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?w=800",
+    imageUrl: "",
   },
   {
     id: 302, slug: "kruje-old-bazaar", destinationSlug: "kruje",
@@ -328,7 +328,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Disa nga të njëjtat biznese familjare kanë tregtuar në pazar për pesë ose gjashtë breza.",
     funFactGr: "Μερικές από τις ίδιες οικογενειακές επιχειρήσεις ασχολούνται με εμπόριο στην αγορά για πέντε ή έξι γενιές.",
     category: "neighbourhood", points: 60, lat: 41.5075, lng: 19.7944, visitDuration: 60,
-    imageUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800",
+    imageUrl: "",
   },
 
   // ── LEZHE ────────────────────────────────────────────────────────────────────
@@ -342,7 +342,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Vendi ku qëndrojmë ishte gjithashtu aty ku Skënderbeu thirrri aleancën e parë shqiptare — Lidhjen e Lezhës — në mars 1444.",
     funFactGr: "Το σημείο που βρισκόμαστε ήταν επίσης εκεί που ο Σκεντέρμπεης κάλεσε την πρώτη αλβανική συμμαχία — τη Λίγκα της Λέζας — τον Μάρτιο του 1444.",
     category: "landmark", points: 100, lat: 41.7833, lng: 19.6500, visitDuration: 45,
-    imageUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800",
+    imageUrl: "",
   },
   {
     id: 402, slug: "lezha-castle", destinationSlug: "lezhe",
@@ -354,7 +354,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Venecianët mbajtën Lezhën për shumicën e shekujve XIV dhe XV dhe e quanin Alessio.",
     funFactGr: "Οι Βενετοί κατείχαν τη Λέζα για μεγάλο μέρος του 14ου και 15ου αιώνα και την αποκαλούσαν Αλέσιο.",
     category: "castle", points: 80, lat: 41.7856, lng: 19.6489, visitDuration: 60,
-    imageUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800",
+    imageUrl: "",
   },
 
   // ── SHKODRA ──────────────────────────────────────────────────────────────────
@@ -368,7 +368,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Legjenda e Rozafës thotë se tre vëllezër vazhdimisht ndërtuan muret e kalasë, por ato rrëzoheshin çdo mëngjes. Një i ditur u tha se duhej të sakrifikonin gruan e njërit vëlla.",
     funFactGr: "Ο θρύλος της Ρόζαφας λέει ότι τρεις αδελφοί συνέχεια έχτιζαν τα τείχη του κάστρου, αλλά αυτά κατέρρεαν κάθε πρωί.",
     category: "castle", points: 120, lat: 42.0533, lng: 19.4828, visitDuration: 90,
-    imageUrl: "https://images.unsplash.com/photo-1586348943529-beaae6c28db9?w=800",
+    imageUrl: "",
   },
   {
     id: 502, slug: "shkodra-old-district", destinationSlug: "shkodra",
@@ -380,7 +380,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Shkodra ishte dikur aq e famshme për kulturën e saj të fotografisë sa kishte studion e parë fotografike në Shqipëri — hapur nga familja Marubi në 1856.",
     funFactGr: "Η Σκόδρα ήταν κάποτε τόσο διάσημη για την κουλτούρα φωτογραφίας της που είχε το πρώτο φωτογραφικό στούντιο στην Αλβανία.",
     category: "neighbourhood", points: 60, lat: 42.0683, lng: 19.5126, visitDuration: 60,
-    imageUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800",
+    imageUrl: "",
   },
 
   // ── ALBANIAN ALPS ────────────────────────────────────────────────────────────
@@ -394,7 +394,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Kanuni — kodi tradicional i ligjit malësor shqiptar — ende ndikon jetën e përditshme në këto fshatra sot.",
     funFactGr: "Ο Κανούν — ο παραδοσιακός αλβανικός ορεινός νομικός κώδικας — εξακολουθεί να επηρεάζει την καθημερινή ζωή σε αυτά τα χωριά σήμερα.",
     category: "nature", points: 150, lat: 42.3833, lng: 19.7833, visitDuration: 240,
-    imageUrl: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800",
+    imageUrl: "",
   },
   {
     id: 602, slug: "valbona-valley", destinationSlug: "nature-alps",
@@ -406,7 +406,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Deri në vitet '90, mënyra e vetme për të hyrë në Valbonë në dimër ishte me mushkë nëpër male.",
     funFactGr: "Μέχρι τη δεκαετία του 1990, ο μόνος τρόπος εισόδου στη Βαλμπόνα το χειμώνα ήταν με μουλάρια μέσα από τα βουνά.",
     category: "nature", points: 180, lat: 42.4667, lng: 19.8833, visitDuration: 480,
-    imageUrl: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800",
+    imageUrl: "",
   },
 
   // ── BEACHES ──────────────────────────────────────────────────────────────────
@@ -420,7 +420,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Tre ishujt e vegjël të Ksamilit janë të arritshëm me not të shkurtër ose kajak.",
     funFactGr: "Τα τρία μικρά νησάκια του Κσαμίλ είναι προσβάσιμα με μια σύντομη κολύμβηση ή καγιάκ.",
     category: "beach", points: 80, lat: 39.7723, lng: 20.0025, visitDuration: 180,
-    imageUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800",
+    imageUrl: "",
   },
   {
     id: 702, slug: "himara", destinationSlug: "beaches",
@@ -432,7 +432,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Himara ka një komunitet të vogël Ortodoks Grek që ka ruajtur gjuhën dhe traditat e saj këtu vazhdimisht për shekuj.",
     funFactGr: "Η Χειμάρα έχει μια μικρή ελληνορθόδοξη κοινότητα που διατηρεί τη γλώσσα και τις παραδόσεις της εδώ αδιάλειπτα για αιώνες.",
     category: "beach", points: 90, lat: 40.1003, lng: 19.7167, visitDuration: 180,
-    imageUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800",
+    imageUrl: "",
   },
   {
     id: 703, slug: "porto-palermo", destinationSlug: "beaches",
@@ -444,7 +444,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Gjatë Luftës së Ftohtë, Bashkimi Sovjetik vendosi fshehurazi nëndetëse në kompleksin e tunelit nëntokësor në Porto Palermo.",
     funFactGr: "Κατά τη διάρκεια της Ψυχρής Πολεμικής, η Σοβιετική Ένωση έκρυβε μυστικά υποβρύχια στο υπόγειο συγκρότημα τούνελ στο Πόρτο Παλέρμο.",
     category: "castle", points: 100, lat: 40.1833, lng: 19.8500, visitDuration: 60,
-    imageUrl: "https://images.unsplash.com/photo-1586348943529-beaae6c28db9?w=800",
+    imageUrl: "",
   },
 
   // ── BERAT ────────────────────────────────────────────────────────────────────
@@ -458,7 +458,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Kalaja e Beratit përmban 42 kisha bizantine brenda mureve të saj — megjithëse shumica janë tashmë në rrënoja.",
     funFactGr: "Το κάστρο Μπεράτι περιέχει 42 βυζαντινές εκκλησίες εντός των τειχών του — αν και οι περισσότερες είναι τώρα σε ερείπια.",
     category: "castle", points: 130, lat: 40.7094, lng: 19.9506, visitDuration: 120,
-    imageUrl: "https://images.unsplash.com/photo-1555217851-6141535bd771?w=800",
+    imageUrl: "",
   },
   {
     id: 802, slug: "onufri-museum", destinationSlug: "berat",
@@ -470,7 +470,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "E kuqja dalluese e Onufrit — një e kuqe e thellë, pothuajse shkëlqyese — erdhi nga një formulë pigmenti të cilën ai nuk e zbuloi kurrë.",
     funFactGr: "Το χαρακτηριστικό κόκκινο του Ονούφρι — ένα βαθύ, σχεδόν λαμπρό κόκκινο — προήλθε από μια φόρμουλα χρώματος που δεν αποκάλυψε ποτέ.",
     category: "museum", points: 110, lat: 40.7094, lng: 19.9506, visitDuration: 60,
-    imageUrl: "https://images.unsplash.com/photo-1555217851-6141535bd771?w=800",
+    imageUrl: "",
   },
   {
     id: 803, slug: "mangalem-district", destinationSlug: "berat",
@@ -482,7 +482,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Qendra Kulturore Islamike në Mangalem mban tre xhami historike brenda një ecjeje të shkurtër: Xhaminë e Beqarëve, Xhaminë e Mbretit dhe një Teqe Bektashiane.",
     funFactGr: "Το Ισλαμικό Πολιτιστικό Κέντρο στο Μαγκαλέμ φιλοξενεί τρία ιστορικά τζαμιά.",
     category: "neighbourhood", points: 90, lat: 40.7058, lng: 19.9522, visitDuration: 75,
-    imageUrl: "https://images.unsplash.com/photo-1555217851-6141535bd771?w=800",
+    imageUrl: "",
   },
   {
     id: 804, slug: "gorica-district", destinationSlug: "berat",
@@ -494,7 +494,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Kanioni i lumit Osum në jug të Beratit është një nga karakteristikat natyrore më dramatike të Shqipërisë.",
     funFactGr: "Το φαράγγι του ποταμού Οσούμ νότια του Μπεράτι είναι ένα από τα πιο δραματικά φυσικά χαρακτηριστικά της Αλβανίας.",
     category: "neighbourhood", points: 80, lat: 40.7042, lng: 19.9489, visitDuration: 60,
-    imageUrl: "https://images.unsplash.com/photo-1555217851-6141535bd771?w=800",
+    imageUrl: "",
   },
   {
     id: 805, slug: "tomor-mountain", destinationSlug: "berat",
@@ -506,7 +506,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Pelegrinazhi i gushtit në Malin e Tomorrit (Kuvendi) tërheq myslimanë Bektashinj nga e gjithë Ballkani.",
     funFactGr: "Το αυγουστιάτικο προσκύνημα στο όρος Τόμορ (το Κουβέντ) προσελκύει Μπεκτασή μουσουλμάνους από ολόκληρα τα Βαλκάνια.",
     category: "nature", points: 120, lat: 40.6500, lng: 20.1667, visitDuration: 360,
-    imageUrl: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800",
+    imageUrl: "",
   },
 
   // ── ELBASAN ──────────────────────────────────────────────────────────────────
@@ -520,7 +520,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Elbasani është qyteti pritës i Ditës së Verës — Dita e Verës — e festuar çdo 14 mars.",
     funFactGr: "Το Ελμπασάν είναι η πόλη διοργάνωσης της Dita e Verës — Ημέρα Καλοκαιριού — που γιορτάζεται κάθε 14 Μαρτίου.",
     category: "castle", points: 110, lat: 41.1125, lng: 20.0822, visitDuration: 90,
-    imageUrl: "https://images.unsplash.com/photo-1575936123452-b67c3203c357?w=800",
+    imageUrl: "",
   },
   {
     id: 902, slug: "petrela-castle", destinationSlug: "elbasan",
@@ -532,7 +532,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Skënderbeu përdori një rrjet kalash sinjalizuese — zjarre natën, tym gjatë ditës — për të komunikuar më shpejt se çdo kasnec osman mund të ngaronte.",
     funFactGr: "Ο Σκεντέρμπεης χρησιμοποίησε ένα δίκτυο από κάστρα σηματοδότησης για να επικοινωνεί γρηγορότερα από οποιονδήποτε Οθωμανό αγγελιαφόρο.",
     category: "castle", points: 100, lat: 41.2667, lng: 19.9167, visitDuration: 75,
-    imageUrl: "https://images.unsplash.com/photo-1575936123452-b67c3203c357?w=800",
+    imageUrl: "",
   },
 
   // ── POGRADEC ─────────────────────────────────────────────────────────────────
@@ -546,7 +546,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Liqeni i Ohrit përmban të paktën 200 lloje endemike — që nuk gjenden askund tjetër në tokë.",
     funFactGr: "Η λίμνη Οχρίδα περιέχει τουλάχιστον 200 ενδημικά είδη — που δεν βρίσκονται πουθενά αλλού στη γη.",
     category: "nature", points: 90, lat: 40.9025, lng: 20.6525, visitDuration: 120,
-    imageUrl: "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=800",
+    imageUrl: "",
   },
 
   // ── KORCA ────────────────────────────────────────────────────────────────────
@@ -560,7 +560,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Korça hapi shkollën e parë moderne të Shqipërisë në gjuhën shqipe në 1887 — Mësonjëtorja.",
     funFactGr: "Η Κορυτσά άνοιξε το πρώτο σύγχρονο σχολείο της Αλβανίας στην αλβανική γλώσσα το 1887 — η Mësonjëtorja.",
     category: "neighbourhood", points: 80, lat: 40.6186, lng: 20.7808, visitDuration: 90,
-    imageUrl: "https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?w=800",
+    imageUrl: "",
   },
   {
     id: 1102, slug: "korca-cathedral", destinationSlug: "korca",
@@ -572,7 +572,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Kur Enver Hoxha shpalli Shqipërinë shtet ateist në 1967, të gjitha 2,169 ndërtesat fetare në vend u mbyllën, u konvertuan ose u shkatërruan.",
     funFactGr: "Όταν ο Enver Hoxha κήρυξε την Αλβανία αθεϊστικό κράτος το 1967, και τα 2.169 θρησκευτικά κτίρια στη χώρα — εκκλησίες, τζαμιά, τεκέδες και συναγωγές — έκλεισαν, μετατράπηκαν ή κατεδαφίστηκαν.",
     category: "landmark", points: 70, lat: 40.6167, lng: 20.7800, visitDuration: 45,
-    imageUrl: "https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?w=800",
+    imageUrl: "",
   },
 
   // ── PERMET ───────────────────────────────────────────────────────────────────
@@ -586,7 +586,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Lumi Vjosë — ku Lengarica bashkohet pak prapa — është lumi i fundit i madh i egër i Europës.",
     funFactGr: "Ο ποταμός Βγιόσα — στον οποίο ενώνεται η Λεγκαρίτσα λίγο πιο κάτω — είναι ο τελευταίος μεγάλος άγριος ποταμός της Ευρώπης.",
     category: "nature", points: 110, lat: 40.2300, lng: 20.3500, visitDuration: 150,
-    imageUrl: "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=800",
+    imageUrl: "",
   },
   {
     id: 1202, slug: "permet-city", destinationSlug: "permet",
@@ -598,7 +598,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Glikoja e Permitit e bërë nga portokallet e hidhura konsiderohet si më e mira në Shqipëri.",
     funFactGr: "Το γλυκό Περμέτ από πικρά πορτοκάλια θεωρείται το καλύτερο στην Αλβανία.",
     category: "landmark", points: 70, lat: 40.2353, lng: 20.3536, visitDuration: 75,
-    imageUrl: "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=800",
+    imageUrl: "",
   },
 
   // ── GJIROKASTER ──────────────────────────────────────────────────────────────
@@ -612,7 +612,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Ka një legjendë rreth Kalasë së Gjirokastrës: kur osmanët po merrnin kalanë në shekullin XV, një princeshë vendase u hodh nga kulla më e lartë me foshnjën e saj në krahë.",
     funFactGr: "Υπάρχει ένας θρύλος για το Κάστρο Αργυροκάστρου: όταν οι Οθωμανοί ήταν έτοιμοι να καταλάβουν το κάστρο τον 15ο αιώνα, μια τοπική πριγκίπισσα πήδηξε από τον ψηλότερο πύργο.",
     category: "castle", points: 150, lat: 40.0757, lng: 20.1394, visitDuration: 90,
-    imageUrl: "https://images.unsplash.com/photo-1570197571499-166b36435e9f?w=800",
+    imageUrl: "",
   },
   {
     id: 1302, slug: "gjirokaster-old-bazaar", destinationSlug: "gjirokaster",
@@ -624,7 +624,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Gjirokastra ishte vendlindja e dy shqiptarëve që formuan vendin në mënyra të kundërta: Enver Hoxhës dhe Ismail Kadaresë.",
     funFactGr: "Το Αργυρόκαστρο ήταν η γενέτειρα δύο Αλβανών που διαμόρφωσαν τη χώρα με αντίθετους τρόπους.",
     category: "neighbourhood", points: 110, lat: 40.0740, lng: 20.1378, visitDuration: 90,
-    imageUrl: "https://images.unsplash.com/photo-1570197571499-166b36435e9f?w=800",
+    imageUrl: "",
   },
 
   // ── SARANDA ──────────────────────────────────────────────────────────────────
@@ -638,7 +638,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Bapstisteri romak në Butrint ka një mozaik dyshemeje të shekullit VI që paraqet 17 lloje kafshësh.",
     funFactGr: "Το ρωμαϊκό βαπτιστήριο στο Βουθρωτό έχει ένα μωσαϊκό δαπέδου του 6ου αιώνα που απεικονίζει 17 είδη ζώων.",
     category: "archaeology", points: 160, lat: 39.7447, lng: 20.0175, visitDuration: 120,
-    imageUrl: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800",
+    imageUrl: "",
   },
   {
     id: 1402, slug: "saranda-promenade", destinationSlug: "saranda",
@@ -650,7 +650,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Në një ditë të qartë nga Kalaja Lëkurësi, Korfuzi është qartë i dukshëm përmes ngushticës 28-kilometërshe.",
     funFactGr: "Σε μια ξάστερη μέρα από το Κάστρο Λεκουρέσι, η Κέρκυρα φαίνεται ξεκάθαρα πέρα από τα 28 χιλιόμετρα του πορθμού.",
     category: "landmark", points: 80, lat: 39.8753, lng: 20.0044, visitDuration: 90,
-    imageUrl: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800",
+    imageUrl: "",
   },
 
   // ── VLORA ────────────────────────────────────────────────────────────────────
@@ -664,7 +664,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Shqiponja dykrenare në flamurin shqiptar rrjedh nga vula e Gjergj Kastrioti Skënderbeut.",
     funFactGr: "Ο δικέφαλος αετός στη σημαία της Αλβανίας προέρχεται από τη σφραγίδα του Γκέρτζ Κάστριοτι Σκεντέρμπεη.",
     category: "landmark", points: 90, lat: 40.4667, lng: 19.4833, visitDuration: 60,
-    imageUrl: "https://images.unsplash.com/photo-1549887534-1541e9326642?w=800",
+    imageUrl: "",
   },
   {
     id: 1502, slug: "karaburun-peninsula", destinationSlug: "vlora",
@@ -676,7 +676,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Ishulli i Sazanit ishte plotësisht i ndaluar për shqiptarët e zakonshëm për mbi 50 vjet.",
     funFactGr: "Το νησί Σάζαν ήταν τελείως απαγορευμένο για τους απλούς Αλβανούς για πάνω από 50 χρόνια.",
     category: "nature", points: 130, lat: 40.5000, lng: 19.3833, visitDuration: 240,
-    imageUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800",
+    imageUrl: "",
   },
 
   // ── TIRANA EXTRAS ────────────────────────────────────────────────────────────
@@ -690,7 +690,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Kur xhamia u rihap në janar 1991, qeveria komuniste u përpoq ta ndalonte ceremoninë — por rreth 10,000 deri 30,000 njerëz erdhën gjithsesi.",
     funFactGr: "Όταν το τζαμί ξανάνοιξε τον Ιανουάριο του 1991, η κομμουνιστική κυβέρνηση προσπάθησε να σταματήσει την τελετή — αλλά εκτιμώμενοι 10.000 με 30.000 άνθρωποι ήρθαν ούτως ή άλλως.",
     category: "mosque", points: 60, lat: 41.3280, lng: 19.8196, visitDuration: 25,
-    imageUrl: "https://images.unsplash.com/photo-1622472506286-9eab47b2b97d?w=800",
+    imageUrl: "",
   },
   {
     id: 106, slug: "tirana-clock-tower", destinationSlug: "tirana",
@@ -702,7 +702,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Kulla e Sahatit është struktura e vetme e llojit të saj në Shqipëri — nuk ka kulla të tjera origjinale të periudhës osmane ende në këmbë.",
     funFactGr: "Ο Πύργος του Ρολογιού είναι η μοναδική κατασκευή του είδους της στην Αλβανία — δεν υπάρχουν άλλοι αρχικοί οθωμανικοί πύργοι ρολογιού που να στέκουν ακόμη.",
     category: "landmark", points: 50, lat: 41.3285, lng: 19.8190, visitDuration: 30,
-    imageUrl: "https://images.unsplash.com/photo-1555990793-da11153b6d8b?w=800",
+    imageUrl: "",
   },
 
   // ── BERAT EXTRAS ──────────────────────────────────────────────────────────────
@@ -716,7 +716,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Lumi Osum rrjedh tërësisht nëpër Shqipëri dhe ka gdhendur grykëderdhje dramatike në jug të Beratit — Kanioni i Osumit, me mure deri në 80 metra të larta.",
     funFactGr: "Ο ποταμός Ωσούμ ρέει εξ ολοκλήρου μέσω της Αλβανίας και έχει σκαλίσει δραματικά φαράγγια νότια του Μπεράτι.",
     category: "promenade", points: 40, lat: 40.7025, lng: 19.9500, visitDuration: 45,
-    imageUrl: "https://images.unsplash.com/photo-1548013146-72479768bada?w=800",
+    imageUrl: "",
   },
   {
     id: 511, slug: "berat-ethnographic-museum", destinationSlug: "berat",
@@ -728,7 +728,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Berati ishte historikisht i famshëm për kuzhindarët e tij të bakrit — kazanxhinjtë — të cilët prodhonin tencere, tepsi dhe enë bakri të tregtuara në gjithë Perandorinë Osmane.",
     funFactGr: "Το Μπεράτι ήταν ιστορικά φημισμένο για τους χαλκουργούς του — kazanxhinjtë — που παρήγαγαν χάλκινες κατσαρόλες, δίσκους και αγγεία που εμπορεύονταν σε όλη την Οθωμανική Αυτοκρατορία.",
     category: "museum", points: 55, lat: 40.7050, lng: 19.9515, visitDuration: 50,
-    imageUrl: "https://images.unsplash.com/photo-1618009639487-1a7ac2c2f61e?w=800",
+    imageUrl: "",
   },
   {
     id: 512, slug: "berat-islamic-cultural-center", destinationSlug: "berat",
@@ -740,7 +740,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Urdhri Halveti mbërriti në Berat në shekullin XVI dhe u rrënjos thellë në kulturën lokale. Muzika dhe poezia e tyre u bënë pjesë e indit kulturor të qytetit.",
     funFactGr: "Το τάγμα Χαλβέτι έφτασε στο Μπεράτι τον 16ο αιώνα και ριζώθηκε βαθιά στην τοπική κουλτούρα. Η μουσική και η ποίησή τους έγιναν μέρος του πολιτιστικού ιστού της πόλης.",
     category: "mosque", points: 65, lat: 40.7038, lng: 19.9472, visitDuration: 40,
-    imageUrl: "https://images.unsplash.com/photo-1584549284-b663e32a5dd1?w=800",
+    imageUrl: "",
   },
 
   // ── GJIROKASTER EXTRA ─────────────────────────────────────────────────────────
@@ -754,7 +754,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Shumica e konakëve të Gjirokastrës u ndërtuan me kat të parë prej guri të ashpër për magazinë dhe kafshë, katin e dytë për familjen dhe katin e tretë për pritjen e mysafirëve.",
     funFactGr: "Τα περισσότερα αρχοντικά της Γκιρόκαστρας χτίστηκαν με ισόγειο από τραχύ λίθο για αποθήκευση και ζώα, πρώτο όροφο για την οικογένεια και δεύτερο για υποδοχή επισκεπτών.",
     category: "historic-town", points: 75, lat: 40.0748, lng: 20.1389, visitDuration: 50,
-    imageUrl: "https://images.unsplash.com/photo-1605130284535-11dd9eedc58a?w=800",
+    imageUrl: "",
   },
 
   // ── VLORA EXTRA ───────────────────────────────────────────────────────────────
@@ -768,7 +768,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Ismail Qemali ishte 75 vjeç kur shpalli pavarësinë — një diplomat dhe politikan osman i cili kaloi shumicën e jetës brenda sistemit osman para se të drejtonte thyerjen prej tij.",
     funFactGr: "Ο Ισμαήλ Κεμάλι ήταν 75 ετών όταν κήρυξε την ανεξαρτησία — ένας Οθωμανός διπλωμάτης και πολιτικός που πέρασε το μεγαλύτερο μέρος της ζωής του μέσα στο οθωμανικό σύστημα.",
     category: "monument", points: 70, lat: 40.4678, lng: 19.4886, visitDuration: 45,
-    imageUrl: "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800",
+    imageUrl: "",
   },
 
   // ── SARANDA EXTRA ─────────────────────────────────────────────────────────────
@@ -782,7 +782,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Syri i Kaltër është studiuar nga hidrologët për dekada por burimi i tij mbetet misteroz. Uji është aq i ftohtë dhe rrjedh me një shpejtësi të tillë nga një thellësi e panjohur.",
     funFactGr: "Το Γαλάζιο Μάτι έχει μελετηθεί από υδρολόγους για δεκαετίες αλλά η πηγή του παραμένει μυστηριώδης. Κανένας δύτης δεν έχει φτάσει ποτέ στον πυθμένα.",
     category: "nature", points: 85, lat: 39.9017, lng: 20.2239, visitDuration: 90,
-    imageUrl: "https://images.unsplash.com/photo-1518457607834-6e8d80c183c5?w=800",
+    imageUrl: "",
   },
 
   // ── DURRES EXTRA ──────────────────────────────────────────────────────────────
@@ -796,7 +796,7 @@ export const ATTRACTIONS: Attraction[] = [
     funFactAl: "Durrësi është rrethuar, kapur dhe kontrolluar nga grekët, romakët, biznatinët, normanët, andegavët, venecianët, osmanët dhe austriakët në pika të ndryshme të historisë së tij.",
     funFactGr: "Το Δυρράχιο έχει πολιορκηθεί, κυριευτεί και ελεγχθεί από Έλληνες, Ρωμαίους, Βυζαντινούς, Νορμανδούς, Ανδεγαυούς, Βενετούς, Οθωμανούς και Αυστριακούς σε διάφορα σημεία της ιστορίας του.",
     category: "archaeology", points: 70, lat: 41.3230, lng: 19.4420, visitDuration: 45,
-    imageUrl: "https://images.unsplash.com/photo-1549887534-1541e9326642?w=800",
+    imageUrl: "",
   },
 ];
 
