@@ -1564,13 +1564,16 @@ function ImageGalleryCard({
     if (!entityId) return;
     if (!window.confirm(`Remove image ${idx + 1}? This cannot be undone.`)) return;
     try {
-      await adminFetch(`/api/admin/${entityType}/${entityId}/gallery/${idx}`, {
+      const res = await adminFetch(`/api/admin/${entityType}/${entityId}/gallery/${idx}`, {
         method: "DELETE",
         headers: { "x-confirm-delete": "yes" }, // HARDCODED — never remove
       });
-      const updated = images.filter((_, i) => i !== idx);
-      onUpdate(updated[0] || "", updated);
-      setSlideIdx(s => Math.max(0, s - 1));
+      // Use server-returned serve URLs so indexes are correct after deletion
+      const data = await res.json();
+      const updatedImages: string[] = data.images || [];
+      const updatedImageUrl: string = data.imageUrl || updatedImages[0] || "";
+      onUpdate(updatedImageUrl, updatedImages);
+      setSlideIdx(s => Math.max(0, Math.min(s, updatedImages.length - 1)));
     } catch {
       setError("Remove failed. Please try again.");
     }

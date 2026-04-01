@@ -260,7 +260,67 @@ function stripAudioData(obj: any, type: 'attraction'|'site'): any {
   return out;
 }
 
+// ── Startup migration: strip external/placeholder imageUrls from DB ──────────
+// Wipes any imageUrl or images[] entries that are NOT admin-uploaded gallery
+// serve URLs (i.e. not /api/images/db/.../gallery/N).
+// This removes Unsplash, picsum, and any other external defaults permanently.
+async function runStartupImageCleanup(): Promise<void> {
+  try {
+    const isExternal = (url: string | null | undefined): boolean => {
+      if (!url) return false;
+      // Keep valid gallery serve URLs — these are admin-uploaded
+      if (url.includes('/api/images/db/') && url.includes('/gallery/')) return false;
+      // Keep data URIs (raw uploaded images not yet migrated)
+      if (url.startsWith('data:')) return false;
+      // Everything else (Unsplash, picsum, http(s):// external) is external placeholder
+      return url.startsWith('http://') || url.startsWith('https://');
+    };
+
+    const sites = await storage.getAllSites();
+    for (const site of sites) {
+      const s = site as any;
+      const cleanedImages: string[] = (s.images || []).filter((img: string) => !isExternal(img));
+      const imagesChanged = cleanedImages.length !== (s.images || []).length;
+      const imageUrlChanged = isExternal(s.imageUrl);
+      if (imagesChanged || imageUrlChanged) {
+        const newImageUrl = imageUrlChanged
+          ? (cleanedImages[0] || null)
+          : s.imageUrl;
+        await storage.updateSite(s.id, {
+          images: imagesChanged ? cleanedImages : s.images,
+          imageUrl: newImageUrl,
+        } as any);
+        console.log(`[startup] Cleaned external image(s) from site ${s.id} (${s.nameEn || s.slug})`);
+      }
+    }
+
+    const attractions = await storage.getAllAttractions();
+    for (const attr of attractions) {
+      const a = attr as any;
+      const cleanedImages: string[] = (a.images || []).filter((img: string) => !isExternal(img));
+      const imagesChanged = cleanedImages.length !== (a.images || []).length;
+      const imageUrlChanged = isExternal(a.imageUrl);
+      if (imagesChanged || imageUrlChanged) {
+        const newImageUrl = imageUrlChanged
+          ? (cleanedImages[0] || null)
+          : a.imageUrl;
+        await storage.updateAttraction(a.id, {
+          images: imagesChanged ? cleanedImages : a.images,
+          imageUrl: newImageUrl,
+        } as any);
+        console.log(`[startup] Cleaned external image(s) from attraction ${a.id} (${a.nameEn || a.slug})`);
+      }
+    }
+    console.log('[startup] Image cleanup complete.');
+  } catch (err) {
+    console.error('[startup] Image cleanup error (non-fatal):', err);
+  }
+}
+
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
+  // Run image cleanup on every server start — idempotent, non-destructive to gallery uploads
+  runStartupImageCleanup();
+
   // ── Public API ──────────────────────────────────────────────────────────────
   app.get("/api/sites", async (_req, res) => {
     const sites = await storage.getAllSites();
@@ -270,7 +330,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/sites/:slug", async (req, res) => {
     const site = await storage.getSiteBySlug(req.params.slug);
     if (!site) return res.status(404).json({ error: "Not found" });
-    res.json(stripAudioData(site, 'site'));
+    res.json(stripImageData(stripAudioData(site, 'site'), 'site'));
   });
 
   app.get("/api/progress/:sessionId", async (req, res) => {
@@ -437,7 +497,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/attractions/:destinationSlug/:slug", async (req, res) => {
     const attr = await storage.getAttractionBySlug(req.params.destinationSlug, req.params.slug);
     if (!attr) return res.status(404).json({ error: "Not found" });
-    res.json(stripAudioData(attr, 'attraction'));
+    res.json(stripImageData(stripAudioData(attr, 'attraction'), 'attraction'));
   });
 
   // Health check
@@ -876,8 +936,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!site) return res.status(404).json({ error: "Site not found" });
     const existing: string[] = [...((site as any).images || [])];
     existing.splice(idx, 1);
-    const updated = await storage.updateSite(id, { images: existing } as any);
-    res.json({ images: (updated as any)?.images || [] });
+    // Update images AND sync imageUrl to the new gallery[0] (or null if empty)
+    await storage.updateSite(id, { images: existing } as any);
+    const serveImages = existing.map((_: any, i: number) =>
+      `${RAILWAY_BASE}/api/images/db/site/${id}/gallery/${i}`
+    );
+    const newImageUrl = serveImages[0] || null;
+    await storage.updateSite(id, { imageUrl: newImageUrl } as any);
+    res.json({ images: serveImages, imageUrl: newImageUrl });
   });
 
   // PUT /api/admin/sites/:id/gallery/reorder — reorder gallery images (drag-and-drop)
@@ -934,8 +1000,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!attr) return res.status(404).json({ error: "Attraction not found" });
     const existing: string[] = [...((attr as any).images || [])];
     existing.splice(idx, 1);
-    const updated = await storage.updateAttraction(id, { images: existing } as any);
-    res.json({ images: (updated as any)?.images || [] });
+    // Update images AND sync imageUrl to the new gallery[0] (or null if empty)
+    await storage.updateAttraction(id, { images: existing } as any);
+    const serveImages = existing.map((_: any, i: number) =>
+      `${RAILWAY_BASE}/api/images/db/attraction/${id}/gallery/${i}`
+    );
+    const newImageUrl = serveImages[0] || null;
+    await storage.updateAttraction(id, { imageUrl: newImageUrl } as any);
+    res.json({ images: serveImages, imageUrl: newImageUrl });
   });
 
   // PUT /api/admin/attractions/:id/gallery/reorder — reorder gallery images (drag-and-drop)
