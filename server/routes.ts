@@ -880,6 +880,31 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json({ images: (updated as any)?.images || [] });
   });
 
+  // PUT /api/admin/sites/:id/gallery/reorder — reorder gallery images (drag-and-drop)
+  // Body: { order: number[] }  — array of old indices in the new desired order
+  // gallery[0] after reorder becomes the new hero image.
+  app.put("/api/admin/sites/:id/gallery/reorder", requireAdmin, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const { order } = req.body as { order: number[] };
+    if (!Array.isArray(order)) return res.status(400).json({ error: "order must be an array" });
+    const site = await storage.getSiteById(id);
+    if (!site) return res.status(404).json({ error: "Site not found" });
+    const existing: string[] = (site as any).images || [];
+    if (order.some(i => i < 0 || i >= existing.length)) {
+      return res.status(400).json({ error: "Index out of range" });
+    }
+    const reordered = order.map(i => existing[i]);
+    existing.forEach((img, i) => { if (!order.includes(i)) reordered.push(img); });
+    await storage.updateSite(id, { images: reordered } as any);
+    const serveImages = reordered.map((_: any, idx: number) =>
+      `${RAILWAY_BASE}/api/images/db/site/${id}/gallery/${idx}`
+    );
+    const newImageUrl = serveImages[0] || null;
+    await storage.updateSite(id, { imageUrl: newImageUrl } as any);
+    res.json({ images: serveImages, imageUrl: newImageUrl });
+  });
+
   // POST /api/admin/attractions/:id/gallery  — add an image to the gallery
   app.post("/api/admin/attractions/:id/gallery", requireAdmin, imageUpload.single("image"), async (req: any, res) => {
     const id = parseInt(req.params.id);
@@ -911,6 +936,29 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     existing.splice(idx, 1);
     const updated = await storage.updateAttraction(id, { images: existing } as any);
     res.json({ images: (updated as any)?.images || [] });
+  });
+
+  // PUT /api/admin/attractions/:id/gallery/reorder — reorder gallery images (drag-and-drop)
+  app.put("/api/admin/attractions/:id/gallery/reorder", requireAdmin, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const { order } = req.body as { order: number[] };
+    if (!Array.isArray(order)) return res.status(400).json({ error: "order must be an array" });
+    const attr = await storage.getAttractionById(id);
+    if (!attr) return res.status(404).json({ error: "Attraction not found" });
+    const existing: string[] = (attr as any).images || [];
+    if (order.some(i => i < 0 || i >= existing.length)) {
+      return res.status(400).json({ error: "Index out of range" });
+    }
+    const reordered = order.map(i => existing[i]);
+    existing.forEach((img, i) => { if (!order.includes(i)) reordered.push(img); });
+    await storage.updateAttraction(id, { images: reordered } as any);
+    const serveImages = reordered.map((_: any, idx: number) =>
+      `${RAILWAY_BASE}/api/images/db/attraction/${id}/gallery/${idx}`
+    );
+    const newImageUrl = serveImages[0] || null;
+    await storage.updateAttraction(id, { imageUrl: newImageUrl } as any);
+    res.json({ images: serveImages, imageUrl: newImageUrl });
   });
 
   // POST /api/admin/upload-image — generic image upload (returns data URI for immediate use)
