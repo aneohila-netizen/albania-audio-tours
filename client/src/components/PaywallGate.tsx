@@ -121,8 +121,8 @@ export default function PaywallGate({ isLocked, siteName, shopifyUrl, children }
   };
 
   return (
-    <div className="flex items-center justify-center px-2 py-6">
-      <div className="w-full max-w-md space-y-4 text-center">
+    <div className="flex items-center justify-center px-2 pt-1 pb-3">
+      <div className="w-full max-w-md space-y-3 text-center">
         {/* Icon */}
         <div className="flex justify-center">
           <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
