@@ -17,7 +17,7 @@
     "lat": 41.3281,
     "lng": 19.8187,
     "visitDuration": 45,
-    "imageUrl": "https://images.unsplash.com/photo-1555990793-da11153b6d8b?w=800"
+    "imageUrl": null
   },
   {
     "id": 102,
@@ -37,7 +37,7 @@
     "lat": 41.3456,
     "lng": 19.7789,
     "visitDuration": 90,
-    "imageUrl": "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800"
+    "imageUrl": null
   },
   {
     "id": 103,
@@ -57,7 +57,7 @@
     "lat": 41.3287,
     "lng": 19.8176,
     "visitDuration": 75,
-    "imageUrl": "https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=800"
+    "imageUrl": null
   },
   {
     "id": 104,
@@ -77,7 +77,7 @@
     "lat": 41.3183,
     "lng": 19.8167,
     "visitDuration": 60,
-    "imageUrl": "https://images.unsplash.com/photo-1555990793-da11153b6d8b?w=800"
+    "imageUrl": null
   },
   {
     "id": 201,
@@ -97,7 +97,7 @@
     "lat": 41.3225,
     "lng": 19.4386,
     "visitDuration": 60,
-    "imageUrl": "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800"
+    "imageUrl": null
   },
   {
     "id": 202,
@@ -117,7 +117,7 @@
     "lat": 41.3183,
     "lng": 19.4289,
     "visitDuration": 90,
-    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800"
+    "imageUrl": null
   },
   {
     "id": 301,
@@ -137,7 +137,7 @@
     "lat": 41.5089,
     "lng": 19.7956,
     "visitDuration": 90,
-    "imageUrl": "https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?w=800"
+    "imageUrl": null
   },
   {
     "id": 302,
@@ -157,7 +157,7 @@
     "lat": 41.5075,
     "lng": 19.7944,
     "visitDuration": 60,
-    "imageUrl": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800"
+    "imageUrl": null
   },
   {
     "id": 401,
@@ -177,7 +177,7 @@
     "lat": 41.7833,
     "lng": 19.65,
     "visitDuration": 45,
-    "imageUrl": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800"
+    "imageUrl": null
   },
   {
     "id": 402,
@@ -197,7 +197,7 @@
     "lat": 41.7856,
     "lng": 19.6489,
     "visitDuration": 60,
-    "imageUrl": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800"
+    "imageUrl": null
   },
   {
     "id": 501,
@@ -217,7 +217,7 @@
     "lat": 42.0533,
     "lng": 19.4828,
     "visitDuration": 90,
-    "imageUrl": "https://images.unsplash.com/photo-1586348943529-beaae6c28db9?w=800"
+    "imageUrl": null
   },
   {
     "id": 502,
@@ -237,7 +237,7 @@
     "lat": 42.0683,
     "lng": 19.5126,
     "visitDuration": 60,
-    "imageUrl": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800"
+    "imageUrl": null
   },
   {
     "id": 601,
@@ -257,7 +257,7 @@
     "lat": 42.3833,
     "lng": 19.7833,
     "visitDuration": 240,
-    "imageUrl": "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800"
+    "imageUrl": null
   },
   {
     "id": 602,
@@ -277,7 +277,7 @@
     "lat": 42.4667,
     "lng": 19.8833,
     "visitDuration": 480,
-    "imageUrl": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800"
+    "imageUrl": null
   },
   {
     "id": 701,
@@ -297,7 +297,7 @@
     "lat": 39.7723,
     "lng": 20.0025,
     "visitDuration": 180,
-    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800"
+    "imageUrl": null
   },
   {
     "id": 702,
@@ -317,7 +317,7 @@
     "lat": 40.1003,
     "lng": 19.7167,
     "visitDuration": 180,
-    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800"
+    "imageUrl": null
   },
   {
     "id": 703,
@@ -337,7 +337,7 @@
     "lat": 40.1833,
     "lng": 19.85,
     "visitDuration": 60,
-    "imageUrl": "https://images.unsplash.com/photo-1586348943529-beaae6c28db9?w=800"
+    "imageUrl": null
   },
   {
     "id": 801,
@@ -357,7 +357,7 @@
     "lat": 40.7094,
     "lng": 19.9506,
     "visitDuration": 120,
-    "imageUrl": "https://images.unsplash.com/photo-1555217851-6141535bd771?w=800"
+    "imageUrl": null
   },
   {
     "id": 802,
@@ -377,7 +377,7 @@
     "lat": 40.7094,
     "lng": 19.9506,
     "visitDuration": 60,
-    "imageUrl": "https://images.unsplash.com/photo-1555217851-6141535bd771?w=800"
+    "imageUrl": null
   },
   {
     "id": 803,
@@ -397,7 +397,7 @@
     "lat": 40.7058,
     "lng": 19.9522,
     "visitDuration": 75,
-    "imageUrl": "https://images.unsplash.com/photo-1555217851-6141535bd771?w=800"
+    "imageUrl": null
   },
   {
     "id": 804,
@@ -417,7 +417,7 @@
     "lat": 40.7042,
     "lng": 19.9489,
     "visitDuration": 60,
-    "imageUrl": "https://images.unsplash.com/photo-1555217851-6141535bd771?w=800"
+    "imageUrl": null
   },
   {
     "id": 805,
@@ -437,7 +437,7 @@
     "lat": 40.65,
     "lng": 20.1667,
     "visitDuration": 360,
-    "imageUrl": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800"
+    "imageUrl": null
   },
   {
     "id": 901,
@@ -457,7 +457,7 @@
     "lat": 41.1125,
     "lng": 20.0822,
     "visitDuration": 90,
-    "imageUrl": "https://images.unsplash.com/photo-1575936123452-b67c3203c357?w=800"
+    "imageUrl": null
   },
   {
     "id": 902,
@@ -477,7 +477,7 @@
     "lat": 41.2667,
     "lng": 19.9167,
     "visitDuration": 75,
-    "imageUrl": "https://images.unsplash.com/photo-1575936123452-b67c3203c357?w=800"
+    "imageUrl": null
   },
   {
     "id": 1001,
@@ -497,7 +497,7 @@
     "lat": 40.9025,
     "lng": 20.6525,
     "visitDuration": 120,
-    "imageUrl": "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=800"
+    "imageUrl": null
   },
   {
     "id": 1101,
@@ -517,7 +517,7 @@
     "lat": 40.6186,
     "lng": 20.7808,
     "visitDuration": 90,
-    "imageUrl": "https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?w=800"
+    "imageUrl": null
   },
   {
     "id": 1102,
@@ -537,7 +537,7 @@
     "lat": 40.6167,
     "lng": 20.78,
     "visitDuration": 45,
-    "imageUrl": "https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?w=800"
+    "imageUrl": null
   },
   {
     "id": 1201,
@@ -557,7 +557,7 @@
     "lat": 40.23,
     "lng": 20.35,
     "visitDuration": 150,
-    "imageUrl": "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=800"
+    "imageUrl": null
   },
   {
     "id": 1202,
@@ -577,7 +577,7 @@
     "lat": 40.2353,
     "lng": 20.3536,
     "visitDuration": 75,
-    "imageUrl": "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=800"
+    "imageUrl": null
   },
   {
     "id": 1301,
@@ -597,7 +597,7 @@
     "lat": 40.0757,
     "lng": 20.1394,
     "visitDuration": 90,
-    "imageUrl": "https://images.unsplash.com/photo-1570197571499-166b36435e9f?w=800"
+    "imageUrl": null
   },
   {
     "id": 1302,
@@ -617,7 +617,7 @@
     "lat": 40.074,
     "lng": 20.1378,
     "visitDuration": 90,
-    "imageUrl": "https://images.unsplash.com/photo-1570197571499-166b36435e9f?w=800"
+    "imageUrl": null
   },
   {
     "id": 1401,
@@ -637,7 +637,7 @@
     "lat": 39.7447,
     "lng": 20.0175,
     "visitDuration": 120,
-    "imageUrl": "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800"
+    "imageUrl": null
   },
   {
     "id": 1402,
@@ -657,7 +657,7 @@
     "lat": 39.8753,
     "lng": 20.0044,
     "visitDuration": 90,
-    "imageUrl": "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800"
+    "imageUrl": null
   },
   {
     "id": 1501,
@@ -677,7 +677,7 @@
     "lat": 40.4667,
     "lng": 19.4833,
     "visitDuration": 60,
-    "imageUrl": "https://images.unsplash.com/photo-1549887534-1541e9326642?w=800"
+    "imageUrl": null
   },
   {
     "id": 1502,
@@ -697,7 +697,7 @@
     "lat": 40.5,
     "lng": 19.3833,
     "visitDuration": 240,
-    "imageUrl": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800"
+    "imageUrl": null
   },
   {
     "id": 105,
@@ -717,7 +717,7 @@
     "lat": 41.328,
     "lng": 19.8196,
     "visitDuration": 25,
-    "imageUrl": "https://images.unsplash.com/photo-1622472506286-9eab47b2b97d?w=800"
+    "imageUrl": null
   },
   {
     "id": 106,
@@ -737,7 +737,7 @@
     "lat": 41.3285,
     "lng": 19.819,
     "visitDuration": 30,
-    "imageUrl": "https://images.unsplash.com/photo-1555990793-da11153b6d8b?w=800"
+    "imageUrl": null
   },
   {
     "id": 510,
@@ -757,7 +757,7 @@
     "lat": 40.7025,
     "lng": 19.95,
     "visitDuration": 45,
-    "imageUrl": "https://images.unsplash.com/photo-1548013146-72479768bada?w=800"
+    "imageUrl": null
   },
   {
     "id": 511,
@@ -777,7 +777,7 @@
     "lat": 40.705,
     "lng": 19.9515,
     "visitDuration": 50,
-    "imageUrl": "https://images.unsplash.com/photo-1618009639487-1a7ac2c2f61e?w=800"
+    "imageUrl": null
   },
   {
     "id": 512,
@@ -797,7 +797,7 @@
     "lat": 40.7038,
     "lng": 19.9472,
     "visitDuration": 40,
-    "imageUrl": "https://images.unsplash.com/photo-1584549284-b663e32a5dd1?w=800"
+    "imageUrl": null
   },
   {
     "id": 1202,
@@ -837,7 +837,7 @@
     "lat": 40.4678,
     "lng": 19.4886,
     "visitDuration": 45,
-    "imageUrl": "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800"
+    "imageUrl": null
   },
   {
     "id": 1303,
@@ -857,7 +857,7 @@
     "lat": 39.9017,
     "lng": 20.2239,
     "visitDuration": 90,
-    "imageUrl": "https://images.unsplash.com/photo-1518457607834-6e8d80c183c5?w=800"
+    "imageUrl": null
   },
   {
     "id": 201,

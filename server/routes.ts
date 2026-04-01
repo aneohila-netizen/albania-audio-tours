@@ -962,12 +962,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
     const reordered = order.map(i => existing[i]);
     existing.forEach((img, i) => { if (!order.includes(i)) reordered.push(img); });
-    await storage.updateSite(id, { images: reordered } as any);
     const serveImages = reordered.map((_: any, idx: number) =>
       `${RAILWAY_BASE}/api/images/db/site/${id}/gallery/${idx}`
     );
     const newImageUrl = serveImages[0] || null;
-    await storage.updateSite(id, { imageUrl: newImageUrl } as any);
+    // Single atomic update — images array and imageUrl together
+    await storage.updateSite(id, { images: reordered, imageUrl: newImageUrl } as any);
     res.json({ images: serveImages, imageUrl: newImageUrl });
   });
 
@@ -1024,12 +1024,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
     const reordered = order.map(i => existing[i]);
     existing.forEach((img, i) => { if (!order.includes(i)) reordered.push(img); });
-    await storage.updateAttraction(id, { images: reordered } as any);
     const serveImages = reordered.map((_: any, idx: number) =>
       `${RAILWAY_BASE}/api/images/db/attraction/${id}/gallery/${idx}`
     );
     const newImageUrl = serveImages[0] || null;
-    await storage.updateAttraction(id, { imageUrl: newImageUrl } as any);
+    // Single atomic update — images array and imageUrl together
+    await storage.updateAttraction(id, { images: reordered, imageUrl: newImageUrl } as any);
     res.json({ images: serveImages, imageUrl: newImageUrl });
   });
 

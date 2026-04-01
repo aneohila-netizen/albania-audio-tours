@@ -1496,6 +1496,20 @@ function AttractionPreviewCard({ form, destinationName, destinationSlug }: { for
 // Thumbnails support drag-and-drop reordering — dragging position 0 away promotes the next image to hero.
 // Images are uploaded directly to the DB and served via /api/images/db/...
 // MEDIA SAFETY: deletion requires server-side x-confirm-delete: yes header.
+//
+// FIX NOTES (bugs resolved in this version):
+// 1. Delete always deleted the LAST image — root cause: ‘slideIdx’ state read inside removeImage was
+//    always the value at the last render, but the real DB index to pass is the serve-URL’s numeric
+//    suffix (extracted via getDbIdx), not the visual position. These diverge after a reorder because
+//    serve URLs keep their original DB index even after the frontend reorder optimistic update.
+//    Fix: extract the DB index from the URL string (.../gallery/N), not from slideIdx position.
+// 2. Drag-and-drop never worked — root cause: dragSrc was a ref, so React never re-rendered when it
+//    was set, meaning onDragOver’s ‘dragSrc.current !== i’ class was always stale. Also, the
+//    drag event handler set opacity on e.currentTarget AFTER React may have cleared it, and the upload
+//    zone’s onDragOver caught thumbnail drag events via bubbling, cancelling them.
+//    Fix: use dragSrcIdx state (not ref), call e.stopPropagation() on thumbnail events, add
+//    e.dataTransfer.setData to mark the drag as carrying valid data, and use a CSS class toggle
+//    on drag start/end instead of direct style mutation.
 function ImageGalleryCard({
   entityType, entityId, imageUrl, images, onUpdate,
 }: {
@@ -1505,29 +1519,40 @@ function ImageGalleryCard({
   images: string[];
   onUpdate: (imageUrl: string, images: string[]) => void;
 }) {
-  const [uploading, setUploading]       = useState(false);
-  const [error, setError]               = useState("");
-  const [slideIdx, setSlideIdx]         = useState(0);
-  const [reordering, setReordering]     = useState(false);
-  const [dragOver, setDragOver]         = useState<number | null>(null);
-  const dragSrc                         = useRef<number | null>(null);
-  const fileRef                         = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading]     = useState(false);
+  const [error, setError]             = useState("");
+  const [slideIdx, setSlideIdx]       = useState(0);
+  const [reordering, setReordering]   = useState(false);
+  // dragSrcIdx is STATE (not ref) so the drop-target CSS re-renders correctly
+  const [dragSrcIdx, setDragSrcIdx]   = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const fileRef                       = useRef<HTMLInputElement>(null);
 
   // All gallery images — gallery[0] IS the hero
   const allImages = images.filter(Boolean);
 
+  // Keep slideIdx in bounds when images array shrinks
   useEffect(() => {
-    if (slideIdx >= allImages.length && allImages.length > 0) setSlideIdx(allImages.length - 1);
+    if (allImages.length === 0) { setSlideIdx(0); return; }
+    if (slideIdx >= allImages.length) setSlideIdx(allImages.length - 1);
   }, [allImages.length]);
 
-  // Auto-advance preview every 4 seconds (pauses during drag)
+  // Auto-advance preview every 4s — paused while user is dragging
   useEffect(() => {
-    if (allImages.length <= 1 || dragSrc.current !== null) return;
+    if (allImages.length <= 1 || dragSrcIdx !== null) return;
     const timer = setInterval(() => setSlideIdx(i => (i + 1) % allImages.length), 4000);
     return () => clearInterval(timer);
-  }, [allImages.length, dragOver]);
+  }, [allImages.length, dragSrcIdx]);
 
-  // Upload one or multiple gallery images — saved immediately to DB
+  // ── Extract the real DB index from a serve URL ──────────────────────────────
+  // Serve URLs look like: .../api/images/db/site/7/gallery/3
+  // The last segment is the actual DB array index.
+  function getDbIdx(serveUrl: string): number {
+    const m = serveUrl.match(/\/gallery\/([0-9]+)/);
+    return m ? parseInt(m[1], 10) : -1;
+  }
+
+  // ── Upload ──────────────────────────────────────────────────────────────────
   const [uploadProgress, setUploadProgress] = useState("");
 
   async function uploadImage(file: File): Promise<string[]> {
@@ -1559,66 +1584,94 @@ function ImageGalleryCard({
     setUploadProgress(""); setUploading(false);
   }
 
-  // Remove gallery image — HARDCODED: requires x-confirm-delete header (media safety rule)
-  async function removeImage(idx: number) {
+  // ── Delete — HARDCODED: requires x-confirm-delete header (media safety rule) ─
+  // CRITICAL: pass the DB index extracted from the serve URL, NOT the visual slideIdx.
+  // After a reorder the visual position and DB index may diverge.
+  async function removeImage(visualIdx: number) {
     if (!entityId) return;
-    if (!window.confirm(`Remove image ${idx + 1}? This cannot be undone.`)) return;
+    const targetUrl = allImages[visualIdx];
+    if (!targetUrl) return;
+    const dbIdx = getDbIdx(targetUrl);
+    if (dbIdx < 0) { setError("Cannot determine image index. Try refreshing."); return; }
+    if (!window.confirm(`Remove image ${visualIdx + 1}? This cannot be undone.`)) return;
     try {
-      const res = await adminFetch(`/api/admin/${entityType}/${entityId}/gallery/${idx}`, {
+      const res = await adminFetch(`/api/admin/${entityType}/${entityId}/gallery/${dbIdx}`, {
         method: "DELETE",
         headers: { "x-confirm-delete": "yes" }, // HARDCODED — never remove
       });
-      // Use server-returned serve URLs so indexes are correct after deletion
+      if (!res.ok) { setError("Remove failed. Please try again."); return; }
       const data = await res.json();
       const updatedImages: string[] = data.images || [];
       const updatedImageUrl: string = data.imageUrl || updatedImages[0] || "";
       onUpdate(updatedImageUrl, updatedImages);
+      // Keep slideIdx in bounds after deletion
       setSlideIdx(s => Math.max(0, Math.min(s, updatedImages.length - 1)));
     } catch {
       setError("Remove failed. Please try again.");
     }
   }
 
-  // ── Drag-and-drop reorder ──────────────────────────────────────────────────
+  // ── Drag-and-drop reorder ───────────────────────────────────────────────────
+  // CRITICAL:
+  // • Use dragSrcIdx STATE (not ref) so CSS drop-target highlights re-render.
+  // • Call e.stopPropagation() on thumbnail events so the upload-zone’s onDragOver
+  //   cannot swallow them and prevent the drop from firing.
+  // • Call e.dataTransfer.setData() so the browser treats the drag as valid data.
+  // • Use CSS class on the drag source element, not direct style mutation.
+
   function handleDragStart(e: React.DragEvent, idx: number) {
-    dragSrc.current = idx;
+    e.stopPropagation();
+    // Mark drag as carrying thumbnail data so the browser allows drop
     e.dataTransfer.effectAllowed = "move";
-    // Make the drag ghost semi-transparent
-    (e.currentTarget as HTMLElement).style.opacity = "0.4";
+    e.dataTransfer.setData("text/plain", String(idx));
+    setDragSrcIdx(idx);
   }
 
   function handleDragEnd(e: React.DragEvent) {
-    (e.currentTarget as HTMLElement).style.opacity = "1";
-    dragSrc.current = null;
-    setDragOver(null);
+    e.stopPropagation();
+    setDragSrcIdx(null);
+    setDragOverIdx(null);
   }
 
   function handleDragEnter(e: React.DragEvent, idx: number) {
     e.preventDefault();
-    setDragOver(idx);
+    e.stopPropagation();
+    setDragOverIdx(idx);
   }
 
   function handleDragOver(e: React.DragEvent) {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = "move";
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.stopPropagation();
+    // Only clear dragOver if we actually left this thumbnail (not moved to a child)
+    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
+      setDragOverIdx(null);
+    }
   }
 
   async function handleDrop(e: React.DragEvent, dropIdx: number) {
     e.preventDefault();
-    setDragOver(null);
-    const src = dragSrc.current;
-    if (src === null || src === dropIdx) return;
+    e.stopPropagation();
+    const srcStr = e.dataTransfer.getData("text/plain");
+    const src = parseInt(srcStr, 10);
+    setDragOverIdx(null);
+    setDragSrcIdx(null);
+    if (isNaN(src) || src === dropIdx) return;
 
-    // Build new order: remove src from its position, insert at dropIdx
+    // Build new order array: take existing indices, move src to dropIdx
     const order = Array.from({ length: allImages.length }, (_, i) => i);
     order.splice(src, 1);
     order.splice(dropIdx, 0, src);
 
     if (!entityId) {
-      // Optimistic local reorder when not yet saved
+      // Optimistic local reorder (no entity saved yet)
       const reordered = order.map(i => allImages[i]);
       onUpdate(reordered[0] || "", reordered);
-      setSlideIdx(dropIdx);
+      setSlideIdx(0);
       return;
     }
 
@@ -1632,6 +1685,7 @@ function ImageGalleryCard({
       if (!res.ok) throw new Error("Reorder failed");
       const data = await res.json();
       onUpdate(data.imageUrl || data.images?.[0] || "", data.images || []);
+      // Show the image that was just dragged (now at dropIdx)
       setSlideIdx(dropIdx);
     } catch {
       setError("Reorder failed. Please try again.");
@@ -1652,16 +1706,17 @@ function ImageGalleryCard({
       </CardHeader>
       <CardContent className="space-y-4">
 
-        {/* Slideshow preview */}
+        {/* Main slideshow preview */}
         {allImages.length > 0 ? (
           <div className="relative rounded-xl overflow-hidden border border-border/60 bg-muted" style={{aspectRatio:"16/9"}}>
             <img
+              key={allImages[slideIdx]}
               src={allImages[slideIdx]}
               alt={`Image ${slideIdx + 1}`}
               className="w-full h-full object-cover"
               onError={e => { (e.target as HTMLImageElement).style.opacity = "0.2"; }}
             />
-            {/* Arrows */}
+            {/* Prev/Next arrows */}
             {allImages.length > 1 && (
               <>
                 <button type="button"
@@ -1676,25 +1731,27 @@ function ImageGalleryCard({
                 </button>
               </>
             )}
-            {/* Dots */}
+            {/* Dot indicators */}
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
               {allImages.map((_, i) => (
                 <button key={i} type="button" onClick={() => setSlideIdx(i)}
                   className={`rounded-full transition-all ${i === slideIdx ? "w-4 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/50"}`} />
               ))}
             </div>
-            {/* Label */}
+            {/* Position label */}
             <div className="absolute top-2 left-2">
               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-black/50 text-white">
                 {slideIdx === 0 ? "Hero (first)" : `Slide ${slideIdx + 1}`} · {slideIdx + 1}/{allImages.length}
               </span>
             </div>
-            {/* Remove button */}
-            <button type="button" onClick={() => removeImage(slideIdx)}
+            {/* Delete current image — deletes the DISPLAYED image, not by index */}
+            <button type="button"
+              onClick={() => removeImage(slideIdx)}
+              title="Delete this image"
               className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-destructive text-white flex items-center justify-center">
               <X className="w-3.5 h-3.5" />
             </button>
-            {/* Reordering overlay */}
+            {/* Reorder-in-progress overlay */}
             {reordering && (
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                 <Loader2 className="w-6 h-6 animate-spin text-white" />
@@ -1712,51 +1769,63 @@ function ImageGalleryCard({
         {allImages.length > 0 && (
           <div>
             <p className="text-[10px] text-muted-foreground/70 mb-1.5">
-              {allImages.length > 1 ? "Drag thumbnails to reorder · first = hero" : "Hero image"}
+              {allImages.length > 1 ? "Drag to reorder · first = hero · click to preview" : "Hero image"}
             </p>
             <div className="flex gap-2 overflow-x-auto pb-1">
-              {allImages.map((img, i) => (
-                <div
-                  key={i}
-                  draggable
-                  onDragStart={e => handleDragStart(e, i)}
-                  onDragEnd={handleDragEnd}
-                  onDragEnter={e => handleDragEnter(e, i)}
-                  onDragOver={handleDragOver}
-                  onDrop={e => handleDrop(e, i)}
-                  onClick={() => setSlideIdx(i)}
-                  title={i === 0 ? "Hero image — drag to reposition" : `Image ${i + 1} — drag to reorder`}
-                  className={[
-                    "relative shrink-0 cursor-grab active:cursor-grabbing rounded-lg overflow-hidden border-2 transition-all select-none",
-                    i === slideIdx ? "border-primary shadow-md" : "border-transparent hover:border-primary/40",
-                    dragOver === i && dragSrc.current !== i ? "border-primary border-dashed scale-105" : "",
-                  ].join(" ")}
-                  style={{width:56, height:56}}>
-                  <img src={img} alt={`${i+1}`} className="w-full h-full object-cover pointer-events-none" />
-                  {/* HERO label — hardcoded, always on index 0 */}
-                  {i === 0 && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-primary/80 text-[8px] text-white text-center font-bold py-0.5 pointer-events-none">HERO</div>
-                  )}
-                  {/* Slide number badge on non-hero thumbnails */}
-                  {i > 0 && (
-                    <div className="absolute top-0.5 right-0.5 bg-black/60 text-[8px] text-white rounded px-0.5 leading-4 pointer-events-none">{i + 1}</div>
-                  )}
-                </div>
-              ))}
+              {allImages.map((img, i) => {
+                const isBeingDragged = dragSrcIdx === i;
+                const isDropTarget   = dragOverIdx === i && dragSrcIdx !== i;
+                return (
+                  <div
+                    key={img}
+                    draggable
+                    onDragStart={e => handleDragStart(e, i)}
+                    onDragEnd={handleDragEnd}
+                    onDragEnter={e => handleDragEnter(e, i)}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={e => handleDrop(e, i)}
+                    onClick={() => setSlideIdx(i)}
+                    title={i === 0 ? "Hero — drag to move" : `Image ${i + 1} — drag to reorder, click to preview`}
+                    className={[
+                      "relative shrink-0 rounded-lg overflow-hidden border-2 transition-all select-none",
+                      "cursor-grab active:cursor-grabbing",
+                      i === slideIdx ? "border-primary shadow-md" : "border-transparent hover:border-primary/40",
+                      isDropTarget  ? "border-primary scale-110 shadow-lg" : "",
+                      isBeingDragged ? "opacity-40" : "opacity-100",
+                    ].join(" ")}
+                    style={{width:56, height:56}}>
+                    <img src={img} alt={`img-${i+1}`} className="w-full h-full object-cover pointer-events-none" />
+                    {/* HERO badge — hardcoded on position 0 */}
+                    {i === 0 && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-primary/80 text-[8px] text-white text-center font-bold py-0.5 pointer-events-none">HERO</div>
+                    )}
+                    {/* Number badge on non-hero thumbnails */}
+                    {i > 0 && (
+                      <div className="absolute top-0.5 right-0.5 bg-black/60 text-[8px] text-white rounded px-0.5 leading-4 pointer-events-none">{i + 1}</div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
 
-        {/* Upload zone — supports file picker and dropping NEW image files from desktop */}
+        {/* Upload zone — NEW files from desktop only; thumbnail drags use stopPropagation */}
         <div
           className="border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all border-border/60 hover:border-primary/40 hover:bg-primary/5"
           onClick={() => fileRef.current?.click()}
-          onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add("border-primary", "bg-primary/5"); }}
+          onDragOver={e => {
+            // Only style the zone if this is a FILE drag (not a thumbnail reorder)
+            if (e.dataTransfer.types.includes("Files")) {
+              e.preventDefault();
+              e.currentTarget.classList.add("border-primary", "bg-primary/5");
+            }
+          }}
           onDragLeave={e => { e.currentTarget.classList.remove("border-primary", "bg-primary/5"); }}
           onDrop={e => {
             e.preventDefault();
             e.currentTarget.classList.remove("border-primary", "bg-primary/5");
-            // Only handle file drops here — thumbnail reorder uses its own handlers
             if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
           }}
         >
