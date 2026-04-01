@@ -1827,6 +1827,7 @@ type DestFormData = {
   lat: string; lng: string;
   region: string; category: string; difficulty: string;
   points: string; visitDuration: string; imageUrl: string;
+  images: string[];
   isLocked: boolean; shopifyUrl: string;
 };
 
@@ -1838,7 +1839,7 @@ const EMPTY_DEST_FORM: DestFormData = {
   audioUrlEn: null, audioUrlAl: null, audioUrlGr: null,
   audioUrlIt: null, audioUrlEs: null, audioUrlDe: null, audioUrlFr: null, audioUrlAr: null, audioUrlSl: null,
   lat: "", lng: "", region: "", category: "", difficulty: "easy",
-  points: "100", visitDuration: "120", imageUrl: "", images: [] as string[],
+  points: "100", visitDuration: "120", imageUrl: "", images: [],
   isLocked: false, shopifyUrl: "",
 };
 
@@ -1905,9 +1906,9 @@ function EditorView({
     }
   }, []);
 
-  function set(field: keyof DestFormData, value: string | null) {
+  function set(field: keyof DestFormData, value: string | null | string[]) {
     setFormState(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) setErrors(prev => { const e = { ...prev }; delete e[field]; return e; });
+    if (errors[field as string]) setErrors(prev => { const e = { ...prev }; delete (e as any)[field]; return e; });
   }
 
   async function handleTranslateDest(langKey: string) {
@@ -2355,6 +2356,7 @@ type AttrFormData = {
   lat: string; lng: string;
   visitDuration: string;
   imageUrl: string;
+  images: string[];
 };
 
 const EMPTY_ATTR_FORM: AttrFormData = {
@@ -2365,7 +2367,7 @@ const EMPTY_ATTR_FORM: AttrFormData = {
   audioUrlEn: "", audioUrlAl: "", audioUrlGr: "",
   audioUrlIt: "", audioUrlEs: "", audioUrlDe: "", audioUrlFr: "", audioUrlAr: "", audioUrlSl: "",
   category: "", points: "50", lat: "", lng: "",
-  visitDuration: "30", imageUrl: "", images: [] as string[],
+  visitDuration: "30", imageUrl: "", images: [],
   isLocked: false, shopifyUrl: "",
 };
 
@@ -2442,9 +2444,9 @@ function AttrEditorView({
     }
   }, []);
 
-  function set(field: keyof AttrFormData, value: string) {
+  function set(field: keyof AttrFormData, value: string | string[]) {
     setFormState(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) setErrors(prev => { const e = { ...prev }; delete e[field]; return e; });
+    if (errors[field as string]) setErrors(prev => { const e = { ...prev }; delete (e as any)[field]; return e; });
   }
 
   async function handleTranslateAttr(langKey: string) {

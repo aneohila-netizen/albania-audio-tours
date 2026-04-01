@@ -430,7 +430,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const b64 = imageData.split(",")[1];
       const buf = Buffer.from(b64, "base64");
       res.setHeader("Content-Type", mime);
-      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      // No long-term caching — gallery images can be deleted and replaced
+      res.setHeader("Cache-Control", "no-store");
       return res.send(buf);
     }
     // Prevent infinite redirect loops for self-referencing serve URLs
@@ -462,7 +463,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const b64  = imageData.split(",")[1];
       const buf  = Buffer.from(b64, "base64");
       res.setHeader("Content-Type", mime);
-      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      // No long-term caching — gallery images can be deleted and replaced
+      res.setHeader("Cache-Control", "no-store");
       return res.send(buf);
     }
     // Prevent redirect loops: if the stored gallery value is itself a serve URL,
