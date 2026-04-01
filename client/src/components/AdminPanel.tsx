@@ -1710,9 +1710,9 @@ function Field({ label, required, error, children }: { label: string; required?:
 // ─── DESTINATION EDITOR ───────────────────────────────────────────────────────
 type DestFormData = {
   slug: string;
-  nameEn: string; nameAl: string; nameGr: string; nameIt: string; nameEs: string; nameDe: string; nameFr: string; nameAr: string; nameSl: string;
-  descEn: string; descAl: string; descGr: string; descIt: string; descEs: string; descDe: string; descFr: string; descAr: string; descSl: string;
-  funFactEn: string; funFactAl: string; funFactGr: string; funFactIt: string; funFactEs: string; funFactDe: string; funFactFr: string; funFactAr: string; funFactSl: string;
+  nameEn: string; nameAl: string; nameGr: string; nameIt: string; nameEs: string; nameDe: string; nameFr: string; nameAr: string; nameSl: string; namePt: string; nameCn: string;
+  descEn: string; descAl: string; descGr: string; descIt: string; descEs: string; descDe: string; descFr: string; descAr: string; descSl: string; descPt: string; descCn: string;
+  funFactEn: string; funFactAl: string; funFactGr: string; funFactIt: string; funFactEs: string; funFactDe: string; funFactFr: string; funFactAr: string; funFactSl: string; funFactPt: string; funFactCn: string;
   audioUrlEn: string | null; audioUrlAl: string | null; audioUrlGr: string | null;
   audioUrlIt: string | null; audioUrlEs: string | null; audioUrlDe: string | null; audioUrlFr: string | null; audioUrlAr: string | null; audioUrlSl: string | null;
   lat: string; lng: string;
@@ -1723,9 +1723,9 @@ type DestFormData = {
 
 const EMPTY_DEST_FORM: DestFormData = {
   slug: "",
-  nameEn: "", nameAl: "", nameGr: "", nameIt: "", nameEs: "", nameDe: "", nameFr: "", nameAr: "", nameSl: "",
-  descEn: "", descAl: "", descGr: "", descIt: "", descEs: "", descDe: "", descFr: "", descAr: "", descSl: "",
-  funFactEn: "", funFactAl: "", funFactGr: "", funFactIt: "", funFactEs: "", funFactDe: "", funFactFr: "", funFactAr: "", funFactSl: "",
+  nameEn: "", nameAl: "", nameGr: "", nameIt: "", nameEs: "", nameDe: "", nameFr: "", nameAr: "", nameSl: "", namePt: "", nameCn: "",
+  descEn: "", descAl: "", descGr: "", descIt: "", descEs: "", descDe: "", descFr: "", descAr: "", descSl: "", descPt: "", descCn: "",
+  funFactEn: "", funFactAl: "", funFactGr: "", funFactIt: "", funFactEs: "", funFactDe: "", funFactFr: "", funFactAr: "", funFactSl: "", funFactPt: "", funFactCn: "",
   audioUrlEn: null, audioUrlAl: null, audioUrlGr: null,
   audioUrlIt: null, audioUrlEs: null, audioUrlDe: null, audioUrlFr: null, audioUrlAr: null, audioUrlSl: null,
   lat: "", lng: "", region: "", category: "", difficulty: "easy",
@@ -1739,12 +1739,15 @@ function siteToForm(s: TourSite): DestFormData {
     nameEn: s.nameEn, nameAl: s.nameAl, nameGr: s.nameGr,
     nameIt: (s as any).nameIt || "", nameEs: (s as any).nameEs || "", nameDe: (s as any).nameDe || "",
     nameFr: (s as any).nameFr || "", nameAr: (s as any).nameAr || "", nameSl: (s as any).nameSl || "",
+    namePt: (s as any).namePt || "", nameCn: (s as any).nameCn || "",
     descEn: s.descEn, descAl: s.descAl, descGr: s.descGr,
     descIt: (s as any).descIt || "", descEs: (s as any).descEs || "", descDe: (s as any).descDe || "",
     descFr: (s as any).descFr || "", descAr: (s as any).descAr || "", descSl: (s as any).descSl || "",
+    descPt: (s as any).descPt || "", descCn: (s as any).descCn || "",
     funFactEn: s.funFactEn || "", funFactAl: s.funFactAl || "", funFactGr: s.funFactGr || "",
     funFactIt: (s as any).funFactIt || "", funFactEs: (s as any).funFactEs || "", funFactDe: (s as any).funFactDe || "",
     funFactFr: (s as any).funFactFr || "", funFactAr: (s as any).funFactAr || "", funFactSl: (s as any).funFactSl || "",
+    funFactPt: (s as any).funFactPt || "", funFactCn: (s as any).funFactCn || "",
     audioUrlEn: s.audioUrlEn, audioUrlAl: s.audioUrlAl, audioUrlGr: s.audioUrlGr,
     audioUrlIt: (s as any).audioUrlIt || null, audioUrlEs: (s as any).audioUrlEs || null, audioUrlDe: (s as any).audioUrlDe || null,
     audioUrlFr: (s as any).audioUrlFr || null, audioUrlAr: (s as any).audioUrlAr || null, audioUrlSl: (s as any).audioUrlSl || null,
@@ -2233,9 +2236,9 @@ function EditorView({
 // ─── ATTRACTION EDITOR ────────────────────────────────────────────────────────
 type AttrFormData = {
   slug: string;
-  nameEn: string; nameAl: string; nameGr: string; nameIt: string; nameEs: string; nameDe: string; nameFr: string; nameAr: string; nameSl: string;
-  descEn: string; descAl: string; descGr: string; descIt: string; descEs: string; descDe: string; descFr: string; descAr: string; descSl: string;
-  funFactEn: string; funFactAl: string; funFactGr: string; funFactIt: string; funFactEs: string; funFactDe: string; funFactFr: string; funFactAr: string; funFactSl: string;
+  nameEn: string; nameAl: string; nameGr: string; nameIt: string; nameEs: string; nameDe: string; nameFr: string; nameAr: string; nameSl: string; namePt: string; nameCn: string;
+  descEn: string; descAl: string; descGr: string; descIt: string; descEs: string; descDe: string; descFr: string; descAr: string; descSl: string; descPt: string; descCn: string;
+  funFactEn: string; funFactAl: string; funFactGr: string; funFactIt: string; funFactEs: string; funFactDe: string; funFactFr: string; funFactAr: string; funFactSl: string; funFactPt: string; funFactCn: string;
   audioUrlEn: string; audioUrlAl: string; audioUrlGr: string;
   audioUrlIt: string; audioUrlEs: string; audioUrlDe: string; audioUrlFr: string; audioUrlAr: string; audioUrlSl: string;
   category: string;
@@ -2247,9 +2250,9 @@ type AttrFormData = {
 
 const EMPTY_ATTR_FORM: AttrFormData = {
   slug: "",
-  nameEn: "", nameAl: "", nameGr: "", nameIt: "", nameEs: "", nameDe: "", nameFr: "", nameAr: "", nameSl: "",
-  descEn: "", descAl: "", descGr: "", descIt: "", descEs: "", descDe: "", descFr: "", descAr: "", descSl: "",
-  funFactEn: "", funFactAl: "", funFactGr: "", funFactIt: "", funFactEs: "", funFactDe: "", funFactFr: "", funFactAr: "", funFactSl: "",
+  nameEn: "", nameAl: "", nameGr: "", nameIt: "", nameEs: "", nameDe: "", nameFr: "", nameAr: "", nameSl: "", namePt: "", nameCn: "",
+  descEn: "", descAl: "", descGr: "", descIt: "", descEs: "", descDe: "", descFr: "", descAr: "", descSl: "", descPt: "", descCn: "",
+  funFactEn: "", funFactAl: "", funFactGr: "", funFactIt: "", funFactEs: "", funFactDe: "", funFactFr: "", funFactAr: "", funFactSl: "", funFactPt: "", funFactCn: "",
   audioUrlEn: "", audioUrlAl: "", audioUrlGr: "",
   audioUrlIt: "", audioUrlEs: "", audioUrlDe: "", audioUrlFr: "", audioUrlAr: "", audioUrlSl: "",
   category: "", points: "50", lat: "", lng: "",
@@ -2263,12 +2266,15 @@ function attrToForm(a: Attraction): AttrFormData {
     nameEn: a.nameEn, nameAl: a.nameAl, nameGr: a.nameGr,
     nameIt: (a as any).nameIt || "", nameEs: (a as any).nameEs || "", nameDe: (a as any).nameDe || "",
     nameFr: (a as any).nameFr || "", nameAr: (a as any).nameAr || "", nameSl: (a as any).nameSl || "",
+    namePt: (a as any).namePt || "", nameCn: (a as any).nameCn || "",
     descEn: a.descEn, descAl: a.descAl, descGr: a.descGr,
     descIt: (a as any).descIt || "", descEs: (a as any).descEs || "", descDe: (a as any).descDe || "",
     descFr: (a as any).descFr || "", descAr: (a as any).descAr || "", descSl: (a as any).descSl || "",
+    descPt: (a as any).descPt || "", descCn: (a as any).descCn || "",
     funFactEn: a.funFactEn || "", funFactAl: a.funFactAl || "", funFactGr: a.funFactGr || "",
     funFactIt: (a as any).funFactIt || "", funFactEs: (a as any).funFactEs || "", funFactDe: (a as any).funFactDe || "",
     funFactFr: (a as any).funFactFr || "", funFactAr: (a as any).funFactAr || "", funFactSl: (a as any).funFactSl || "",
+    funFactPt: (a as any).funFactPt || "", funFactCn: (a as any).funFactCn || "",
     audioUrlEn: a.audioUrlEn || "", audioUrlAl: a.audioUrlAl || "", audioUrlGr: a.audioUrlGr || "",
     audioUrlIt: (a as any).audioUrlIt || "", audioUrlEs: (a as any).audioUrlEs || "", audioUrlDe: (a as any).audioUrlDe || "",
     audioUrlFr: (a as any).audioUrlFr || "", audioUrlAr: (a as any).audioUrlAr || "", audioUrlSl: (a as any).audioUrlSl || "",
@@ -2436,7 +2442,13 @@ function AttrEditorView({
 
       if (res.ok) {
         setSavedOk(true);
-        setTimeout(() => { setSavedOk(false); onSaved(); }, 800);
+        if (isNew) {
+          // New attraction: navigate to the list after save
+          setTimeout(() => { setSavedOk(false); onSaved(); }, 800);
+        } else {
+          // Existing attraction: stay on page, just show confirmation
+          setTimeout(() => setSavedOk(false), 2500);
+        }
       } else {
         const err = await res.json().catch(() => ({}));
         alert(`Save failed: ${err.error || res.status}`);
