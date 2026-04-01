@@ -99,12 +99,11 @@ export default function DestinationPage() {
         interval={5000}
         
       >
-        {/* Overlay: title, tagline, badges */}
+        {/* Overlay: title only — tagline removed to keep hero image clean */}
         <div className="absolute bottom-0 left-0 right-0 p-5 pointer-events-none">
-          <h1 className="text-3xl font-bold text-white mb-1 leading-tight drop-shadow-lg" style={{ fontFamily: "var(--font-display)" }}>
+          <h1 className="text-3xl font-bold text-white leading-tight drop-shadow-lg" style={{ fontFamily: "var(--font-display)" }}>
             {name}
           </h1>
-          <p className="text-sm text-white/80 italic">{tagline}</p>
         </div>
         <div className="absolute top-3 right-3 flex flex-col gap-1.5 items-end pointer-events-none">
           {totalAttrPoints > 0 && (

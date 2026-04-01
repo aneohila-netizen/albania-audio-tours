@@ -121,18 +121,18 @@ export default function PaywallGate({ isLocked, siteName, shopifyUrl, children }
   };
 
   return (
-    <div className="min-h-[60vh] flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md space-y-6 text-center">
-        {/* Lock icon */}
+    <div className="flex items-center justify-center px-2 py-6">
+      <div className="w-full max-w-md space-y-4 text-center">
+        {/* Icon */}
         <div className="flex justify-center">
-          <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
-            <Headphones size={34} className="text-primary" />
+          <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+            <Headphones size={24} className="text-primary" />
           </div>
         </div>
 
         {/* Heading */}
         <div>
-          <h2 className="text-xl font-bold mb-2">{siteName}</h2>
+          <h2 className="text-base font-bold mb-1">{siteName}</h2>
           <p className="text-muted-foreground text-sm leading-relaxed">
             Audio tours are a <strong>premium feature</strong>.
             Subscribe to unlock all narrated tours, offline playback, and all 11 languages.
