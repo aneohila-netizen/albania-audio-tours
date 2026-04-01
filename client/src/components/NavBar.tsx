@@ -132,11 +132,11 @@ export default function NavBar() {
           })}
         </nav>
 
-        {/* Right controls */}
-        <div className="flex items-center gap-2">
+        {/* Right controls — flex-1 on mobile when search open so it fills the gap */}
+        <div className={`flex items-center gap-2 ${searchOpen ? "flex-1 min-w-0" : ""}`}>
 
           {/* ── Global Search ───────────────────────────────────────── */}
-          <div className="relative" ref={searchRef}>
+          <div className={`relative ${searchOpen ? "flex-1 md:flex-none" : ""}`} ref={searchRef}>
             {/* Search button — expands to input on click */}
             {!searchOpen ? (
               <button
@@ -148,7 +148,7 @@ export default function NavBar() {
                 <Search size={20} className="sm:w-4 sm:h-4" />
               </button>
             ) : (
-              <div className="flex items-center gap-1 bg-card border border-primary/30 rounded-xl px-2.5 py-1.5 shadow-md w-56">
+              <div className="flex items-center gap-1 bg-card border border-primary/30 rounded-xl px-2.5 py-1.5 shadow-md w-full md:w-56">
                 <Search size={14} className="text-muted-foreground shrink-0" />
                 <input
                   ref={searchInputRef}
