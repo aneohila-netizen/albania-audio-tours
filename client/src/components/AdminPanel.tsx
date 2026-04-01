@@ -1515,11 +1515,21 @@ function ImageGalleryCard({
   const [uploadProgress, setUploadProgress] = useState("");
   const [error, setError]               = useState("");
   const [slideIdx, setSlideIdx]         = useState(0);
-  const [selectedIdx, setSelectedIdx]   = useState<number | null>(null); // for reorder
+  const [selectedIdx, setSelectedIdx]   = useState<number | null>(null);
   const [moving, setMoving]             = useState(false);
+  // cacheBust increments after every reorder/delete so <img src> changes
+  // and the browser re-fetches the image even though the URL path is the same.
+  const [cacheBust, setCacheBust]       = useState(() => Date.now());
   const fileRef                         = useRef<HTMLInputElement>(null);
 
   const allImages = images.filter(Boolean);
+
+  // Helper: append cache-bust param to any gallery serve URL
+  // Only added in admin view — visitor-facing pages are unaffected.
+  function bust(url: string): string {
+    if (!url) return url;
+    return url.includes('?') ? `${url}&_t=${cacheBust}` : `${url}?_t=${cacheBust}`;
+  }
 
   // Keep slideIdx in bounds when array shrinks
   useEffect(() => {
@@ -1585,6 +1595,7 @@ function ImageGalleryCard({
       onUpdate(d.imageUrl || imgs[0] || "", imgs);
       setSelectedIdx(null);
       setSlideIdx(s => Math.max(0, Math.min(s, imgs.length - 1)));
+      setCacheBust(Date.now()); // force re-fetch of all gallery images
     } catch {
       setError("Delete failed. Please try again.");
     }
@@ -1623,6 +1634,7 @@ function ImageGalleryCard({
       onUpdate(d.imageUrl || newImgs[0] || "", newImgs);
       setSelectedIdx(newPos);
       setSlideIdx(newPos);
+      setCacheBust(Date.now()); // force re-fetch so new order is visible
     } catch (e: any) {
       setError(`Move failed: ${e?.message || "network error"}`);
     } finally {
@@ -1646,8 +1658,8 @@ function ImageGalleryCard({
         {allImages.length > 0 ? (
           <div className="relative rounded-xl overflow-hidden border border-border/60 bg-muted" style={{aspectRatio:"16/9"}}>
             <img
-              key={allImages[slideIdx]}
-              src={allImages[slideIdx]}
+              key={bust(allImages[slideIdx])}
+              src={bust(allImages[slideIdx])}
               alt={`Image ${slideIdx + 1}`}
               className="w-full h-full object-cover"
               onError={e => { (e.target as HTMLImageElement).style.opacity="0.2"; }}
@@ -1713,6 +1725,7 @@ function ImageGalleryCard({
                         if (!res.ok) { setError(`Failed: ${d?.error || res.status}`); return; }
                         onUpdate(d.imageUrl || d.images?.[0] || "", d.images || []);
                         setSelectedIdx(0); setSlideIdx(0);
+                        setCacheBust(Date.now()); // force re-fetch
                       } catch (e: any) { setError(`Failed: ${e?.message}`); }
                       finally { setMoving(false); }
                     }}
@@ -1770,7 +1783,7 @@ function ImageGalleryCard({
                         isViewing   ? "border-primary" :
                         "border-transparent hover:border-primary/40",
                       ].join(" ")}>
-                      <img src={img} alt={`img-${i+1}`} className="w-full h-full object-cover" />
+                      <img src={bust(img)} alt={`img-${i+1}`} className="w-full h-full object-cover" />
                       {i === 0 && (
                         <div className="absolute bottom-0 left-0 right-0 bg-primary/80 text-[8px] text-white text-center font-bold py-0.5">HERO</div>
                       )}
