@@ -322,6 +322,7 @@ const CN: Translations = {
 export const TRANSLATIONS: Record<Lang, Translations> = {
   en: EN, al: AL, gr: GR,
   it: EN, es: EN, de: EN, fr: EN, ar: EN, sl: EN,
+  pt: PT, cn: CN,
 };
 
 /**
