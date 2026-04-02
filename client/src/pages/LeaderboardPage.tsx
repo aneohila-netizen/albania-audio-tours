@@ -3,6 +3,23 @@ import { useApp } from "@/App";
 import { getSessionId } from "@/lib/session";
 import { Trophy, Star, Medal } from "lucide-react";
 
+// Deterministic travel-themed nickname from a session ID string.
+// Same ID always produces the same name. Privacy-safe (no real data stored).
+// Pattern: [Adjective] [Albanian place/icon] — e.g. "Bold Eagle", "Swift Berat"
+const ADJ = ["Bold","Brave","Calm","Eager","Fleet","Grand","Keen","Noble",
+  "Quick","Sharp","Steady","Swift","True","Warm","Wild","Wise"];
+const NOUN = ["Eagle","Berat","Tirana","Gjirokastra","Butrint","Riviera",
+  "Shkodra","Kruja","Alps","Ohrid","Durrës","Lezha","Permet","Valbona",
+  "Rozafa","Apollonia"];
+function explorerName(sessionId: string): string {
+  // Simple hash: sum char codes then modulo list length
+  let h = 0;
+  for (let i = 0; i < sessionId.length; i++) h = (h * 31 + sessionId.charCodeAt(i)) >>> 0;
+  const adj = ADJ[h % ADJ.length];
+  const noun = NOUN[Math.floor(h / ADJ.length) % NOUN.length];
+  return `${adj} ${noun}`;
+}
+
 interface LeaderboardEntry {
   sessionId: string;
   totalPoints: number;
@@ -114,7 +131,7 @@ export default function LeaderboardPage() {
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-sm flex items-center gap-2">
-                    {isMe ? `${t.lbYou} 👤` : `Explorer #${entry.sessionId.slice(-4)}`}
+                    {isMe ? `${t.lbYou} 👤` : explorerName(entry.sessionId)}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {entry.visitCount} {t.visitedSites.toLowerCase()}

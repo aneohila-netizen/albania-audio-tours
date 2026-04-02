@@ -5,6 +5,7 @@ import { useDestinations, useAttractions } from "@/lib/useApiData";
 import type { Destination } from "@/lib/staticData";
 import { Search, MapPin, Star, ChevronRight, LayoutGrid, List } from "lucide-react";
 import { getLangText } from "@/lib/i18n";
+import BackToTop from "@/components/BackToTop";
 
 const CATEGORY_COLORS: Record<string, string> = {
   city: "#C0392B",
@@ -322,6 +323,8 @@ export default function SitesPage() {
           <p className="text-sm">Try a different search or filter</p>
         </div>
       )}
+
+      <BackToTop />
     </div>
   );
 }

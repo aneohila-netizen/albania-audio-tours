@@ -2,13 +2,25 @@
  * AudioPlayer — Inline component on detail pages.
  * When Play is pressed, loads the track into the global StickyAudioPlayer
  * which persists at the bottom of the screen across navigation.
+ *
+ * Button label:
+ *   • "Start Audio Tour" — site has never been played this session
+ *   • "Resume" — site was played at least once this session (stored in sessionStorage)
  */
-import { Volume2, Play, Loader2 } from "lucide-react";
+import { Volume2, Play } from "lucide-react";
 import { useApp } from "@/App";
 import type { TourSite } from "@shared/schema";
 import type { Lang } from "@/lib/i18n";
 import { useAudioPlayer } from "@/components/StickyAudioPlayer";
 import type { AudioTrack } from "@/components/StickyAudioPlayer";
+
+// Track which sites have been played at least once this session
+function hasBeenPlayed(siteId: number): boolean {
+  try { return !!sessionStorage.getItem(`alb_played_${siteId}`); } catch { return false; }
+}
+function markPlayed(siteId: number): void {
+  try { sessionStorage.setItem(`alb_played_${siteId}`, "1"); } catch {}
+}
 
 // ── Stored MP3 helper ─────────────────────────────────────────────────────────
 function getStoredAudioUrl(site: TourSite, lang: Lang): string | null {
@@ -46,6 +58,9 @@ export default function AudioPlayer({ site, text, onComplete, nextStopUrl, nextS
   // Is this specific site currently playing in the sticky player?
   const isThisSitePlaying = isActive && currentTrack?.siteId === site.id && currentTrack?.lang === lang;
 
+  // Has this site been played before this session? Determines Start vs Resume label.
+  const played = hasBeenPlayed(site.id);
+
   if (!text && !storedUrl) {
     return (
       <div
@@ -69,8 +84,8 @@ export default function AudioPlayer({ site, text, onComplete, nextStopUrl, nextS
       nextStopUrl: nextStopUrl || null,
       nextStopName: nextStopName || null,
     };
+    markPlayed(site.id); // remember this site was started
     loadTrack(track);
-    onComplete; // onComplete is now handled via AudioPlayerProvider's onComplete callback
   };
 
   return (
@@ -100,7 +115,7 @@ export default function AudioPlayer({ site, text, onComplete, nextStopUrl, nextS
           aria-label={`Play audio guide for ${site.nameEn}`}
         >
           <Play size={16} />
-          {t.resumeAudio}
+          {played ? t.resumeAudio : t.startAudioTour}
         </button>
       )}
     </div>

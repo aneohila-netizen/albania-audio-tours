@@ -14,6 +14,7 @@ import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb, Navigation } f
 import GallerySlideshow from "@/components/GallerySlideshow";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLangText } from "@/lib/i18n";
+import BackToTop from "@/components/BackToTop";
 
 const CATEGORY_COLORS: Record<string, string> = {
   city: "#C0392B", archaeology: "#8B4513", castle: "#4A4A6A",
@@ -241,6 +242,7 @@ export default function DestinationPage() {
         </a>
       </div>
 
+      <BackToTop />
     </div>
   );
 }

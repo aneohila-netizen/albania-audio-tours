@@ -1200,7 +1200,7 @@ export default function MapPage() {
           <div className="sticky top-0 bg-card/96 backdrop-blur rounded-t-2xl border-b border-border">
             <div className="flex items-center justify-between px-3 py-2.5">
               <a href="/#/sites"
-                className="text-xs font-semibold text-primary hover:underline underline-offset-2"
+                className="text-sm font-semibold text-primary hover:underline underline-offset-2"
                 onClick={() => { setShowDestPanel(false); setDestSearch(""); }}
               >All Destinations</a>
               <button
@@ -1220,7 +1220,7 @@ export default function MapPage() {
                   value={destSearch}
                   onChange={e => setDestSearch(e.target.value)}
                   placeholder="Search destinations…"
-                  className="w-full pl-7 pr-2 py-1.5 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  className="w-full pl-7 pr-2 py-1.5 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
                   autoComplete="off"
                 />
                 {destSearch && (
@@ -1255,7 +1255,7 @@ export default function MapPage() {
                   className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/60 transition-colors text-left group"
                 >
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: "#C0392B" }} />
-                  <span className="text-xs text-foreground leading-tight flex-1 truncate group-hover:text-primary transition-colors">
+                  <span className="text-sm text-foreground leading-tight flex-1 truncate group-hover:text-primary transition-colors">
                     {dName}
                   </span>
                   <ChevronRight size={10} className="text-muted-foreground/50 group-hover:text-primary shrink-0 transition-colors" />

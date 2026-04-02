@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useApp } from "@/App";
 import type { TourSite } from "@shared/schema";
-import { BookOpen, Star, Award } from "lucide-react";
+import { BookOpen, Star, Award, MapPin, Headphones, Trophy } from "lucide-react";
 import { STATIC_SITES } from "@/lib/staticData";
 
 const BADGE_MILESTONES = [
@@ -177,10 +177,50 @@ export default function PassportPage() {
         </div>
       </div>
 
+      {/* Empty state — shown only when no sites visited yet */}
       {visitedCount === 0 && (
-        <div className="text-center py-8 text-muted-foreground">
-          <p className="text-sm">Start exploring to collect stamps!</p>
-          <p className="text-xs mt-1">Visit sites on the map or tour list to earn points.</p>
+        <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-5 py-8 text-center space-y-5">
+          {/* Headline */}
+          <div>
+            <p className="text-xl font-bold" style={{ fontFamily: "var(--font-display)" }}>
+              Your adventure starts here
+            </p>
+            <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+              Explore Albania's 43 destinations, collect stamps as you visit, and climb the leaderboard.
+            </p>
+          </div>
+
+          {/* 3 steps */}
+          <div className="grid grid-cols-3 gap-3 text-xs text-muted-foreground">
+            <div className="flex flex-col items-center gap-1.5">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <MapPin size={18} style={{ color: "hsl(var(--primary))" }} />
+              </div>
+              <span className="leading-tight">Visit a site on the map</span>
+            </div>
+            <div className="flex flex-col items-center gap-1.5">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Headphones size={18} style={{ color: "hsl(var(--primary))" }} />
+              </div>
+              <span className="leading-tight">Hear the audio story</span>
+            </div>
+            <div className="flex flex-col items-center gap-1.5">
+              <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
+                <Trophy size={18} className="text-amber-500" />
+              </div>
+              <span className="leading-tight">Earn stamps &amp; points</span>
+            </div>
+          </div>
+
+          {/* CTA */}
+          <a
+            href="/#/"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+            style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+          >
+            <MapPin size={15} />
+            Open the Map
+          </a>
         </div>
       )}
     </div>
