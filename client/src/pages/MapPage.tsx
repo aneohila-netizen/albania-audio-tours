@@ -360,10 +360,13 @@ export default function MapPage() {
     };
   }, []);
 
-  // ── Rebuild markers when layer mode or visited status changes ─────────────
+  // ── Rebuild markers when layer mode, visited status, or data finishes loading ─
+  // DESTINATIONS and ATTRACTIONS start as [] while the API fetches.
+  // This effect re-fires the moment they arrive, so pins appear on first load
+  // without the user needing to click a tab.
   useEffect(() => {
     if (mapReadyRef.current) buildMarkers();
-  }, [layerMode, visitedSiteIds]);
+  }, [layerMode, visitedSiteIds, DESTINATIONS, ATTRACTIONS]);
 
   // ── GPS blue dot ────────────────────────────────────────────
   useEffect(() => {
