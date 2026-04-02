@@ -57,6 +57,12 @@ export interface Translations {
   funFact: string;
   audioTourTitle: string;
   noAudio: string;
+  // Onboarding guide popup
+  guideGreeting: string;
+  guideSubtitle: string;
+  guideSkip: string;
+  guideNext: string;
+  guideDone: string;
   filterAll: string;
   searchPlaceholder: string;
   passportTitle: string;
@@ -105,6 +111,11 @@ const EN: Translations = {
   funFact: "Did You Know?",
   audioTourTitle: "Audio Guide",
   noAudio: "Audio guide coming soon for this site.",
+  guideGreeting: "Quick Guide",
+  guideSubtitle: "Here's how to explore Albania with this app",
+  guideSkip: "Skip",
+  guideNext: "Next",
+  guideDone: "Got it \u2713",
   filterAll: "All",
   searchPlaceholder: "Search sites...",
   passportTitle: "Your Travel Passport",
@@ -153,6 +164,11 @@ const AL: Translations = {
   funFact: "A e Dinit?",
   audioTourTitle: "Udhërrëfyes Audio",
   noAudio: "Udhërrëfyesi audio po vjen së shpejti.",
+  guideGreeting: "Udhëzues i Shpejtë",
+  guideSubtitle: "Ja si të eksplorosh Shqipërinë me këtë aplikacion",
+  guideSkip: "Kalo",
+  guideNext: "Tjetër",
+  guideDone: "Kuptova \u2713",
   filterAll: "Të Gjitha",
   searchPlaceholder: "Kërko vende...",
   passportTitle: "Pasaporta Juaj e Udhëtimit",
@@ -201,6 +217,11 @@ const GR: Translations = {
   funFact: "Γνωρίζατε ότι;",
   audioTourTitle: "Ηχητικός Οδηγός",
   noAudio: "Ο ηχητικός οδηγός έρχεται σύντομα.",
+  guideGreeting: "Γρήγορος Οδηγός",
+  guideSubtitle: "Πώς να εξερευνήσετε την Αλβανία με αυτή την εφαρμογή",
+  guideSkip: "Παράλειψη",
+  guideNext: "Επόμενο",
+  guideDone: "Εντάξει \u2713",
   filterAll: "Όλα",
   searchPlaceholder: "Αναζήτηση τοποθεσιών...",
   passportTitle: "Το Ταξιδιωτικό σας Διαβατήριο",
@@ -250,6 +271,11 @@ const PT: Translations = {
   funFact: "Você Sabia?",
   audioTourTitle: "Guia de Áudio",
   noAudio: "Guia de áudio em breve.",
+  guideGreeting: "Guia Rápido",
+  guideSubtitle: "Como explorar a Albânia com esta aplicação",
+  guideSkip: "Pular",
+  guideNext: "Próximo",
+  guideDone: "Entendi \u2713",
   filterAll: "All",
   searchPlaceholder: "Search sites...",
   passportTitle: "Your Travel Passport",
@@ -299,6 +325,11 @@ const CN: Translations = {
   funFact: "你知道吗？",
   audioTourTitle: "语音导览",
   noAudio: "语音导览即将推出。",
+  guideGreeting: "快速指南",
+  guideSubtitle: "如何使用本应用探索阿尔巴尼亚",
+  guideSkip: "跳过",
+  guideNext: "下一步",
+  guideDone: "明白了 \u2713",
   filterAll: "All",
   searchPlaceholder: "Search sites...",
   passportTitle: "Your Travel Passport",

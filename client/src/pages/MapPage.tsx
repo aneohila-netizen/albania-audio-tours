@@ -89,11 +89,16 @@ export default function MapPage() {
   const [popupDismissed, setPopupDismissed] = useState(false);
 
   // ── Onboarding tooltip tour ─────────────────────────────────────────────────
-  // Shown once per session (sessionStorage), dismissed before Explore Nearby popup
-  const [showOnboarding, setShowOnboarding] = useState(() => {
-    try { return !sessionStorage.getItem("alb_onboarded"); } catch { return true; }
-  });
+  // Centered modal, shown 3 s after first visit (once per session).
+  const alreadySeen = (() => { try { return !!sessionStorage.getItem("alb_onboarded"); } catch { return false; } })();
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardStep, setOnboardStep] = useState(0);
+
+  useEffect(() => {
+    if (alreadySeen) return;
+    const timer = setTimeout(() => setShowOnboarding(true), 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   function dismissOnboarding() {
     try { sessionStorage.setItem("alb_onboarded", "1"); } catch {}
@@ -1068,115 +1073,74 @@ export default function MapPage() {
         />
       )}
 
-      {/* ── Onboarding Tooltip Tour ─────────────────────────────────────────
-           Shown once per session. 4 steps, each pointing at a key UI element.
-           Appears before the Explore Nearby popup. Dismissed on Skip or step 4 Next. */}
+      {/* ── Onboarding Popup ────────────────────────────────────────────────
+           Centered modal, 3s delay, once per session, greeting in active language. */}
       {showOnboarding && (() => {
         const STEPS = [
-          {
-            emoji: "📍",
-            title: "Tap any map pin",
-            body: "Each pin is a real place with an audio story. Tap it to hear the guide and see details.",
-            hint: "Try tapping a red or green pin on the map",
-          },
-          {
-            emoji: "🔍",
-            title: "Search a specific place",
-            body: "Looking for Berat or Skanderbeg Square? Use the search icon in the top bar to jump there directly.",
-            hint: "Search icon is in the top navigation bar",
-          },
-          {
-            emoji: "🏖️",
-            title: "Browse all destinations",
-            body: "Tap \u201cTour Sites\u201d in the nav to see all 43 destinations with audio tours, sorted by region.",
-            hint: "\u201cTour Sites\u201d tab is in the top navigation bar",
-          },
-          {
-            emoji: "📱",
-            title: "Find your nearest tour",
-            body: "Allow location access once and the map instantly shows what\u2019s closest to you \u2014 perfect for on-the-go exploration.",
-            hint: "Tap \u201cShare Location\u201d at the top-left of the map",
-          },
+          { emoji: "📍", title: "Tap any map pin", body: "Each pin is a real place with an audio story. Tap it to hear the guide and see details.", hint: "Try tapping a red or green pin on the map" },
+          { emoji: "🔍", title: "Search a specific place", body: "Looking for Berat or Skanderbeg Square? Use the search icon in the top bar.", hint: "Search icon is in the top navigation bar" },
+          { emoji: "🏖️", title: "Browse all destinations", body: "Tap Destinations in the nav to see all 43 destinations with audio tours.", hint: "Destinations tab is in the bottom navigation bar" },
+          { emoji: "📱", title: "Find your nearest tour", body: "Allow location access once and the map instantly shows what’s closest to you.", hint: "Tap Share Location at the top-left of the map" },
         ];
         const step = STEPS[onboardStep];
         const isLast = onboardStep === STEPS.length - 1;
         return (
           <div
-            className="absolute inset-0 z-[1060] flex items-end justify-center pb-28 px-4 pointer-events-none"
+            className="fixed inset-0 z-[2000] flex items-center justify-center px-5"
+            style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(2px)" }}
+            onClick={dismissOnboarding}
             aria-live="polite"
           >
-            {/* Card */}
             <div
-              className="pointer-events-auto w-full max-w-sm rounded-2xl bg-card border border-border shadow-2xl overflow-hidden"
-              style={{ animation: "popup-in 0.3s cubic-bezier(0.34,1.56,0.64,1) both" }}
+              className="w-full max-w-sm rounded-2xl bg-card border border-border shadow-2xl overflow-hidden"
+              style={{ animation: "popup-in 0.35s cubic-bezier(0.34,1.56,0.64,1) both" }}
               role="dialog"
-              aria-label="Quick start guide"
+              aria-label={t.guideGreeting}
+              onClick={e => e.stopPropagation()}
             >
-              {/* Progress bar */}
               <div className="flex h-1">
                 {STEPS.map((_, i) => (
-                  <div
-                    key={i}
-                    className="flex-1 transition-all duration-300"
-                    style={{
-                      background: i <= onboardStep ? "hsl(var(--primary))" : "hsl(var(--muted))",
-                      marginRight: i < STEPS.length - 1 ? 2 : 0,
-                    }}
-                  />
+                  <div key={i} className="flex-1 transition-all duration-300"
+                    style={{ background: i <= onboardStep ? "hsl(var(--primary))" : "hsl(var(--muted))", marginRight: i < STEPS.length - 1 ? 2 : 0 }} />
                 ))}
               </div>
-
               <div className="px-5 pt-4 pb-5 space-y-3">
-                {/* Header */}
+                {onboardStep === 0 && (
+                  <div className="pb-2 border-b border-border/60">
+                    <p className="text-base font-bold" style={{ fontFamily: "var(--font-display)" }}>
+                      {"👋"} {t.guideGreeting}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{t.guideSubtitle}</p>
+                  </div>
+                )}
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2.5">
                     <span className="text-2xl" aria-hidden="true">{step.emoji}</span>
                     <div>
-                      <p className="font-bold text-sm leading-tight" style={{ fontFamily: "var(--font-display)" }}>
-                        {step.title}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        Step {onboardStep + 1} of {STEPS.length}
-                      </p>
+                      <p className="font-bold text-sm leading-tight" style={{ fontFamily: "var(--font-display)" }}>{step.title}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{onboardStep + 1} / {STEPS.length}</p>
                     </div>
                   </div>
-                  <button
-                    onClick={dismissOnboarding}
+                  <button onClick={dismissOnboarding}
                     className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors shrink-0 -mt-0.5 -mr-1"
-                    aria-label="Skip guide"
-                  >
+                    aria-label={t.guideSkip}>
                     <X size={14} />
                   </button>
                 </div>
-
-                {/* Body */}
                 <p className="text-sm text-muted-foreground leading-relaxed">{step.body}</p>
-
-                {/* Hint chip */}
                 <div className="flex items-center gap-1.5 bg-primary/8 rounded-lg px-3 py-1.5">
-                  <span className="text-[10px] text-primary font-medium">→ {step.hint}</span>
+                  <span className="text-[10px] text-primary font-medium">{"→"} {step.hint}</span>
                 </div>
-
-                {/* Navigation — both buttons equal size so Skip is easy to find */}
                 <div className="flex items-center gap-2 pt-1">
-                  <button
-                    onClick={dismissOnboarding}
-                    className="flex-1 px-4 py-2 rounded-xl text-xs font-semibold border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
-                  >
-                    Skip
+                  <button onClick={dismissOnboarding}
+                    className="flex-1 px-4 py-2 rounded-xl text-xs font-semibold border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors">
+                    {t.guideSkip}
                   </button>
                   <button
-                    onClick={() => {
-                      if (isLast) {
-                        dismissOnboarding();
-                      } else {
-                        setOnboardStep(s => s + 1);
-                      }
-                    }}
+                    onClick={() => { if (isLast) { dismissOnboarding(); } else { setOnboardStep(s => s + 1); } }}
                     className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-colors"
-                    style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
-                  >
-                    {isLast ? "Got it ✓" : "Next"}
+                    style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}>
+                    {isLast ? t.guideDone : t.guideNext}
                     {!isLast && <ArrowRight size={12} />}
                   </button>
                 </div>
