@@ -1157,13 +1157,13 @@ export default function MapPage() {
                   <span className="text-[10px] text-primary font-medium">→ {step.hint}</span>
                 </div>
 
-                {/* Navigation */}
-                <div className="flex items-center justify-between pt-1">
+                {/* Navigation — both buttons equal size so Skip is easy to find */}
+                <div className="flex items-center gap-2 pt-1">
                   <button
                     onClick={dismissOnboarding}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
+                    className="flex-1 px-4 py-2 rounded-xl text-xs font-semibold border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
                   >
-                    Skip guide
+                    Skip
                   </button>
                   <button
                     onClick={() => {
@@ -1173,10 +1173,10 @@ export default function MapPage() {
                         setOnboardStep(s => s + 1);
                       }
                     }}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-colors"
                     style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
                   >
-                    {isLast ? "Got it" : "Next"}
+                    {isLast ? "Got it ✓" : "Next"}
                     {!isLast && <ArrowRight size={12} />}
                   </button>
                 </div>
