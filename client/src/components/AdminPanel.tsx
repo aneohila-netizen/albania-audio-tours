@@ -1104,6 +1104,20 @@ function AttractionsView({
   );
 }
 
+// Tile layer definitions — shared by all map pickers
+const TILES = {
+  street: {
+    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+    attribution: "\u00a9 CartoDB \u00a9 OpenStreetMap contributors",
+    maxZoom: 19,
+  },
+  satellite: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution: "Tiles &copy; Esri &mdash; Esri, USGS, NOAA",
+    maxZoom: 19,
+  },
+} as const;
+
 // ─── MAP PICKER (interactive Leaflet) ─────────────────────────────────────────
 function MapPicker({
   lat,
@@ -1115,8 +1129,20 @@ function MapPicker({
   onPick: (lat: number, lng: number) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-  const markerRef = useRef<any>(null);
+  const mapRef      = useRef<any>(null);
+  const markerRef   = useRef<any>(null);
+  const tileRef     = useRef<any>(null);
+  const [isSat, setIsSat] = useState(false);
+
+  // Swap tile layer when satellite toggle changes
+  useEffect(() => {
+    const map = mapRef.current;
+    const L = (window as any).L;
+    if (!map || !L || !tileRef.current) return;
+    tileRef.current.remove();
+    const t = isSat ? TILES.satellite : TILES.street;
+    tileRef.current = L.tileLayer(t.url, { attribution: t.attribution, maxZoom: t.maxZoom }).addTo(map);
+  }, [isSat]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -1137,10 +1163,8 @@ function MapPicker({
       const initLng = lng && !isNaN(lng) ? lng : 20.1683;
 
       const map = L.map(containerRef.current!, { zoomControl: true }).setView([initLat, initLng], 13);
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-        attribution: "© CartoDB",
-        maxZoom: 19,
-      }).addTo(map);
+      const tile = L.tileLayer(TILES.street.url, { attribution: TILES.street.attribution, maxZoom: TILES.street.maxZoom }).addTo(map);
+      tileRef.current = tile;
 
       const marker = L.marker([initLat, initLng], { draggable: true }).addTo(map);
       marker.bindPopup("Drag to adjust location").openPopup();
@@ -1181,6 +1205,7 @@ function MapPicker({
         mapRef.current.remove();
         mapRef.current = null;
         markerRef.current = null;
+        tileRef.current = null;
       }
     };
   }, []);
@@ -1195,7 +1220,39 @@ function MapPicker({
 
   return (
     <div>
-      <div ref={containerRef} style={{ height: 280, borderRadius: 12, overflow: "hidden", border: "1px solid hsl(var(--border))" }} />
+      <div style={{ position: "relative" }}>
+        <div ref={containerRef} style={{ height: 280, borderRadius: 12, overflow: "hidden", border: "1px solid hsl(var(--border))" }} />
+        {/* Map / Satellite toggle — overlaid top-right */}
+        <div style={{
+          position: "absolute", top: 8, right: 8, zIndex: 1000,
+          display: "flex", borderRadius: 8, overflow: "hidden",
+          border: "1px solid rgba(0,0,0,0.25)",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
+        }}>
+          {(["Map", "Satellite"] as const).map((label) => {
+            const active = label === "Map" ? !isSat : isSat;
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setIsSat(label === "Satellite")}
+                style={{
+                  padding: "4px 10px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  background: active ? "hsl(var(--primary))" : "rgba(255,255,255,0.92)",
+                  color: active ? "#fff" : "#333",
+                  border: "none",
+                  cursor: "pointer",
+                  lineHeight: 1.5,
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
       <p className="text-xs text-muted-foreground mt-1.5">
         Click the map or drag the pin to set the exact location. Albania addresses are imprecise — manual pinning is the most reliable method.
       </p>

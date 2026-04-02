@@ -36,14 +36,29 @@ function RouteMap({ waypoints, centerLat, centerLng }: {
   centerLng: number;
 }) {
   const divRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
+  const mapRef  = useRef<any>(null);
+  const tileRef  = useRef<any>(null);
+  const [isSat, setIsSat] = useState(false);
+
+  // Swap tile layer on satellite toggle
+  useEffect(() => {
+    const L = (window as any).L;
+    if (!mapRef.current || !L || !tileRef.current) return;
+    tileRef.current.remove();
+    const url = isSat
+      ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+      : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+    tileRef.current = L.tileLayer(url, {
+      attribution: isSat ? "Tiles © Esri" : "© CartoDB", maxZoom: 19,
+    }).addTo(mapRef.current);
+  }, [isSat]);
 
   useEffect(() => {
     if (!divRef.current) return;
     const L = (window as any).L;
     if (!L) return;
 
-    if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+    if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; tileRef.current = null; }
 
     const center: [number, number] = waypoints.length > 0
       ? [waypoints[0].lat, waypoints[0].lng]
@@ -55,7 +70,7 @@ function RouteMap({ waypoints, centerLat, centerLng }: {
       scrollWheelZoom: false,
     }).setView(center, 15);
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+    tileRef.current = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
       attribution: "© CartoDB",
       maxZoom: 19,
     }).addTo(mapRef.current);
@@ -142,7 +157,7 @@ function RouteMap({ waypoints, centerLat, centerLng }: {
     }
 
     return function() {
-      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; tileRef.current = null; }
     };
   }, [waypoints]);
 
@@ -151,7 +166,27 @@ function RouteMap({ waypoints, centerLat, centerLng }: {
       <p style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", marginBottom: 6 }}>
         Tap any pin to get directions from your current location.
       </p>
-      <div ref={divRef} style={{ height: 280, borderRadius: 8, border: "1px solid hsl(var(--border))", zIndex: 0 }} />
+      <div style={{ position: "relative" }}>
+        <div ref={divRef} style={{ height: 280, borderRadius: 8, border: "1px solid hsl(var(--border))", zIndex: 0 }} />
+        {/* Map / Satellite toggle */}
+        <div style={{
+          position: "absolute", top: 8, right: 8, zIndex: 1000,
+          display: "flex", borderRadius: 8, overflow: "hidden",
+          border: "1px solid rgba(0,0,0,0.25)", boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
+        }}>
+          {(["Map", "Satellite"] as const).map((lbl) => {
+            const active = lbl === "Map" ? !isSat : isSat;
+            return (
+              <button key={lbl} type="button" onClick={() => setIsSat(lbl === "Satellite")}
+                style={{
+                  padding: "4px 10px", fontSize: 11, fontWeight: 600, lineHeight: 1.5,
+                  background: active ? "#C0392B" : "rgba(255,255,255,0.92)",
+                  color: active ? "#fff" : "#333", border: "none", cursor: "pointer",
+                }}>{lbl}</button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

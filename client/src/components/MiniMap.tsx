@@ -1,9 +1,22 @@
 /**
  * MiniMap — lightweight Leaflet map for frontend attraction/destination detail pages.
  * Shows an interactive map centred on the given lat/lng with a red marker.
- * The "Get Directions" link (passed as children or rendered automatically) opens Google Maps.
+ * Includes a Map / Satellite toggle button overlaid top-right.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const TILES = {
+  street: {
+    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+    attribution: "© CartoDB © OpenStreetMap contributors",
+    maxZoom: 19,
+  },
+  satellite: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution: "Tiles © Esri — Esri, USGS, NOAA",
+    maxZoom: 19,
+  },
+} as const;
 
 interface MiniMapProps {
   lat: number;
@@ -13,7 +26,9 @@ interface MiniMapProps {
 
 export default function MiniMap({ lat, lng, label }: MiniMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
+  const mapRef       = useRef<any>(null);
+  const tileRef      = useRef<any>(null);
+  const [isSat, setIsSat] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -22,7 +37,6 @@ export default function MiniMap({ lat, lng, label }: MiniMapProps) {
     import("leaflet").then(L => {
       if (!mounted || !containerRef.current) return;
 
-      // Fix default marker icon paths
       delete (L.Icon.Default.prototype as any)._getIconUrl;
       L.Icon.Default.mergeOptions({
         iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -32,14 +46,15 @@ export default function MiniMap({ lat, lng, label }: MiniMapProps) {
 
       const map = L.map(containerRef.current!, {
         zoomControl: true,
-        scrollWheelZoom: false, // prevent accidental zoom when scrolling the page
+        scrollWheelZoom: false,
         dragging: true,
       }).setView([lat, lng], 15);
 
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-        attribution: "© CartoDB",
-        maxZoom: 19,
+      const tile = L.tileLayer(TILES.street.url, {
+        attribution: TILES.street.attribution,
+        maxZoom: TILES.street.maxZoom,
       }).addTo(map);
+      tileRef.current = tile;
 
       // Red custom icon
       const redIcon = L.divIcon({
@@ -61,7 +76,6 @@ export default function MiniMap({ lat, lng, label }: MiniMapProps) {
 
       mapRef.current = map;
 
-      // Ensure tiles render correctly (ResizeObserver handles hidden-tab case)
       const ro = new ResizeObserver(() => {
         if (containerRef.current && containerRef.current.offsetWidth > 0) {
           map.invalidateSize();
@@ -74,17 +88,53 @@ export default function MiniMap({ lat, lng, label }: MiniMapProps) {
 
     return () => {
       mounted = false;
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; tileRef.current = null; }
     };
   }, [lat, lng]);
 
+  // Swap tile layer when toggle changes
+  useEffect(() => {
+    const map = mapRef.current;
+    const L = (window as any).L;
+    if (!map || !L || !tileRef.current) return;
+    tileRef.current.remove();
+    const t = isSat ? TILES.satellite : TILES.street;
+    tileRef.current = L.tileLayer(t.url, { attribution: t.attribution, maxZoom: t.maxZoom }).addTo(map);
+  }, [isSat]);
+
   return (
-    <div
-      ref={containerRef}
-      style={{ width: "100%", height: "200px" }}
-    />
+    <div style={{ position: "relative", width: "100%", height: "200px" }}>
+      <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+      {/* Map / Satellite toggle */}
+      <div style={{
+        position: "absolute", top: 8, right: 8, zIndex: 1000,
+        display: "flex", borderRadius: 8, overflow: "hidden",
+        border: "1px solid rgba(0,0,0,0.25)",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
+      }}>
+        {(["Map", "Satellite"] as const).map((lbl) => {
+          const active = lbl === "Map" ? !isSat : isSat;
+          return (
+            <button
+              key={lbl}
+              type="button"
+              onClick={() => setIsSat(lbl === "Satellite")}
+              style={{
+                padding: "4px 10px",
+                fontSize: 11,
+                fontWeight: 600,
+                background: active ? "#C0392B" : "rgba(255,255,255,0.92)",
+                color: active ? "#fff" : "#333",
+                border: "none",
+                cursor: "pointer",
+                lineHeight: 1.5,
+              }}
+            >
+              {lbl}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }

@@ -77,6 +77,8 @@ function LeafletMap({ mapId, centerLat, centerLng, waypoints, onWaypointsChange 
   waypoints: Waypoint[]; onWaypointsChange: (wp: Waypoint[]) => void;
 }) {
   const mapRef = useRef<any>(null);
+  const tileRef = useRef<any>(null);
+  const [isSat, setIsSat] = useState(false);
   const markersRef = useRef<any[]>([]);
   const polylineRef = useRef<any>(null);
   const waypointsRef = useRef(waypoints);
@@ -87,7 +89,20 @@ function LeafletMap({ mapId, centerLat, centerLng, waypoints, onWaypointsChange 
   useEffect(() => { onChangeRef.current = onWaypointsChange; }, [onWaypointsChange]);
 
   // Init Leaflet once using the stable DOM id
+  // Swap tile layer when satellite toggle changes
   useEffect(() => {
+    const map = mapRef.current;
+    const L = (window as any).L;
+    if (!map || !L || !tileRef.current) return;
+    tileRef.current.remove();
+    const url = isSat
+      ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+      : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+    const attr = isSat ? "Tiles © Esri" : "© CartoDB";
+    tileRef.current = L.tileLayer(url, { attribution: attr, maxZoom: 19 }).addTo(map);
+  }, [isSat]);
+
+    useEffect(() => {
     const L = (window as any).L;
     if (!L) return;
 
@@ -98,7 +113,7 @@ function LeafletMap({ mapId, centerLat, centerLng, waypoints, onWaypointsChange 
     if (!div) return;
 
     mapRef.current = L.map(div, { zoomControl: true }).setView([centerLat, centerLng], 15);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+    tileRef.current = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
       attribution: "© CartoDB", maxZoom: 19,
     }).addTo(mapRef.current);
 
