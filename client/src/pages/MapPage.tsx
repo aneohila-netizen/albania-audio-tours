@@ -81,6 +81,9 @@ export default function MapPage() {
   const [selectedPin, setSelectedPin] = useState<PinItem | null>(null);
   const [showVisitModal, setShowVisitModal] = useState(false);
   const [layerMode, setLayerMode] = useState<LayerMode>("destinations");
+  // Category filter — only shown in Destinations layer.
+  // "all" shows every destination; any other value hides non-matching pins instantly.
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [, navigate] = useLocation();
 
   const [heroDismissed, setHeroDismissed] = useState(false);
@@ -202,7 +205,11 @@ export default function MapPage() {
     };
 
     if (layerMode === "destinations") {
-      DESTINATIONS.forEach(dest => {
+      // Apply category filter — show all if "all", otherwise only matching category
+      const visibleDests = categoryFilter === "all"
+        ? DESTINATIONS
+        : DESTINATIONS.filter(d => d.category === categoryFilter);
+      visibleDests.forEach(dest => {
         addDestinationMarker(L, map, dest, addTo);
       });
     } else {
@@ -376,13 +383,10 @@ export default function MapPage() {
     };
   }, []);
 
-  // ── Rebuild markers when layer mode, visited status, or data finishes loading ─
-  // DESTINATIONS and ATTRACTIONS start as [] while the API fetches.
-  // This effect re-fires the moment they arrive, so pins appear on first load
-  // without the user needing to click a tab.
+  // ── Rebuild markers when layer, category filter, visited status, or data changes ─
   useEffect(() => {
     if (mapReadyRef.current) buildMarkers();
-  }, [layerMode, visitedSiteIds, DESTINATIONS, ATTRACTIONS]);
+  }, [layerMode, categoryFilter, visitedSiteIds, DESTINATIONS, ATTRACTIONS]);
 
   // ── GPS blue dot ────────────────────────────────────────────
   useEffect(() => {
@@ -882,6 +886,96 @@ export default function MapPage() {
         </div>
       </div>
 
+      {/* ── Category filter pill bar ────────────────────────────────────────────────
+           Only visible in Destinations layer. Floating white pill bar under Share Location.
+           Industry standard: Option A + C (Google Maps style + count badge). */}
+      {layerMode === "destinations" && DESTINATIONS.length > 0 && (() => {
+        // Build category list with counts from actual data
+        const cats = [
+          { key: "all",           emoji: "🗺️",  label: "All",          count: DESTINATIONS.length },
+          { key: "city",          emoji: "🏙️",  label: "City",         count: DESTINATIONS.filter(d => d.category === "city").length },
+          { key: "nature",        emoji: "🏔️",  label: "Nature",       count: DESTINATIONS.filter(d => d.category === "nature").length },
+          { key: "beach",         emoji: "🏖️",  label: "Beach",        count: DESTINATIONS.filter(d => d.category === "beach").length },
+          { key: "historic-town", emoji: "🏘️",  label: "Historic Town",count: DESTINATIONS.filter(d => d.category === "historic-town").length },
+          { key: "castle",        emoji: "🏰",  label: "Castle",       count: DESTINATIONS.filter(d => d.category === "castle").length },
+          { key: "archaeology",   emoji: "🏛️",  label: "Archaeology",  count: DESTINATIONS.filter(d => d.category === "archaeology").length },
+          { key: "cultural",      emoji: "🎭",  label: "Cultural",     count: DESTINATIONS.filter(d => d.category === "cultural").length },
+        ].filter(c => c.key === "all" || c.count > 0); // hide empty categories
+
+        return (
+          <div
+            className="absolute z-[1000]"
+            style={{
+              top: "3.5rem",   // below the Share Location button
+              left: "0.75rem",
+              right: "6rem",   // leave room for layer toggle on the right
+              pointerEvents: "none", // container passthrough; buttons handle their own events
+            }}
+          >
+            <div
+              className="flex gap-1.5 overflow-x-auto"
+              style={{
+                pointerEvents: "auto",
+                scrollbarWidth: "none",   // Firefox
+                msOverflowStyle: "none",  // IE
+                WebkitOverflowScrolling: "touch",
+                paddingBottom: "2px",     // room for shadow on active pill
+              }}
+            >
+              {cats.map(({ key, emoji, label, count }) => {
+                const active = categoryFilter === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setCategoryFilter(key)}
+                    className="flex items-center gap-1 shrink-0 transition-all duration-200"
+                    style={{
+                      padding: "5px 10px",
+                      borderRadius: "999px",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      lineHeight: 1.3,
+                      whiteSpace: "nowrap",
+                      cursor: "pointer",
+                      background: active ? "hsl(var(--primary))" : "rgba(255,255,255,0.95)",
+                      color: active ? "#fff" : "#222",
+                      border: active ? "1.5px solid transparent" : "1.5px solid rgba(0,0,0,0.14)",
+                      boxShadow: active
+                        ? "0 2px 8px rgba(192,57,43,0.35)"
+                        : "0 1px 4px rgba(0,0,0,0.18)",
+                      backdropFilter: "blur(6px)",
+                    }}
+                    aria-pressed={active}
+                    aria-label={`Filter by ${label}: ${count} destinations`}
+                  >
+                    <span aria-hidden="true">{emoji}</span>
+                    <span>{label}</span>
+                    {/* Count badge — hidden when active (already filtered) */}
+                    {!active && (
+                      <span style={{
+                        marginLeft: "2px",
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        color: "hsl(var(--primary))",
+                        background: "hsl(var(--primary)/0.1)",
+                        borderRadius: "999px",
+                        padding: "0 5px",
+                        lineHeight: "16px",
+                        minWidth: "16px",
+                        textAlign: "center",
+                      }}>
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Scroll-down handle — mobile only, right edge of map, red-box position ──
            The map captures all touch events so users can't swipe-scroll past it.
            This pill button lets them scroll down to the footer without touching the map. */}
@@ -925,7 +1019,7 @@ export default function MapPage() {
       <div className="absolute top-3 right-3 z-[1000]">
         <div className="flex items-center gap-1 rounded-xl border border-border bg-card/95 backdrop-blur p-1 shadow-md">
           <button
-            onClick={() => { setLayerMode("attractions"); setShowDestPanel(false); }}
+            onClick={() => { setLayerMode("attractions"); setShowDestPanel(false); setCategoryFilter("all"); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               layerMode === "attractions"
                 ? "bg-primary text-primary-foreground"
