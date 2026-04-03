@@ -108,18 +108,27 @@ export default function GallerySlideshow({
       onMouseLeave={() => setPaused(false)}
     >
       {/* Images — stacked, only active one visible */}
-      {allImages.map((src, i) => (
-        <img
-          key={i}
-          src={src}
-          alt={i === 0 ? alt : `${alt} — gallery ${i}`}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
-            i === activeIdx ? "opacity-100" : "opacity-0"
-          }`}
-          onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-          loading={i === 0 ? "eager" : "lazy"}
-        />
-      ))}
+      {allImages.map((src, i) => {
+        // Use src as key (not index) so React creates a fresh <img> element
+        // whenever the URL changes — prevents browser serving a cached old photo
+        // when the new upload shares the same URL path (e.g. gallery/0).
+        // Append no-cache param only for gallery serve URLs (not for data: URIs or external URLs).
+        const bustedSrc = src.includes('/api/images/db/') && !src.startsWith('data:')
+          ? `${src}${src.includes('?') ? '&' : '?'}_t=${Date.now()}`
+          : src;
+        return (
+          <img
+            key={src}
+            src={bustedSrc}
+            alt={i === 0 ? alt : `${alt} — gallery ${i}`}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
+              i === activeIdx ? "opacity-100" : "opacity-0"
+            }`}
+            onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+            loading={i === 0 ? "eager" : "lazy"}
+          />
+        );
+      })}
 
       {/* Overlay gradient */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />

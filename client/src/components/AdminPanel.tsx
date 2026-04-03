@@ -1028,7 +1028,11 @@ function SitesView({
                   data-testid={`row-site-${site.id}`}
                 >
                   {site.imageUrl ? (
-                    <img src={site.imageUrl} alt={site.nameEn} className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                    <img
+                      src={site.imageUrl.includes('/api/images/db/') ? `${site.imageUrl}?_t=${site.id}` : site.imageUrl}
+                      alt={site.nameEn}
+                      className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                    />
                   ) : (
                     <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                       <MapPin className="w-5 h-5 text-muted-foreground" />
@@ -1186,7 +1190,11 @@ function AttractionsView({
                 className="flex items-center gap-4 p-4 rounded-xl border border-border/60 bg-card hover:border-primary/30 transition-colors"
               >
                 {attr.imageUrl ? (
-                  <img src={attr.imageUrl} alt={attr.nameEn} className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                  <img
+                    src={attr.imageUrl.includes('/api/images/db/') ? `${attr.imageUrl}?_t=${attr.id}` : attr.imageUrl}
+                    alt={attr.nameEn}
+                    className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                  />
                 ) : (
                   <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                     <Star className="w-5 h-5 text-muted-foreground" />

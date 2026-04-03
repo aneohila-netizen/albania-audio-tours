@@ -162,6 +162,15 @@ const AUDIO_DIR = path.join(process.cwd(), "data", "audio");
 const IMAGE_DIR = path.join(process.cwd(), "data", "images");
 if (!fs.existsSync(AUDIO_DIR)) fs.mkdirSync(AUDIO_DIR, { recursive: true });
 if (!fs.existsSync(IMAGE_DIR)) fs.mkdirSync(IMAGE_DIR, { recursive: true });
+// Clear any legacy image files on disk on every startup.
+// All images are stored in the DB as base64 — files on disk are stale leftovers.
+try {
+  const legacyFiles = fs.readdirSync(IMAGE_DIR);
+  if (legacyFiles.length > 0) {
+    legacyFiles.forEach(f => { try { fs.unlinkSync(path.join(IMAGE_DIR, f)); } catch {} });
+    console.log(`[startup] Cleared ${legacyFiles.length} legacy image file(s) from disk.`);
+  }
+} catch { /* non-fatal */ }
 
 const audioStorage = multer.diskStorage({
   destination: (_req, _file, cb) => {
