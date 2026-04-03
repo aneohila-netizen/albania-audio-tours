@@ -82,9 +82,10 @@ export default function MapPage() {
   const [selectedPin, setSelectedPin] = useState<PinItem | null>(null);
   const [showVisitModal, setShowVisitModal] = useState(false);
   const [layerMode, setLayerMode] = useState<LayerMode>("destinations");
-  // Category filter — only shown in Destinations layer.
-  // "all" shows every destination; any other value hides non-matching pins instantly.
+  // Destination category filter — only active in Destinations layer
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  // Attraction category filter — only active in Attractions layer
+  const [attrCategoryFilter, setAttrCategoryFilter] = useState<string>("all");
   const [, navigate] = useLocation();
 
   const [heroDismissed, setHeroDismissed] = useState(false);
@@ -217,9 +218,14 @@ export default function MapPage() {
         addDestinationMarker(L, map, dest, addTo);
       });
     } else {
-      // Show all attractions — plus destination markers for destinations without attractions
-      const destsWithAttrs = new Set(ATTRACTIONS.map(a => a.destinationSlug));
-      ATTRACTIONS.forEach(attr => {
+      // Apply attraction category filter (multi-category aware)
+      const visibleAttrs = attrCategoryFilter === "all"
+        ? ATTRACTIONS
+        : ATTRACTIONS.filter(a =>
+            a.category.split(",").map((c: string) => c.trim()).includes(attrCategoryFilter)
+          );
+      const destsWithAttrs = new Set(visibleAttrs.map(a => a.destinationSlug));
+      visibleAttrs.forEach(attr => {
         addAttractionMarker(L, map, attr, addTo);
       });
       // Destinations that have no attractions yet — show destination marker
@@ -389,10 +395,10 @@ export default function MapPage() {
     };
   }, []);
 
-  // ── Rebuild markers when layer, category filter, visited status, or data changes ─
+  // ── Rebuild markers when layer, either category filter, visited status, or data changes ─
   useEffect(() => {
     if (mapReadyRef.current) buildMarkers();
-  }, [layerMode, categoryFilter, visitedSiteIds, DESTINATIONS, ATTRACTIONS]);
+  }, [layerMode, categoryFilter, attrCategoryFilter, visitedSiteIds, DESTINATIONS, ATTRACTIONS]);
 
   // ── GPS blue dot ────────────────────────────────────────────
   useEffect(() => {
@@ -893,53 +899,84 @@ export default function MapPage() {
       </div>
 
       {/* ── Category filter pill bar ────────────────────────────────────────────────
-           Only visible in Destinations layer. Floating white pill bar under Share Location.
-           Industry standard: Option A + C (Google Maps style + count badge). */}
-      {layerMode === "destinations" && DESTINATIONS.length > 0 && (() => {
-        // Helper: count destinations that include a category (supports comma-separated multi-category)
-        const countCat = (key: string) =>
-          DESTINATIONS.filter(d => d.category.split(",").map(x => x.trim()).includes(key)).length;
+           Shown in both layers. Destinations layer: destination categories.
+           Attractions layer: attraction categories (built from actual ATTRACTIONS data).
+           Both use the same pill design — active=red, count badge when inactive. */}
+      {(() => {
+        // Build the right pill list depending on the active layer
+        let cats: { key: string; emoji: string; label: string; count: number }[];
+        let activeFilter: string;
+        let setFilter: (v: string) => void;
+        let totalCount: number;
 
-        // Category list with real counts.
-        // "cultural" is intentionally excluded from the public filter bar — hidden until ready.
-        const cats = [
-          { key: "all",           emoji: "🗺️",  label: "All",          count: DESTINATIONS.length },
-          { key: "city",          emoji: "🏙️",  label: "City",         count: countCat("city") },
-          { key: "nature",        emoji: "🏔️",  label: "Nature",       count: countCat("nature") },
-          { key: "beach",         emoji: "🏖️",  label: "Beach",        count: countCat("beach") },
-          { key: "historic-town", emoji: "🏘️",  label: "Historic Town",count: countCat("historic-town") },
-          { key: "castle",        emoji: "🏰",  label: "Castle",       count: countCat("castle") },
-          { key: "archaeology",   emoji: "🏛️",  label: "Archaeology",  count: countCat("archaeology") },
-          // cultural: hidden from public bar, available in admin for future use
-        ].filter(c => c.key === "all" || c.count > 0); // hide empty categories
+        if (layerMode === "destinations" && DESTINATIONS.length > 0) {
+          const countCat = (key: string) =>
+            DESTINATIONS.filter(d => d.category.split(",").map(x => x.trim()).includes(key)).length;
+          cats = [
+            { key: "all",           emoji: "🗺️", label: "All",           count: DESTINATIONS.length },
+            { key: "city",          emoji: "🏙️", label: "City",          count: countCat("city") },
+            { key: "nature",        emoji: "🏔️", label: "Nature",        count: countCat("nature") },
+            { key: "beach",         emoji: "🏖️", label: "Beach",         count: countCat("beach") },
+            { key: "historic-town", emoji: "🏘️", label: "Historic Town", count: countCat("historic-town") },
+            { key: "castle",        emoji: "🏰", label: "Castle",        count: countCat("castle") },
+            { key: "archaeology",   emoji: "🏛️", label: "Archaeology",  count: countCat("archaeology") },
+            // cultural: hidden from public bar
+          ].filter(c => c.key === "all" || c.count > 0);
+          activeFilter = categoryFilter;
+          setFilter = setCategoryFilter;
+          totalCount = DESTINATIONS.length;
+
+        } else if (layerMode === "attractions" && ATTRACTIONS.length > 0) {
+          // Build from actual attraction data — expand comma-separated multi-categories
+          const allAttrCats = Array.from(
+            new Set(ATTRACTIONS.flatMap(a => a.category.split(",").map((c: string) => c.trim()).filter(Boolean)))
+          ).sort();
+          const countAttrCat = (key: string) =>
+            ATTRACTIONS.filter(a => a.category.split(",").map((c: string) => c.trim()).includes(key)).length;
+          cats = [
+            { key: "all", emoji: "🗺️", label: "All", count: ATTRACTIONS.length },
+            ...allAttrCats.map(cat => ({
+              key: cat,
+              emoji: (CATEGORY_EMOJI as any)[cat] || "📍",
+              label: cat.charAt(0).toUpperCase() + cat.slice(1).replace("-", " "),
+              count: countAttrCat(cat),
+            })),
+          ].filter(c => c.key === "all" || c.count > 0);
+          activeFilter = attrCategoryFilter;
+          setFilter = setAttrCategoryFilter;
+          totalCount = ATTRACTIONS.length;
+
+        } else {
+          return null; // no data yet
+        }
 
         return (
           <div
             className="absolute z-[1000]"
             style={{
-              top: "3.5rem",   // below the Share Location button
+              top: "3.5rem",
               left: "0.75rem",
-              right: "6rem",   // leave room for layer toggle on the right
-              pointerEvents: "none", // container passthrough; buttons handle their own events
+              right: "6rem",
+              pointerEvents: "none",
             }}
           >
             <div
               className="flex gap-1.5 overflow-x-auto"
               style={{
                 pointerEvents: "auto",
-                scrollbarWidth: "none",   // Firefox
-                msOverflowStyle: "none",  // IE
+                scrollbarWidth: "none",
+                msOverflowStyle: "none",
                 WebkitOverflowScrolling: "touch",
-                paddingBottom: "2px",     // room for shadow on active pill
+                paddingBottom: "2px",
               }}
             >
               {cats.map(({ key, emoji, label, count }) => {
-                const active = categoryFilter === key;
+                const active = activeFilter === key;
                 return (
                   <button
                     key={key}
                     type="button"
-                    onClick={() => setCategoryFilter(key)}
+                    onClick={() => setFilter(key)}
                     className="flex items-center gap-1 shrink-0 transition-all duration-200"
                     style={{
                       padding: "5px 10px",
@@ -952,29 +989,21 @@ export default function MapPage() {
                       background: active ? "hsl(var(--primary))" : "rgba(255,255,255,0.95)",
                       color: active ? "#fff" : "#222",
                       border: active ? "1.5px solid transparent" : "1.5px solid rgba(0,0,0,0.14)",
-                      boxShadow: active
-                        ? "0 2px 8px rgba(192,57,43,0.35)"
-                        : "0 1px 4px rgba(0,0,0,0.18)",
+                      boxShadow: active ? "0 2px 8px rgba(192,57,43,0.35)" : "0 1px 4px rgba(0,0,0,0.18)",
                       backdropFilter: "blur(6px)",
                     }}
                     aria-pressed={active}
-                    aria-label={`Filter by ${label}: ${count} destinations`}
+                    aria-label={`Filter by ${label}: ${count}`}
                   >
                     <span aria-hidden="true">{emoji}</span>
                     <span>{label}</span>
-                    {/* Count badge — hidden when active (already filtered) */}
                     {!active && (
                       <span style={{
-                        marginLeft: "2px",
-                        fontSize: "10px",
-                        fontWeight: 700,
+                        marginLeft: "2px", fontSize: "10px", fontWeight: 700,
                         color: "hsl(var(--primary))",
                         background: "hsl(var(--primary)/0.1)",
-                        borderRadius: "999px",
-                        padding: "0 5px",
-                        lineHeight: "16px",
-                        minWidth: "16px",
-                        textAlign: "center",
+                        borderRadius: "999px", padding: "0 5px",
+                        lineHeight: "16px", minWidth: "16px", textAlign: "center",
                       }}>
                         {count}
                       </span>
@@ -1030,7 +1059,7 @@ export default function MapPage() {
       <div className="absolute top-3 right-3 z-[1000]">
         <div className="flex items-center gap-1 rounded-xl border border-border bg-card/95 backdrop-blur p-1 shadow-md">
           <button
-            onClick={() => { setLayerMode("attractions"); setShowDestPanel(false); setCategoryFilter("all"); }}
+            onClick={() => { setLayerMode("attractions"); setShowDestPanel(false); setCategoryFilter("all"); setAttrCategoryFilter("all"); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               layerMode === "attractions"
                 ? "bg-primary text-primary-foreground"
@@ -1040,7 +1069,7 @@ export default function MapPage() {
             <MapPin size={12} /> Attractions
           </button>
           <button
-            onClick={() => { setLayerMode("destinations"); setShowDestPanel(true); }}
+            onClick={() => { setLayerMode("destinations"); setShowDestPanel(true); setAttrCategoryFilter("all"); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               layerMode === "destinations"
                 ? "bg-primary text-primary-foreground"
