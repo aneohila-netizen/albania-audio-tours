@@ -286,10 +286,10 @@ export default function NavBar() {
           const active = location === href || (href !== "/" && location.startsWith(href));
           const isSubscribe = href === "/subscriptions";
           return (
-            <Link key={href} href={href}>
+            <Link key={href} href={href} className="flex-1 min-w-0">
               <a
                 data-testid={`mobile-nav-${href.replace(/\//g, "") || "map"}`}
-                className={`flex-1 flex flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 px-1 transition-all select-none ${
+                className={`w-full flex flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 px-1 transition-all select-none ${
                   active
                     ? isSubscribe
                       ? "bg-primary text-primary-foreground shadow-sm"
