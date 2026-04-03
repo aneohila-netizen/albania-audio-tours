@@ -80,7 +80,7 @@ export default function MapPage() {
 
   const [selectedPin, setSelectedPin] = useState<PinItem | null>(null);
   const [showVisitModal, setShowVisitModal] = useState(false);
-  const [layerMode, setLayerMode] = useState<LayerMode>("attractions");
+  const [layerMode, setLayerMode] = useState<LayerMode>("destinations");
   const [, navigate] = useLocation();
 
   const [heroDismissed, setHeroDismissed] = useState(false);
@@ -240,20 +240,56 @@ export default function MapPage() {
 
   function addDestinationMarker(L: LeafletLib, map: LeafletMap, dest: Destination, addTo?: (m: any) => void) {
     const color = CATEGORY_COLORS[dest.category] || "#C0392B";
-    const emoji = CATEGORY_EMOJI[dest.category] || "📍";
+    const name = destName(dest);
+    // Clean teardrop pin — industry standard (Google Maps, TripAdvisor, GetYourGuide style).
+    // No emoji/icon inside: at destination overview zoom 43 pins with icons create visual noise.
+    // Short name label below the pin so the visitor immediately knows what each pin is.
+    const PIN_W = 22;
+    const PIN_H = 32;
+    const html = `
+      <div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;">
+        <div style="
+          width:${PIN_W}px;height:${PIN_H}px;
+          background:${color};
+          border-radius:${PIN_W / 2}px ${PIN_W / 2}px ${PIN_W / 2}px 0;
+          transform:rotate(-45deg);
+          box-shadow:0 2px 8px rgba(0,0,0,0.35);
+          border:2px solid rgba(255,255,255,0.9);
+          display:flex;align-items:center;justify-content:center;
+        ">
+          <div style="
+            width:7px;height:7px;
+            background:rgba(255,255,255,0.85);
+            border-radius:50%;
+            transform:rotate(45deg);
+          "></div>
+        </div>
+        <span style="
+          margin-top:4px;
+          font-size:10px;
+          font-weight:600;
+          color:#1a1a1a;
+          text-shadow:0 1px 3px rgba(255,255,255,0.95),0 1px 3px rgba(255,255,255,0.95);
+          white-space:nowrap;
+          max-width:90px;
+          overflow:hidden;
+          text-overflow:ellipsis;
+          line-height:1.2;
+          pointer-events:none;
+        ">${name}</span>
+      </div>`;
     const icon = L.divIcon({
       className: "",
-      html: markerHtml(emoji, color, false, 44),
-      iconSize: [44, 44],
-      iconAnchor: [22, 44],
-      popupAnchor: [0, -46],
+      html,
+      iconSize: [90, PIN_H + 22],
+      iconAnchor: [45, PIN_H],
+      popupAnchor: [0, -(PIN_H + 24)],
     });
     const marker = L.marker([dest.lat, dest.lng], { icon }).addTo(map);
-    // aria-label for screen readers and WCAG 2.1
     const destEl = marker.getElement();
     if (destEl) {
       destEl.setAttribute("role", "button");
-      destEl.setAttribute("aria-label", `${destName(dest)} — ${dest.category} destination. Tap to explore.`);
+      destEl.setAttribute("aria-label", `${name} — ${dest.category} destination. Tap to explore.`);
       destEl.setAttribute("tabindex", "0");
       destEl.addEventListener("keydown", (e: any) => {
         if (e.key === "Enter" || e.key === " ") setSelectedPin({ type: "destination", data: dest });
