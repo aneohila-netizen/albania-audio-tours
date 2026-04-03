@@ -39,6 +39,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   landmark:       "#C0392B",
   "hot-springs":  "#A0522D",
   ruins:          "#7A6A5A",
+  cultural:       "#7B3F9E",
 };
 
 const CATEGORY_EMOJI: Record<string, string> = {
@@ -205,10 +206,13 @@ export default function MapPage() {
     };
 
     if (layerMode === "destinations") {
-      // Apply category filter — show all if "all", otherwise only matching category
+      // Apply category filter — comma-separated multi-category support.
+      // e.g. a destination with category="city,historic-town" matches both "city" and "historic-town" pills.
       const visibleDests = categoryFilter === "all"
         ? DESTINATIONS
-        : DESTINATIONS.filter(d => d.category === categoryFilter);
+        : DESTINATIONS.filter(d =>
+            d.category.split(",").map(x => x.trim()).includes(categoryFilter)
+          );
       visibleDests.forEach(dest => {
         addDestinationMarker(L, map, dest, addTo);
       });
@@ -258,9 +262,11 @@ export default function MapPage() {
   }
 
   function addDestinationMarker(L: LeafletLib, map: LeafletMap, dest: Destination, addTo?: (m: any) => void) {
-    const color = CATEGORY_COLORS[dest.category] || "#C0392B";
+    // Use primary category (first in comma-separated list) for pin colour
+    const primaryCat = dest.category.split(",")[0].trim();
+    const color = CATEGORY_COLORS[primaryCat] || "#C0392B";
     const name = destName(dest);
-    const emoji2 = CATEGORY_EMOJI[dest.category] || '📍';
+    const emoji2 = CATEGORY_EMOJI[primaryCat] || '📍';
     // Thumbtack pushpin + name label — same pin shape as attractions for consistency.
     // Slightly larger (40px vs 36px) so destinations stand out on overview zoom.
     const destPinSize = 40;
@@ -890,16 +896,21 @@ export default function MapPage() {
            Only visible in Destinations layer. Floating white pill bar under Share Location.
            Industry standard: Option A + C (Google Maps style + count badge). */}
       {layerMode === "destinations" && DESTINATIONS.length > 0 && (() => {
-        // Build category list with counts from actual data
+        // Helper: count destinations that include a category (supports comma-separated multi-category)
+        const countCat = (key: string) =>
+          DESTINATIONS.filter(d => d.category.split(",").map(x => x.trim()).includes(key)).length;
+
+        // Category list with real counts.
+        // "cultural" is intentionally excluded from the public filter bar — hidden until ready.
         const cats = [
           { key: "all",           emoji: "🗺️",  label: "All",          count: DESTINATIONS.length },
-          { key: "city",          emoji: "🏙️",  label: "City",         count: DESTINATIONS.filter(d => d.category === "city").length },
-          { key: "nature",        emoji: "🏔️",  label: "Nature",       count: DESTINATIONS.filter(d => d.category === "nature").length },
-          { key: "beach",         emoji: "🏖️",  label: "Beach",        count: DESTINATIONS.filter(d => d.category === "beach").length },
-          { key: "historic-town", emoji: "🏘️",  label: "Historic Town",count: DESTINATIONS.filter(d => d.category === "historic-town").length },
-          { key: "castle",        emoji: "🏰",  label: "Castle",       count: DESTINATIONS.filter(d => d.category === "castle").length },
-          { key: "archaeology",   emoji: "🏛️",  label: "Archaeology",  count: DESTINATIONS.filter(d => d.category === "archaeology").length },
-          { key: "cultural",      emoji: "🎭",  label: "Cultural",     count: DESTINATIONS.filter(d => d.category === "cultural").length },
+          { key: "city",          emoji: "🏙️",  label: "City",         count: countCat("city") },
+          { key: "nature",        emoji: "🏔️",  label: "Nature",       count: countCat("nature") },
+          { key: "beach",         emoji: "🏖️",  label: "Beach",        count: countCat("beach") },
+          { key: "historic-town", emoji: "🏘️",  label: "Historic Town",count: countCat("historic-town") },
+          { key: "castle",        emoji: "🏰",  label: "Castle",       count: countCat("castle") },
+          { key: "archaeology",   emoji: "🏛️",  label: "Archaeology",  count: countCat("archaeology") },
+          // cultural: hidden from public bar, available in admin for future use
         ].filter(c => c.key === "all" || c.count > 0); // hide empty categories
 
         return (

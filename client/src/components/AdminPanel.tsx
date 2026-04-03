@@ -58,9 +58,11 @@ const CATEGORY_COLORS: Record<string, string> = {
   landmark: "bg-indigo-100 text-indigo-800",
   ruins: "bg-stone-100 text-stone-800",
   city: "bg-gray-100 text-gray-800",
+  cultural: "bg-purple-100 text-purple-800",
 };
 
-const DEST_CATEGORIES = ["archaeology", "castle", "beach", "historic-town", "nature", "city"];
+// cultural is included for admin editing but hidden from the public filter bar until ready
+const DEST_CATEGORIES = ["archaeology", "castle", "beach", "historic-town", "nature", "city", "cultural"];
 const ATTR_CATEGORIES = [
   "castle", "mosque", "museum", "monument", "district", "church",
   "promenade", "landmark", "ruins", "nature", "archaeology", "market", "hot-springs",
@@ -2242,11 +2244,42 @@ function EditorView({
                       <SelectContent>{REGIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
                     </Select>
                   </Field>
+                  {/* Category — multi-select checkboxes (stored as comma-separated string).
+                      A destination can belong to multiple categories, e.g. city + historic-town.
+                      At least one must be selected. */}
                   <Field label="Category" error={errors.category} required>
-                    <Select value={form.category} onValueChange={v => set("category", v)}>
-                      <SelectTrigger data-testid="select-category"><SelectValue placeholder="Category" /></SelectTrigger>
-                      <SelectContent>{DEST_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                    </Select>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {DEST_CATEGORIES.map(c => {
+                        const selected = form.category.split(",").map(x => x.trim()).filter(Boolean).includes(c);
+                        return (
+                          <button
+                            key={c}
+                            type="button"
+                            data-testid={`cat-${c}`}
+                            onClick={() => {
+                              const current = form.category.split(",").map(x => x.trim()).filter(Boolean);
+                              const next = selected
+                                ? current.filter(x => x !== c)          // deselect
+                                : [...current, c];                        // select
+                              set("category", next.join(","));
+                            }}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                              selected
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                            }`}
+                          >
+                            {selected && <span className="text-[10px] leading-none">✓</span>}
+                            {c}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {form.category && (
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Selected: <span className="font-medium text-foreground">{form.category}</span>
+                      </p>
+                    )}
                   </Field>
                   <Field label="Difficulty">
                     <Select value={form.difficulty} onValueChange={v => set("difficulty", v)}>

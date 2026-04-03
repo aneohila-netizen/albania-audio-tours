@@ -48,15 +48,21 @@ export default function SitesPage() {
   const DESTINATIONS = useDestinations();
   const ATTRACTIONS = useAttractions();
 
-  const categories = ["all", ...Array.from(new Set(DESTINATIONS.map(d => d.category)))];
+  // Build category list from actual data — expand comma-separated multi-categories.
+  // Each destination may have "city,historic-town" so we expand and deduplicate.
+  const categories = ["all", ...Array.from(
+    new Set(DESTINATIONS.flatMap(d => d.category.split(",").map(x => x.trim()).filter(Boolean)))
+  ).filter(c => c !== "cultural")]; // cultural hidden from public filter until ready
 
   const filtered = DESTINATIONS.filter(d => {
     const n = name(d).toLowerCase();
     const tl = tagline(d).toLowerCase();
     const q = search.toLowerCase();
+    // Support comma-separated multi-category matching
+    const cats = d.category.split(",").map(x => x.trim());
     return (
       (q === "" || n.includes(q) || tl.includes(q)) &&
-      (filterCat === "all" || d.category === filterCat)
+      (filterCat === "all" || cats.includes(filterCat))
     );
   });
 
@@ -162,9 +168,9 @@ export default function SitesPage() {
                   <div className="absolute top-3 left-3">
                     <span
                       className="text-xs font-semibold px-2 py-0.5 rounded-full text-white"
-                      style={{ background: CATEGORY_COLORS[dest.category] || "#C0392B" }}
+                      style={{ background: CATEGORY_COLORS[dest.category.split(',')[0].trim()] || '#C0392B' }}
                     >
-                      {CATEGORY_EMOJI[dest.category] || "📍"} {catLabel(dest.category)}
+                      {CATEGORY_EMOJI[dest.category.split(',')[0].trim()] || '📍'} {catLabel(dest.category.split(',')[0].trim())}
                     </span>
                   </div>
                   <div className="absolute top-3 right-3">
@@ -257,10 +263,10 @@ export default function SitesPage() {
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <span
                           className="text-xs font-semibold px-2 py-0.5 rounded-full text-white"
-                          style={{ background: CATEGORY_COLORS[dest.category] || "#C0392B" }}
-                        >
-                          {CATEGORY_EMOJI[dest.category] || "📍"} {catLabel(dest.category)}
-                        </span>
+                          style={{ background: CATEGORY_COLORS[dest.category.split(',')[0].trim()] || '#C0392B' }}
+                    >
+                      {CATEGORY_EMOJI[dest.category.split(',')[0].trim()] || '📍'} {catLabel(dest.category.split(',')[0].trim())}
+                    </span>
                         <span className="points-badge">
                           <Star size={8} fill="currentColor" />
                           {dest.totalPoints}
