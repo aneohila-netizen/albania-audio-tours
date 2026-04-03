@@ -10,7 +10,7 @@ import PaywallGate from "@/components/PaywallGate";
 import BookWithGuide from "@/components/BookWithGuide";
 import StarRatingDisplay from "@/components/StarRatingDisplay";
 import ItineraryCard from "@/components/ItineraryCard";
-import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb, Navigation } from "lucide-react";
+import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb, Navigation, LayoutGrid, List } from "lucide-react";
 import GallerySlideshow from "@/components/GallerySlideshow";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLangText } from "@/lib/i18n";
@@ -37,6 +37,8 @@ export default function DestinationPage() {
   const [, params] = useRoute("/sites/:dest");
   const [, navigate] = useLocation();
   const [showFullDesc, setShowFullDesc] = useState(false);
+  const [attrFilter, setAttrFilter] = useState("all");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const { lang, visitedSiteIds } = useApp();
 
   // Fetch destination directly from Railway (bypasses Perplexity proxy)
@@ -167,63 +169,236 @@ export default function DestinationPage() {
       <BookWithGuide shopifyUrl={(dest as any).shopifyUrl || ""} siteName={name} />
 
       {/* Attractions */}
-      {attractions.length > 0 && (
-        <div>
-          <h2 className="text-lg font-bold mb-4" style={{ fontFamily: "var(--font-display)" }}>
-            Attractions in {name}
-          </h2>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {attractions.map(attr => {
-              const isVisited = visitedSiteIds.has(attr.id);
-              return (
-                <article key={attr.slug} data-testid={`attr-card-${attr.slug}`}
-                  className="tour-card rounded-xl border border-border bg-card overflow-hidden cursor-pointer group"
-                  onClick={() => navigate(`/sites/${params?.dest}/${attr.slug}`)}>
-                  <div className="relative h-36 bg-muted overflow-hidden">
-                    {attr.imageUrl ? (
-                      <img src={attr.imageUrl} alt={attrName(attr)}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        loading="lazy" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-3xl">
-                        {CATEGORY_EMOJI[attr.category] || "📍"}
+      {attractions.length > 0 && (() => {
+        // Build category list with counts for the filter pill bar
+        const attrCats = Array.from(new Set(attractions.map(a => a.category))).sort();
+        const countCat = (cat: string) => attractions.filter(a => a.category === cat).length;
+
+        // Apply filter
+        const visible = attrFilter === "all"
+          ? attractions
+          : attractions.filter(a => a.category === attrFilter);
+
+        const catLabel = (c: string) => c.charAt(0).toUpperCase() + c.slice(1).replace("-", " ");
+
+        return (
+          <div>
+            {/* Header row: title + view toggle */}
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold" style={{ fontFamily: "var(--font-display)" }}>
+                Attractions in {name}
+                {attrFilter !== "all" && (
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    ({visible.length})
+                  </span>
+                )}
+              </h2>
+              {/* Grid / List toggle */}
+              <div className="flex items-center border border-border rounded-lg overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("grid")}
+                  className={`p-2 transition-colors ${
+                    viewMode === "grid" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-muted"
+                  }`}
+                  aria-label="Grid view"
+                >
+                  <LayoutGrid size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("list")}
+                  className={`p-2 transition-colors ${
+                    viewMode === "list" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-muted"
+                  }`}
+                  aria-label="List view"
+                >
+                  <List size={15} />
+                </button>
+              </div>
+            </div>
+
+            {/* Category filter pill bar — same pattern as map/SitesPage */}
+            {attrCats.length > 1 && (
+              <div
+                className="flex gap-1.5 overflow-x-auto pb-2 mb-4"
+                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+              >
+                {/* All pill */}
+                <button
+                  type="button"
+                  onClick={() => setAttrFilter("all")}
+                  className="flex items-center gap-1 shrink-0 transition-all duration-200"
+                  style={{
+                    padding: "5px 10px", borderRadius: "999px", fontSize: "12px",
+                    fontWeight: 600, whiteSpace: "nowrap", cursor: "pointer",
+                    background: attrFilter === "all" ? "hsl(var(--primary))" : "hsl(var(--card))",
+                    color: attrFilter === "all" ? "#fff" : "hsl(var(--foreground))",
+                    border: attrFilter === "all" ? "1.5px solid transparent" : "1.5px solid hsl(var(--border))",
+                    boxShadow: attrFilter === "all" ? "0 2px 8px rgba(192,57,43,0.25)" : "0 1px 3px rgba(0,0,0,0.08)",
+                  }}
+                >
+                  <span>All</span>
+                  {attrFilter !== "all" && (
+                    <span style={{
+                      marginLeft: 3, fontSize: 10, fontWeight: 700,
+                      color: "hsl(var(--primary))",
+                      background: "hsl(var(--primary)/0.1)",
+                      borderRadius: "999px", padding: "0 5px", lineHeight: "16px",
+                    }}>{attractions.length}</span>
+                  )}
+                </button>
+
+                {/* Per-category pills */}
+                {attrCats.map(cat => {
+                  const active = attrFilter === cat;
+                  const count = countCat(cat);
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setAttrFilter(cat)}
+                      className="flex items-center gap-1 shrink-0 transition-all duration-200"
+                      style={{
+                        padding: "5px 10px", borderRadius: "999px", fontSize: "12px",
+                        fontWeight: 600, whiteSpace: "nowrap", cursor: "pointer",
+                        background: active ? "hsl(var(--primary))" : "hsl(var(--card))",
+                        color: active ? "#fff" : "hsl(var(--foreground))",
+                        border: active ? "1.5px solid transparent" : "1.5px solid hsl(var(--border))",
+                        boxShadow: active ? "0 2px 8px rgba(192,57,43,0.25)" : "0 1px 3px rgba(0,0,0,0.08)",
+                      }}
+                    >
+                      <span>{CATEGORY_EMOJI[cat] || "📍"}</span>
+                      <span>{catLabel(cat)}</span>
+                      {!active && (
+                        <span style={{
+                          marginLeft: 2, fontSize: 10, fontWeight: 700,
+                          color: "hsl(var(--primary))",
+                          background: "hsl(var(--primary)/0.1)",
+                          borderRadius: "999px", padding: "0 5px", lineHeight: "16px",
+                        }}>{count}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Grid view */}
+            {viewMode === "grid" && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {visible.map(attr => {
+                  const isVisited = visitedSiteIds.has(attr.id);
+                  return (
+                    <article key={attr.slug} data-testid={`attr-card-${attr.slug}`}
+                      className="tour-card rounded-xl border border-border bg-card overflow-hidden cursor-pointer group"
+                      onClick={() => navigate(`/sites/${params?.dest}/${attr.slug}`)}>
+                      <div className="relative h-36 bg-muted overflow-hidden">
+                        {attr.imageUrl ? (
+                          <img src={attr.imageUrl} alt={attrName(attr)}
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            loading="lazy" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-3xl">
+                            {CATEGORY_EMOJI[attr.category] || "📍"}
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                        {isVisited && (
+                          <div className="absolute top-2 right-2 rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: "#2D7A22", color: "white" }}>
+                            ✓ Visited
+                          </div>
+                        )}
+                        <div className="absolute bottom-2 left-2">
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full text-white"
+                            style={{ background: CATEGORY_COLORS[attr.category] || "#C0392B" }}>
+                            {CATEGORY_EMOJI[attr.category] || "📍"}{" "}{catLabel(attr.category)}
+                          </span>
+                        </div>
                       </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                    {isVisited && (
-                      <div className="absolute top-2 right-2 rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: "#2D7A22", color: "white" }}>
-                        ✓ Visited
+                      <div className="p-3">
+                        <h3 className="font-bold text-sm mb-1 leading-tight" style={{ fontFamily: "var(--font-display)" }}>
+                          {attrName(attr)}
+                        </h3>
+                        <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{attrDesc(attr)}</p>
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock size={10} /> {attr.visitDuration}m
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="points-badge"><Star size={8} fill="currentColor" /> {attr.points}</span>
+                            <ChevronRight size={13} className="text-primary" />
+                          </div>
+                        </div>
                       </div>
-                    )}
-                    <div className="absolute bottom-2 left-2">
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full text-white"
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* List view */}
+            {viewMode === "list" && (
+              <div className="space-y-2">
+                {visible.map((attr, idx) => {
+                  const isVisited = visitedSiteIds.has(attr.id);
+                  return (
+                    <article key={attr.slug} data-testid={`attr-list-${attr.slug}`}
+                      className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card cursor-pointer hover:border-primary/40 transition-colors group"
+                      onClick={() => navigate(`/sites/${params?.dest}/${attr.slug}`)}>
+                      {/* Number */}
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
                         style={{ background: CATEGORY_COLORS[attr.category] || "#C0392B" }}>
-                        {CATEGORY_EMOJI[attr.category] || "📍"}{" "}
-                        {attr.category.charAt(0).toUpperCase() + attr.category.slice(1).replace("-", " ")}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="p-3">
-                    <h3 className="font-bold text-sm mb-1 leading-tight" style={{ fontFamily: "var(--font-display)" }}>
-                      {attrName(attr)}
-                    </h3>
-                    <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{attrDesc(attr)}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock size={10} /> {attr.visitDuration}m
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="points-badge"><Star size={8} fill="currentColor" /> {attr.points}</span>
+                        {idx + 1}
+                      </div>
+                      {/* Thumbnail */}
+                      <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted shrink-0">
+                        {attr.imageUrl ? (
+                          <img src={attr.imageUrl} alt={attrName(attr)}
+                            className="w-full h-full object-cover"
+                            loading="lazy" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-xl">
+                            {CATEGORY_EMOJI[attr.category] || "📍"}
+                          </div>
+                        )}
+                      </div>
+                      {/* Text */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-white"
+                            style={{ background: CATEGORY_COLORS[attr.category] || "#C0392B" }}>
+                            {CATEGORY_EMOJI[attr.category]} {catLabel(attr.category)}
+                          </span>
+                          {isVisited && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#2D7A22", color: "white" }}>✓ Visited</span>
+                          )}
+                        </div>
+                        <p className="font-semibold text-sm leading-tight truncate">{attrName(attr)}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{attrDesc(attr)}</p>
+                      </div>
+                      {/* Meta */}
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className="points-badge text-[10px]"><Star size={8} fill="currentColor" /> {attr.points}</span>
+                        <span className="text-[10px] text-muted-foreground flex items-center gap-0.5"><Clock size={9}/>{attr.visitDuration}m</span>
                         <ChevronRight size={13} className="text-primary" />
                       </div>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Empty filter state */}
+            {visible.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                No attractions in this category.
+                <button onClick={() => setAttrFilter("all")} className="ml-2 text-primary underline">Show all</button>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {attractions.length === 0 && (
         <div className="rounded-xl border border-border bg-muted/30 p-6 text-center text-muted-foreground">
