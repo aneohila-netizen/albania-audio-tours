@@ -1203,8 +1203,8 @@ function AttractionsView({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-sm text-foreground">{attr.nameEn}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[attr.category] || "bg-muted text-muted-foreground"}`}>
-                      {attr.category}
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[attr.category.split(",")[0].trim()] || "bg-muted text-muted-foreground"}`}>
+                      {attr.category.split(",")[0].trim()}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -2897,11 +2897,41 @@ function AttrEditorView({
                   <Input value={form.funFactEn} onChange={e => set("funFactEn", e.target.value)} placeholder="An interesting fact about this attraction" />
                 </Field>
                 <div className="grid grid-cols-2 gap-4">
+                  {/* Category — multi-select checkboxes, same pattern as destinations.
+                      Stored as comma-separated string e.g. "landmark,museum".
+                      Primary category (first) drives pin colour and badges. */}
                   <Field label="Category" error={errors.category} required>
-                    <Select value={form.category} onValueChange={v => set("category", v)}>
-                      <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                      <SelectContent>{ATTR_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                    </Select>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {ATTR_CATEGORIES.map(c => {
+                        const selected = form.category.split(",").map((x: string) => x.trim()).filter(Boolean).includes(c);
+                        return (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => {
+                              const current = form.category.split(",").map((x: string) => x.trim()).filter(Boolean);
+                              const next = selected
+                                ? current.filter((x: string) => x !== c)
+                                : [...current, c];
+                              set("category", next.join(","));
+                            }}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                              selected
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                            }`}
+                          >
+                            {selected && <span className="text-[10px] leading-none">✓</span>}
+                            {c}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {form.category && (
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Selected: <span className="font-medium text-foreground">{form.category}</span>
+                      </p>
+                    )}
                   </Field>
                   <Field label="Visit Duration (minutes)">
                     <Input type="number" min="5" max="300" value={form.visitDuration} onChange={e => set("visitDuration", e.target.value)} />

@@ -170,14 +170,18 @@ export default function DestinationPage() {
 
       {/* Attractions */}
       {attractions.length > 0 && (() => {
-        // Build category list with counts for the filter pill bar
-        const attrCats = Array.from(new Set(attractions.map(a => a.category))).sort();
-        const countCat = (cat: string) => attractions.filter(a => a.category === cat).length;
+        // Build category list — expand comma-separated multi-categories, dedupe, sort
+        const attrCats = Array.from(
+          new Set(attractions.flatMap(a => a.category.split(",").map((c: string) => c.trim()).filter(Boolean)))
+        ).sort();
+        // Count: attraction matches if any of its categories matches the filter
+        const countCat = (cat: string) =>
+          attractions.filter(a => a.category.split(",").map((c: string) => c.trim()).includes(cat)).length;
 
-        // Apply filter
+        // Apply filter — multi-category aware
         const visible = attrFilter === "all"
           ? attractions
-          : attractions.filter(a => a.category === attrFilter);
+          : attractions.filter(a => a.category.split(",").map((c: string) => c.trim()).includes(attrFilter));
 
         const catLabel = (c: string) => c.charAt(0).toUpperCase() + c.slice(1).replace("-", " ");
 
@@ -300,7 +304,7 @@ export default function DestinationPage() {
                             loading="lazy" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-3xl">
-                            {CATEGORY_EMOJI[attr.category] || "📍"}
+                            {CATEGORY_EMOJI[attr.category.split(",")[0].trim()] || "📍"}
                           </div>
                         )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
@@ -311,8 +315,8 @@ export default function DestinationPage() {
                         )}
                         <div className="absolute bottom-2 left-2">
                           <span className="text-xs font-semibold px-2 py-0.5 rounded-full text-white"
-                            style={{ background: CATEGORY_COLORS[attr.category] || "#C0392B" }}>
-                            {CATEGORY_EMOJI[attr.category] || "📍"}{" "}{catLabel(attr.category)}
+                            style={{ background: CATEGORY_COLORS[attr.category.split(",")[0].trim()] || "#C0392B" }}>
+                            {CATEGORY_EMOJI[attr.category.split(",")[0].trim()] || "📍"}{" "}{catLabel(attr.category.split(",")[0].trim())}
                           </span>
                         </div>
                       </div>
@@ -348,7 +352,7 @@ export default function DestinationPage() {
                       onClick={() => navigate(`/sites/${params?.dest}/${attr.slug}`)}>
                       {/* Number */}
                       <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-                        style={{ background: CATEGORY_COLORS[attr.category] || "#C0392B" }}>
+                        style={{ background: CATEGORY_COLORS[attr.category.split(",")[0].trim()] || "#C0392B" }}>
                         {idx + 1}
                       </div>
                       {/* Thumbnail */}
@@ -359,7 +363,7 @@ export default function DestinationPage() {
                             loading="lazy" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-xl">
-                            {CATEGORY_EMOJI[attr.category] || "📍"}
+                            {CATEGORY_EMOJI[attr.category.split(",")[0].trim()] || "📍"}
                           </div>
                         )}
                       </div>
@@ -367,8 +371,8 @@ export default function DestinationPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
                           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-white"
-                            style={{ background: CATEGORY_COLORS[attr.category] || "#C0392B" }}>
-                            {CATEGORY_EMOJI[attr.category]} {catLabel(attr.category)}
+                            style={{ background: CATEGORY_COLORS[attr.category.split(",")[0].trim()] || "#C0392B" }}>
+                            {CATEGORY_EMOJI[attr.category.split(",")[0].trim()]} {catLabel(attr.category.split(",")[0].trim())}
                           </span>
                           {isVisited && (
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "#2D7A22", color: "white" }}>✓ Visited</span>
