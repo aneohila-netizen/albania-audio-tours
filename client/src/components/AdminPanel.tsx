@@ -18,7 +18,7 @@ import {
   MapPin, Globe, Music, Image, Info, ArrowLeft, Save,
   Upload, Play, Pause, Loader2, X, Link, CheckCircle2,
   LayoutList, Star, Route, FileText, Settings, Megaphone, Power, PowerOff,
-  Phone, Mail, ExternalLink, ChevronLeft, ChevronRight, ArrowLeftRight,
+  Phone, Mail, ExternalLink, ChevronLeft, ChevronRight, ArrowLeftRight, RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,7 @@ import type { TourSite } from "@shared/schema";
 import ItineraryManager from "@/components/ItineraryManager";
 import AdminCmsManager from "@/components/AdminCmsManager";
 import AdminSubscriptions from "@/components/AdminSubscriptions";
+import { queryClient } from "@/lib/queryClient";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 const ADMIN_PASSWORD = "AlbaTour2026!";
@@ -617,6 +618,61 @@ function LoginView({ onLogin }: { onLogin: () => void }) {
 
 // ─── SITES LIST ───────────────────────────────────────────────────────────────
 // ─── ADMIN SETTINGS ─────────────────────────────────────────────────────────────
+// ─── CacheFlushButton ───────────────────────────────────────────────────────
+// One button per cache scope. Calls queryClient.invalidateQueries() with the
+// provided keys then shows a "Flushed!" confirmation for 2 seconds.
+function CacheFlushButton({
+  label, description, keys, variant,
+}: {
+  label: string;
+  description: string;
+  keys: (string | string[])[];
+  variant: "all" | "destinations" | "attractions";
+}) {
+  const [state, setState] = useState<"idle" | "flushing" | "done">("idle");
+
+  async function flush() {
+    setState("flushing");
+    // Invalidate all specified query key prefixes
+    await Promise.all(
+      keys.map(k => queryClient.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }))
+    );
+    // Also reset so queries are considered stale and will refetch immediately
+    await Promise.all(
+      keys.map(k => queryClient.resetQueries({ queryKey: Array.isArray(k) ? k : [k] }))
+    );
+    setState("done");
+    setTimeout(() => setState("idle"), 2500);
+  }
+
+  const colors = {
+    all:          { bg: "bg-primary/5 hover:bg-primary/10 border-primary/20",   text: "text-primary",     icon: "text-primary" },
+    destinations: { bg: "bg-blue-50 hover:bg-blue-100 border-blue-200",          text: "text-blue-700",    icon: "text-blue-500" },
+    attractions:  { bg: "bg-green-50 hover:bg-green-100 border-green-200",       text: "text-green-700",   icon: "text-green-500" },
+  };
+  const c = colors[variant];
+
+  return (
+    <button
+      type="button"
+      onClick={flush}
+      disabled={state !== "idle"}
+      className={`flex flex-col items-start gap-1 rounded-xl border p-3 transition-all text-left ${c.bg} disabled:opacity-60`}
+    >
+      <div className="flex items-center gap-2">
+        <RefreshCw
+          size={14}
+          className={`${c.icon} ${state === "flushing" ? "animate-spin" : ""}`}
+        />
+        <span className={`text-xs font-semibold ${c.text}`}>
+          {state === "done" ? "✓ Flushed!" : state === "flushing" ? "Flushing…" : label}
+        </span>
+      </div>
+      <span className="text-[10px] text-muted-foreground leading-tight">{description}</span>
+    </button>
+  );
+}
+
 function AdminSettings() {
   const token = getAdminToken() || "";
   const headers = { "Content-Type": "application/json", "x-admin-token": token };
@@ -729,6 +785,53 @@ function AdminSettings() {
               <span>💬 <strong>Banner is hidden.</strong> No announcement is shown to visitors. Turn it back on at any time for a new campaign or pricing announcement.</span>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Cache / Data Refresh ─────────────────────────────────────────
+           Invalidates the client-side TanStack Query cache so all pages 
+           re-fetch fresh data from Railway on next view. */}
+      <Card>
+        <CardContent className="px-5 py-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+              <RefreshCw size={18} className="text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-sm">Refresh Page Data</p>
+              <p className="text-xs text-muted-foreground mt-0.5 max-w-xs">
+                After editing destinations or attractions, use these buttons to force all pages to reload fresh data immediately. Clears the 5-minute browser cache.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {/* Flush all */}
+            <CacheFlushButton
+              label="Flush All"
+              description="Pages + Destinations + Attractions"
+              keys={["railway"]}
+              variant="all"
+            />
+            {/* Flush destinations only */}
+            <CacheFlushButton
+              label="Flush Destinations"
+              description="Destination list and detail pages"
+              keys={[["railway", "sites"]]}
+              variant="destinations"
+            />
+            {/* Flush attractions only */}
+            <CacheFlushButton
+              label="Flush Attractions"
+              description="Attraction list and detail pages"
+              keys={[["railway", "attractions"]]}
+              variant="attractions"
+            />
+          </div>
+
+          <p className="text-[11px] text-muted-foreground">
+            ℹ️ Visitors will also see updated data within 5 minutes automatically. These buttons are for when you need it to be immediate.
+          </p>
         </CardContent>
       </Card>
 
@@ -888,11 +991,20 @@ function SitesView({
         <BackendStatusBanner />
 
         {/* Destinations list */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <h2 className="font-semibold text-foreground">Destinations</h2>
-          <Button size="sm" onClick={onNew} className="gap-1.5" data-testid="button-new-site">
-            <Plus className="w-4 h-4" /> Add Destination
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Inline cache flush — instantly refreshes destination data on all visitor pages */}
+            <CacheFlushButton
+              label="Refresh"
+              description="Flush destination cache"
+              keys={[["railway", "sites"]]}
+              variant="destinations"
+            />
+            <Button size="sm" onClick={onNew} className="gap-1.5" data-testid="button-new-site">
+              <Plus className="w-4 h-4" /> Add Destination
+            </Button>
+          </div>
         </div>
 
         {loading ? (
@@ -1045,9 +1157,18 @@ function AttractionsView({
               {destinationName} — Attractions
             </span>
           </div>
-          <Button size="sm" onClick={onNew} className="gap-1.5" data-testid="button-new-attraction">
-            <Plus className="w-4 h-4" /> Add Attraction
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Inline cache flush for attractions */}
+            <CacheFlushButton
+              label="Refresh"
+              description="Flush attraction cache"
+              keys={[["railway", "attractions"]]}
+              variant="attractions"
+            />
+            <Button size="sm" onClick={onNew} className="gap-1.5" data-testid="button-new-attraction">
+              <Plus className="w-4 h-4" /> Add Attraction
+            </Button>
+          </div>
         </div>
       </header>
 
