@@ -220,81 +220,56 @@ export default function MapPage() {
     }
   }
 
+  // Thumbtack / pushpin SVG — round ball on top, thin needle below.
+  // Matches the reference image: Apple Maps / Yelp pushpin aesthetic.
+  // Consistent shape for ALL pins; colour encodes category.
+  // isVisited: ball turns green with a tick inside.
   function markerHtml(emoji: string, color: string, isVisited: boolean, size = 38) {
-    return `
-      <div style="
-        width:${size}px; height:${size}px;
-        border-radius: 50% 50% 50% 0;
-        background:${isVisited ? "#2D7A22" : color};
-        transform: rotate(-45deg);
-        display: flex; align-items: center; justify-content: center;
-        box-shadow: 0 3px 12px rgba(0,0,0,0.35);
-        border: 2.5px solid white;
-        cursor: pointer;
-      ">
-        <span style="transform:rotate(45deg); font-size:${Math.round(size * 0.44)}px; line-height:1;">
-          ${isVisited ? "✓" : emoji}
-        </span>
-      </div>`;
+    const ballR  = size * 0.38;
+    const cx     = size / 2;
+    const ballCY = ballR + 2;
+    const nTop   = ballCY + ballR - 3;
+    const nBot   = size - 1;
+    const fill   = isVisited ? '#2D7A22' : color;
+    return `<svg xmlns="http://www.w3.org/2000/svg"
+      width="${size}" height="${size}"
+      viewBox="0 0 ${size} ${size}"
+      style="display:block;cursor:pointer;filter:drop-shadow(0 2px 5px rgba(0,0,0,0.38));overflow:visible">
+      <path d="M${cx-2.5},${nTop} L${cx},${nBot} L${cx+2.5},${nTop} Z" fill="#9a9a9a"/>
+      <line x1="${cx-0.5}" y1="${nTop+2}" x2="${cx-0.5}" y2="${nBot-3}"
+        stroke="rgba(255,255,255,0.5)" stroke-width="0.8"/>
+      <circle cx="${cx}" cy="${ballCY}" r="${ballR}" fill="${fill}" stroke="white" stroke-width="2"/>
+      <path d="M${cx-ballR*0.45},${ballCY-ballR*0.45} a${ballR*0.4},${ballR*0.32} 0 0,1 ${ballR*0.7},${ballR*0.12}"
+        fill="none" stroke="rgba(255,255,255,0.65)" stroke-width="1.5" stroke-linecap="round"/>
+      ${isVisited
+        ? `<text x="${cx}" y="${ballCY+ballR*0.38}" text-anchor="middle" dominant-baseline="middle"
+            font-size="${Math.round(ballR*1.1)}" fill="white" font-weight="bold" font-family="system-ui">✓</text>`
+        : `<text x="${cx}" y="${ballCY+ballR*0.4}" text-anchor="middle" dominant-baseline="middle"
+            font-size="${Math.round(ballR*0.9)}" font-family="system-ui">${emoji}</text>`
+      }
+    </svg>`;
   }
 
   function addDestinationMarker(L: LeafletLib, map: LeafletMap, dest: Destination, addTo?: (m: any) => void) {
     const color = CATEGORY_COLORS[dest.category] || "#C0392B";
     const name = destName(dest);
-    // Clean teardrop pin — industry standard (Google Maps, TripAdvisor, GetYourGuide style).
-    // No emoji/icon inside: at destination overview zoom 43 pins with icons create visual noise.
-    // Short name label below the pin so the visitor immediately knows what each pin is.
-    const PIN_W = 22;
-    const PIN_H = 32;
-    const html = `
-      <div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;">
-        <div style="
-          width:${PIN_W}px;height:${PIN_H}px;
-          background:${color};
-          border-radius:${PIN_W / 2}px ${PIN_W / 2}px ${PIN_W / 2}px 0;
-          transform:rotate(-45deg);
-          box-shadow:0 2px 8px rgba(0,0,0,0.35);
-          border:2px solid rgba(255,255,255,0.9);
-          display:flex;align-items:center;justify-content:center;
-        ">
-          <div style="
-            width:7px;height:7px;
-            background:rgba(255,255,255,0.85);
-            border-radius:50%;
-            transform:rotate(45deg);
-          "></div>
-        </div>
-        <span style="
-          margin-top:4px;
-          font-size:10px;
-          font-weight:600;
-          color:#1a1a1a;
-          text-shadow:0 1px 3px rgba(255,255,255,0.95),0 1px 3px rgba(255,255,255,0.95);
-          white-space:nowrap;
-          max-width:90px;
-          overflow:hidden;
-          text-overflow:ellipsis;
-          line-height:1.2;
-          pointer-events:none;
-        ">${name}</span>
-      </div>`;
+    const emoji2 = CATEGORY_EMOJI[dest.category] || '📍';
+    // Thumbtack pushpin + name label — same pin shape as attractions for consistency.
+    // Slightly larger (40px vs 36px) so destinations stand out on overview zoom.
+    const destPinSize = 40;
+    const pinSvg = markerHtml(emoji2, color, false, destPinSize);
+    const html = `<div style="display:flex;flex-direction:column;align-items:center;">
+      ${pinSvg}
+      <span style="margin-top:3px;font-size:10px;font-weight:700;color:#1a1a1a;line-height:1.15;text-shadow:0 1px 2px rgba(255,255,255,0.95),0 0 4px rgba(255,255,255,0.9);white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;pointer-events:none;">${name}</span>
+    </div>`;
     const icon = L.divIcon({
-      className: "",
+      className: '',
       html,
-      iconSize: [90, PIN_H + 22],
-      iconAnchor: [45, PIN_H],
-      popupAnchor: [0, -(PIN_H + 24)],
+      iconSize: [90, destPinSize + 20],
+      iconAnchor: [45, destPinSize],
+      popupAnchor: [0, -(destPinSize + 22)],
     });
     const marker = L.marker([dest.lat, dest.lng], { icon }).addTo(map);
-    const destEl = marker.getElement();
-    if (destEl) {
-      destEl.setAttribute("role", "button");
-      destEl.setAttribute("aria-label", `${name} — ${dest.category} destination. Tap to explore.`);
-      destEl.setAttribute("tabindex", "0");
-      destEl.addEventListener("keydown", (e: any) => {
-        if (e.key === "Enter" || e.key === " ") setSelectedPin({ type: "destination", data: dest });
-      });
-    }
     marker.on("click", () => setSelectedPin({ type: "destination", data: dest }));
     if (addTo) addTo(marker); else { marker.addTo(map); markersRef.current.push(marker); }
   }
