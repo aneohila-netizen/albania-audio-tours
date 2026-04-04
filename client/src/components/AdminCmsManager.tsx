@@ -238,7 +238,7 @@ function CoverImageUploader({
       {value ? (
         <div className="relative rounded-xl overflow-hidden border border-border">
           <div className="w-full" style={{ aspectRatio: "16/9" }}>
-            <img src={value} alt="Cover" className="w-full h-full object-cover" />
+            <img src={value} alt="Cover" className="w-full h-full object-cover" loading="lazy" />
           </div>
           <button
             type="button"

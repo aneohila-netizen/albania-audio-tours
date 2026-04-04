@@ -1971,7 +1971,7 @@ function ImageGalleryCard({
                         isViewing   ? "border-primary" :
                         "border-transparent hover:border-primary/40",
                       ].join(" ")}>
-                      <img src={bust(img)} alt={`img-${i+1}`} className="w-full h-full object-cover" />
+                      <img src={bust(img)} alt={`img-${i+1}`} className="w-full h-full object-cover" loading="lazy" />
                       {i === 0 && (
                         <div className="absolute bottom-0 left-0 right-0 bg-primary/80 text-[8px] text-white text-center font-bold py-0.5">HERO</div>
                       )}

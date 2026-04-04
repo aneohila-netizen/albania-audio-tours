@@ -2,7 +2,7 @@ import { Switch, Route, Router, useLocation } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { useState, createContext, useContext, useEffect } from "react";
+import { useState, createContext, useContext, useEffect, lazy, Suspense } from "react";
 import { SubscriptionProvider } from "@/lib/subscriptionContext";
 import { Toaster } from "@/components/ui/toaster";
 import { PerplexityAttribution } from "@/components/PerplexityAttribution";
@@ -11,24 +11,28 @@ import { TRANSLATIONS } from "@/lib/i18n";
 import { AudioPlayerProvider } from "@/components/StickyAudioPlayer";
 import RatingSheet from "@/components/RatingSheet";
 import type { AudioTrack } from "@/components/StickyAudioPlayer";
-import MapPage from "@/pages/MapPage";
-import SitesPage from "@/pages/SitesPage";
-import SiteDetailPage from "@/pages/SiteDetailPage";
-import DestinationPage from "@/pages/DestinationPage";
-import AttractionDetailPage from "@/pages/AttractionDetailPage";
-import PassportPage from "@/pages/PassportPage";
-import LeaderboardPage from "@/pages/LeaderboardPage";
-import ContactPage from "@/pages/ContactPage";
-import TermsPage from "@/pages/TermsPage";
-import RefundPage from "@/pages/RefundPage";
-import BlogPage from "@/pages/BlogPage";
-import SubscriptionsPage from "@/pages/SubscriptionsPage";
-import ActivatePage from "@/pages/ActivatePage";
-import ResetPasswordPage from "@/pages/ResetPasswordPage";
-import CmsPageRenderer from "@/pages/CmsPageRenderer";
-import AdminPanel from "@/components/AdminPanel";
 import NavBar from "@/components/NavBar";
 import LaunchBanner from "@/components/LaunchBanner";
+
+// Map page loads eagerly — it’s the homepage
+import MapPage from "@/pages/MapPage";
+
+// All other pages load lazily — only downloaded when the user navigates there
+const SitesPage            = lazy(() => import("@/pages/SitesPage"));
+const SiteDetailPage       = lazy(() => import("@/pages/SiteDetailPage"));
+const DestinationPage      = lazy(() => import("@/pages/DestinationPage"));
+const AttractionDetailPage = lazy(() => import("@/pages/AttractionDetailPage"));
+const PassportPage         = lazy(() => import("@/pages/PassportPage"));
+const LeaderboardPage      = lazy(() => import("@/pages/LeaderboardPage"));
+const ContactPage          = lazy(() => import("@/pages/ContactPage"));
+const TermsPage            = lazy(() => import("@/pages/TermsPage"));
+const RefundPage           = lazy(() => import("@/pages/RefundPage"));
+const BlogPage             = lazy(() => import("@/pages/BlogPage"));
+const SubscriptionsPage    = lazy(() => import("@/pages/SubscriptionsPage"));
+const ActivatePage         = lazy(() => import("@/pages/ActivatePage"));
+const ResetPasswordPage    = lazy(() => import("@/pages/ResetPasswordPage"));
+const CmsPageRenderer      = lazy(() => import("@/pages/CmsPageRenderer"));
+const AdminPanel           = lazy(() => import("@/components/AdminPanel"));
 
 // Global context
 interface AppContextType {
@@ -150,6 +154,11 @@ function AppRoutes() {
   return (
     <Router hook={useHashLocation}>
       <AudioPlayerProvider onComplete={handleAudioComplete} onNavigate={handleNavigate}>
+        <Suspense fallback={
+          <div className="flex items-center justify-center min-h-screen bg-background">
+            <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          </div>
+        }>
         <Switch>
           {/* Admin */}
           <Route path="/admin" component={AdminPanel} />
@@ -225,6 +234,7 @@ function AppRoutes() {
             onClose={() => setRatingState(null)}
           />
         )}
+      </Suspense>
       </AudioPlayerProvider>
     </Router>
   );

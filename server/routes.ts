@@ -23,8 +23,25 @@ function resolveFfmpeg(): string {
 }
 const FFMPEG_BIN = resolveFfmpeg();
 import multer from "multer";
+import sharp from "sharp";
 import { storage } from "./storage";
 import { insertUserProgressSchema, insertTourSiteSchema, insertAttractionSchema } from "@shared/schema";
+
+// ── Image compression helper ─────────────────────────────────────────────────
+// Resizes to max 1200px wide/tall and compresses to WebP (quality 82).
+// Falls back to original buffer if sharp fails for any reason.
+async function compressImage(buffer: Buffer, mimeType: string): Promise<{ buf: Buffer; mime: string }> {
+  try {
+    const compressed = await sharp(buffer)
+      .resize({ width: 1200, height: 1200, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 82 })
+      .toBuffer();
+    return { buf: compressed, mime: "image/webp" };
+  } catch (err) {
+    console.warn("[compressImage] sharp failed, using original:", err);
+    return { buf: buffer, mime: mimeType };
+  }
+}
 
 const execFileAsync = promisify(execFile);
 
@@ -439,8 +456,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const b64 = imageData.split(",")[1];
       const buf = Buffer.from(b64, "base64");
       res.setHeader("Content-Type", mime);
-      // No long-term caching — gallery images can be deleted and replaced
-      res.setHeader("Cache-Control", "no-store");
+      // Cache at edge (Cloudflare) for 1 year — safe because uploads always use
+      // a cache-busted URL (?_t=timestamp), so replaced images get a new URL.
+      // The browser must revalidate each session (no-cache) but Cloudflare serves
+      // from edge without hitting Railway on repeat visits.
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      // ETag for conditional requests
+      const etag = `"${Buffer.from(b64.slice(0, 32)).toString("hex")}"` ;
+      res.setHeader("ETag", etag);
+      if (req.headers["if-none-match"] === etag) return res.status(304).end();
       return res.send(buf);
     }
     // Prevent infinite redirect loops for self-referencing serve URLs
@@ -472,8 +496,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const b64  = imageData.split(",")[1];
       const buf  = Buffer.from(b64, "base64");
       res.setHeader("Content-Type", mime);
-      // No long-term caching — gallery images can be deleted and replaced
-      res.setHeader("Cache-Control", "no-store");
+      // Cache at edge (Cloudflare) for 1 year — safe because uploads always use
+      // a cache-busted URL (?_t=timestamp), so replaced images get a new URL.
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      const etag = `"${Buffer.from(b64.slice(0, 32)).toString("hex")}"` ;
+      res.setHeader("ETag", etag);
+      if (req.headers["if-none-match"] === etag) return res.status(304).end();
       return res.send(buf);
     }
     // Prevent redirect loops: if the stored gallery value is itself a serve URL,
@@ -818,9 +846,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     async (req: any, res) => {
       const id = parseInt(req.params.id);
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      // Store image as data URI in DB — never lost on Railway redeploy
-      const mime = req.file.mimetype || "image/jpeg";
-      const b64 = (req.file.buffer ?? fs.readFileSync(req.file.path)).toString("base64");
+      // Compress before storing — reduces DB size and serves faster
+      const rawBuf = req.file.buffer ?? fs.readFileSync(req.file.path);
+      const { buf, mime } = await compressImage(rawBuf, req.file.mimetype || "image/jpeg");
+      const b64 = buf.toString("base64");
       const dataUri = `data:${mime};base64,${b64}`;
       const imageUrl = `${RAILWAY_BASE}/api/images/db/attraction/${id}`;
       const updated = await storage.updateAttraction(id, { imageUrl: dataUri } as any);
@@ -904,8 +933,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     async (req: any, res) => {
       const id = parseInt(req.params.id);
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      const mime = req.file.mimetype || "image/jpeg";
-      const b64 = (req.file.buffer ?? fs.readFileSync(req.file.path)).toString("base64");
+      // Compress before storing — reduces DB size and serves faster
+      const rawBuf = req.file.buffer ?? fs.readFileSync(req.file.path);
+      const { buf, mime } = await compressImage(rawBuf, req.file.mimetype || "image/jpeg");
+      const b64 = buf.toString("base64");
       const dataUri = `data:${mime};base64,${b64}`;
       const imageUrl = `${RAILWAY_BASE}/api/images/db/site/${id}`;
       const updated = await storage.updateSite(id, { imageUrl: dataUri } as any);
@@ -920,8 +951,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/admin/sites/:id/gallery", requireAdmin, imageUpload.single("image"), async (req: any, res) => {
     const id = parseInt(req.params.id);
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    const mime = req.file.mimetype || "image/jpeg";
-    const b64 = (req.file.buffer ?? fs.readFileSync(req.file.path)).toString("base64");
+    const rawBuf = req.file.buffer ?? fs.readFileSync(req.file.path);
+    const { buf, mime } = await compressImage(rawBuf, req.file.mimetype || "image/jpeg");
+    const b64 = buf.toString("base64");
     const dataUri = `data:${mime};base64,${b64}`;
     if (req.file.path) try { fs.unlinkSync(req.file.path); } catch (_) {}
     const site = await storage.getSiteById(id);
@@ -986,8 +1018,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/admin/attractions/:id/gallery", requireAdmin, imageUpload.single("image"), async (req: any, res) => {
     const id = parseInt(req.params.id);
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    const mime = req.file.mimetype || "image/jpeg";
-    const b64 = (req.file.buffer ?? fs.readFileSync(req.file.path)).toString("base64");
+    const rawBuf = req.file.buffer ?? fs.readFileSync(req.file.path);
+    const { buf, mime } = await compressImage(rawBuf, req.file.mimetype || "image/jpeg");
+    const b64 = buf.toString("base64");
     const dataUri = `data:${mime};base64,${b64}`;
     if (req.file.path) try { fs.unlinkSync(req.file.path); } catch (_) {}
     const attr = await storage.getAttractionById(id);
