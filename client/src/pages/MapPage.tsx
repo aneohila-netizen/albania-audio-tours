@@ -1016,27 +1016,28 @@ export default function MapPage() {
         );
       })()}
 
-      {/* Scroll-down handle — mobile only, right edge of map, red-box position ──
-           The map captures all touch events so users can't swipe-scroll past it.
-           This pill button lets them scroll down to the footer without touching the map. */}
+      {/* Scroll-down CTA — mobile only, bottom-left above the bottom panel.
+           Google Maps / Apple Maps pattern: labelled pill so first-time visitors
+           immediately understand there is more content below the map. */}
       <button
-        className="md:hidden absolute z-[1000] flex flex-col items-center gap-0.5"
+        className="md:hidden absolute z-[1000] flex items-center gap-1.5"
         style={{
-          right: "0.5rem",
-          top: "50%",
-          transform: "translateY(-50%)",
-          background: "hsl(var(--card)/0.92)",
-          backdropFilter: "blur(4px)",
+          bottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)",
+          left: "0.75rem",
+          background: "hsl(var(--card)/0.95)",
+          backdropFilter: "blur(8px)",
           border: "1px solid hsl(var(--border))",
           borderRadius: "999px",
-          padding: "10px 6px",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.18)",
+          padding: "7px 14px 7px 10px",
+          boxShadow: "0 2px 12px rgba(0,0,0,0.22)",
           cursor: "pointer",
+          fontSize: "12px",
+          fontWeight: 600,
+          color: "hsl(var(--foreground))",
+          lineHeight: 1.2,
         }}
-        aria-label="Scroll down to footer"
-        title="Scroll down"
+        aria-label="Browse destinations below"
         onClick={() => {
-          // Scroll past the map into the footer area
           const mapEl = document.querySelector("[data-testid='map-container']")?.parentElement?.parentElement;
           if (mapEl) {
             const rect = mapEl.getBoundingClientRect();
@@ -1046,13 +1047,13 @@ export default function MapPage() {
           }
         }}
       >
-        {/* Three stacked chevron dots — universal scroll indicator */}
-        <svg width="12" height="20" viewBox="0 0 12 20" fill="none" aria-hidden="true">
-          <path d="M2 2L6 6L10 2" stroke="hsl(var(--muted-foreground))" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-          <path d="M2 8L6 12L10 8" stroke="hsl(var(--muted-foreground))" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-          <path d="M2 14L6 18L10 14" stroke="hsl(var(--muted-foreground))" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+        {/* Down-arrow icon */}
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"
+          style={{ color: "hsl(var(--primary))" }}>
+          <path d="M7 2v9M3.5 7.5L7 11l3.5-3.5" stroke="currentColor" strokeWidth="2"
+            strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
-        <span style={{ fontSize: "9px", color: "hsl(var(--muted-foreground))", lineHeight: 1, writingMode: "vertical-rl", transform: "rotate(180deg)", letterSpacing: "0.5px" }}>scroll</span>
+        Browse destinations
       </button>
 
       {/* Layer toggle */}
@@ -1222,10 +1223,30 @@ export default function MapPage() {
            Centered modal, 3s delay, once per session, greeting in active language. */}
       {showOnboarding && (() => {
         const STEPS = [
-          { emoji: "📍", title: "Tap any map pin", body: "Each pin is a real place with an audio story. Tap it to hear the guide and see details.", hint: "Try tapping a red or green pin on the map" },
-          { emoji: "🔍", title: "Search a specific place", body: "Looking for Berat or Skanderbeg Square? Use the search icon in the top bar.", hint: "Search icon is in the top navigation bar" },
-          { emoji: "🏖️", title: "Browse all destinations", body: "Tap Destinations in the nav to see all 43 destinations with audio tours.", hint: "Destinations tab is in the bottom navigation bar" },
-          { emoji: "📱", title: "Find your nearest tour", body: "Allow location access once and the map instantly shows what’s closest to you.", hint: "Tap Share Location at the top-left of the map" },
+          {
+            emoji: "📍",
+            title: "Explore Nearby",
+            body: "Tap \"Share Location\" and the map instantly shows the attractions closest to where you are right now. No planning needed — perfect if you just arrived.",
+            hint: "\"Share Location\" button is at the top-left of the map",
+          },
+          {
+            emoji: "🏖️",
+            title: "Filter by what you love",
+            body: "Use the category pills just below the map controls to show only what interests you: Beach, Castle, Nature, Historic Town and more. One tap — the map updates instantly.",
+            hint: "Pill bar sits below the Share Location button",
+          },
+          {
+            emoji: "🏙️",
+            title: "Browse all 43 destinations",
+            body: "Switch to the Destinations view (top-right toggle) to open a searchable list of every destination in Albania — with descriptions, photos, and walking routes.",
+            hint: "\"Destinations\" toggle is at the top-right of the map",
+          },
+          {
+            emoji: "🎧",
+            title: "Start an audio tour",
+            body: "Tap any pin on the map, then press Play to hear the story of that place. Audio works offline — no signal needed once it loads.",
+            hint: "Tap a pin → see the story panel → press Play",
+          },
         ];
         const step = STEPS[onboardStep];
         const isLast = onboardStep === STEPS.length - 1;
