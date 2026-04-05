@@ -1332,6 +1332,78 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // ── R2 Migration Endpoint ──────────────────────────────────────────────────
+  // Server-side: reads raw base64 from DB, uploads to R2, writes R2 URL back.
+  // Safe to re-run — skips images already on R2 or stored as serve URLs.
+  app.post('/api/admin/migrate-images-to-r2', requireAdmin, async (_req, res) => {
+    if (!isR2Configured()) return res.status(503).json({ error: 'R2 not configured' });
+    let migrated = 0; let skipped = 0;
+    try {
+      const processGallery = async (gallery: string[], folder: string): Promise<{newGallery: string[], count: number}> => {
+        let count = 0;
+        const newGallery = await Promise.all(gallery.map(async (img: string) => {
+          if (!img?.startsWith('data:')) return img;
+          const m = img.match(/^data:([^;]+);base64,(.+)$/s);
+          if (!m) return img;
+          const { buf, mime } = await compressImage(Buffer.from(m[2], 'base64'), m[1]);
+          count++;
+          return uploadToR2(buf, mime, folder);
+        }));
+        return { newGallery, count };
+      };
+
+      const sites = await storage.getAllSites();
+      for (const site of sites) {
+        const s = site as any;
+        const patch: any = {};
+        if (s.imageUrl?.startsWith('data:')) {
+          const m = s.imageUrl.match(/^data:([^;]+);base64,(.+)$/s);
+          if (m) {
+            const { buf, mime } = await compressImage(Buffer.from(m[2], 'base64'), m[1]);
+            patch.imageUrl = await uploadToR2(buf, mime, 'sites');
+            migrated++;
+          }
+        }
+        const gallery: string[] = s.images || [];
+        if (gallery.some((img: string) => img?.startsWith('data:'))) {
+          const { newGallery, count } = await processGallery(gallery, 'sites');
+          patch.images = newGallery;
+          if (!patch.imageUrl) patch.imageUrl = newGallery[0] || s.imageUrl;
+          migrated += count;
+        }
+        if (Object.keys(patch).length) await storage.updateSite(s.id, patch as any);
+        else skipped++;
+      }
+
+      const allAttractions = await storage.getAllAttractions();
+      for (const attr of allAttractions) {
+        const a = attr as any;
+        const patch: any = {};
+        if (a.imageUrl?.startsWith('data:')) {
+          const m = a.imageUrl.match(/^data:([^;]+);base64,(.+)$/s);
+          if (m) {
+            const { buf, mime } = await compressImage(Buffer.from(m[2], 'base64'), m[1]);
+            patch.imageUrl = await uploadToR2(buf, mime, 'attractions');
+            migrated++;
+          }
+        }
+        const gallery: string[] = a.images || [];
+        if (gallery.some((img: string) => img?.startsWith('data:'))) {
+          const { newGallery, count } = await processGallery(gallery, 'attractions');
+          patch.images = newGallery;
+          if (!patch.imageUrl) patch.imageUrl = newGallery[0] || a.imageUrl;
+          migrated += count;
+        }
+        if (Object.keys(patch).length) await storage.updateAttraction(a.id, patch as any);
+        else skipped++;
+      }
+
+      res.json({ success: true, migrated, skipped });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message, migrated, skipped });
+    }
+  });
+
   // ── App Settings ────────────────────────────────────────────────────────────
 
   // Public: read a single setting value (no auth — used by the banner)
