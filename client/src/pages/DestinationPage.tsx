@@ -127,7 +127,8 @@ export default function DestinationPage() {
 
       {/* ── Share this tour ── */}
       {(() => {
-        const shareUrl = `https://albaniaaudiotours.com/#/sites/${dest.slug}`;
+        // /og/:slug URL — bots get rich OG preview, humans get redirected to SPA
+        const shareUrl  = `https://albaniaaudiotours.com/og/${dest.slug}`;
         const shareText = `Explore ${name} with AlbaniaAudioTours — self-guided audio tours of Albania`;
 
         const handleShare = async () => {

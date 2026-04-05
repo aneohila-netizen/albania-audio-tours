@@ -1404,6 +1404,68 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ── Open Graph preview pages ─────────────────────────────────────────────────
+  // /og/:slug — returns minimal HTML with full OG meta tags.
+  // WhatsApp/Telegram bots read this page; humans are immediately JS-redirected
+  // to the real SPA route (/#/sites/:slug).
+  const PUBLIC_DOMAIN = "https://albaniaaudiotours.com";
+
+  app.get('/og/:slug', async (req, res) => {
+    const { slug } = req.params;
+    try {
+      const sites = await storage.getAllSites();
+      const site = sites.find((s: any) => s.slug === slug);
+      if (!site) return res.redirect(`${PUBLIC_DOMAIN}/#/sites/${slug}`);
+
+      const s = site as any;
+      const name = s.nameEn || s.name || slug;
+      const desc = (s.descriptionEn || s.description || `Explore ${name} with self-guided audio tours of Albania.`)
+        .replace(/<[^>]*>/g, "")
+        .slice(0, 200);
+
+      const rawImages: string[] = s.images || [];
+      const heroRaw = rawImages[0] || s.imageUrl || "";
+      let imageUrl = "";
+      if (heroRaw.startsWith("https://pub-")) {
+        imageUrl = heroRaw;
+      } else if (heroRaw.includes("/api/images/db/")) {
+        imageUrl = heroRaw.startsWith("http") ? heroRaw : `${RAILWAY_BASE}${heroRaw}`;
+      }
+      if (!imageUrl) imageUrl = `${PUBLIC_DOMAIN}/icon-512.png`;
+
+      const pageUrl = `${PUBLIC_DOMAIN}/#/sites/${slug}`;
+      const ogUrl   = `${PUBLIC_DOMAIN}/og/${slug}`;
+
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${name} — AlbaniaAudioTours</title>
+  <meta name="description" content="${desc}">
+  <meta property="og:type"        content="website">
+  <meta property="og:site_name"   content="AlbaniaAudioTours">
+  <meta property="og:url"         content="${ogUrl}">
+  <meta property="og:title"       content="${name} — Self-Guided Audio Tour">
+  <meta property="og:description" content="${desc}">
+  <meta property="og:image"       content="${imageUrl}">
+  <meta property="og:image:width"  content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:title"       content="${name} — Self-Guided Audio Tour">
+  <meta name="twitter:description" content="${desc}">
+  <meta name="twitter:image"       content="${imageUrl}">
+  <meta http-equiv="refresh" content="0; url=${pageUrl}">
+  <script>window.location.replace("${pageUrl}");</script>
+</head>
+<body><p>Redirecting to <a href="${pageUrl}">${name}</a>...</p></body>
+</html>`);
+    } catch (e) {
+      res.redirect(`${PUBLIC_DOMAIN}/#/sites/${slug}`);
+    }
+  });
+
   // ── App Settings ────────────────────────────────────────────────────────────
 
   // Public: read a single setting value (no auth — used by the banner)
