@@ -110,10 +110,10 @@ export default function GallerySlideshow({
       {/* Images — stacked, only active one visible */}
       {allImages.map((src, i) => {
         // Use src as key (not index) so React creates a fresh <img> element
-        // whenever the URL changes — prevents browser serving a cached old photo
-        // when the new upload shares the same URL path (e.g. gallery/0).
-        // Append no-cache param only for gallery serve URLs (not for data: URIs or external URLs).
-        const bustedSrc = src.includes('/api/images/db/') && !src.startsWith('data:')
+        // whenever the URL changes.
+        // Cache-bust only legacy positional serve URLs (/api/images/db/) —
+        // R2 URLs (pub-xxx.r2.dev) and data: URIs are already immutable.
+        const bustedSrc = src.includes('/api/images/db/')
           ? `${src}${src.includes('?') ? '&' : '?'}_t=${Date.now()}`
           : src;
         return (

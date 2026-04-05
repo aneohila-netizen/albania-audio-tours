@@ -1029,7 +1029,7 @@ function SitesView({
                 >
                   {site.imageUrl ? (
                     <img
-                      src={site.imageUrl.includes('/api/images/db/') ? `${site.imageUrl}?_t=${site.id}` : site.imageUrl}
+                      src={site.imageUrl.includes('/api/images/db/') ? `${site.imageUrl}?_t=${Date.now()}` : site.imageUrl}
                       alt={site.nameEn}
                       className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                     />
@@ -1191,7 +1191,7 @@ function AttractionsView({
               >
                 {attr.imageUrl ? (
                   <img
-                    src={attr.imageUrl.includes('/api/images/db/') ? `${attr.imageUrl}?_t=${attr.id}` : attr.imageUrl}
+                    src={attr.imageUrl.includes('/api/images/db/') ? `${attr.imageUrl}?_t=${Date.now()}` : attr.imageUrl}
                     alt={attr.nameEn}
                     className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                   />
@@ -1767,9 +1767,9 @@ function ImageGalleryCard({
     if (!entityId) return;
     const url = allImages[visualIdx];
     if (!url) return;
-    const m = url.match(/\/gallery\/([0-9]+)/);
-    if (!m) { setError("Cannot identify image. Try refreshing the page."); return; }
-    const dbIdx = parseInt(m[1], 10);
+    // R2 URLs use visual index === DB index. Legacy serve URLs embed index in path.
+    const legacyMatch = url.match(/\/gallery\/([0-9]+)/);
+    const dbIdx = legacyMatch ? parseInt(legacyMatch[1], 10) : visualIdx;
     if (!window.confirm(`Delete image ${visualIdx + 1} of ${allImages.length}? This cannot be undone.`)) return;
     setError("");
     try {

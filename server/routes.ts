@@ -25,6 +25,7 @@ const FFMPEG_BIN = resolveFfmpeg();
 import multer from "multer";
 import sharp from "sharp";
 import { storage } from "./storage";
+import { uploadToR2, deleteFromR2, isR2Configured } from "./r2";
 import { insertUserProgressSchema, insertTourSiteSchema, insertAttractionSchema } from "@shared/schema";
 
 // ── Image compression helper ─────────────────────────────────────────────────
@@ -838,7 +839,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json({ success: true, attraction: updated });
   });
 
-  // ── Admin: Attraction Image Upload — stored as base64 in DB (survives redeploys) ──
+  // ── Admin: Attraction Image Upload — R2 CDN (falls back to base64 if R2 not configured) ──
   app.post(
     "/api/admin/attractions/:id/image",
     requireAdmin,
@@ -846,16 +847,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     async (req: any, res) => {
       const id = parseInt(req.params.id);
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      // Compress before storing — reduces DB size and serves faster
       const rawBuf = req.file.buffer ?? fs.readFileSync(req.file.path);
       const { buf, mime } = await compressImage(rawBuf, req.file.mimetype || "image/jpeg");
-      const b64 = buf.toString("base64");
-      const dataUri = `data:${mime};base64,${b64}`;
-      const imageUrl = `${RAILWAY_BASE}/api/images/db/attraction/${id}`;
-      const updated = await storage.updateAttraction(id, { imageUrl: dataUri } as any);
-      if (!updated) return res.status(404).json({ error: "Attraction not found" });
-      // Clean up temp file if multer used diskStorage
       if (req.file.path) try { fs.unlinkSync(req.file.path); } catch (_) {}
+      let imageUrl: string;
+      if (isR2Configured()) {
+        imageUrl = await uploadToR2(buf, mime, "attractions");
+      } else {
+        const b64 = buf.toString("base64");
+        imageUrl = `data:${mime};base64,${b64}`;
+      }
+      const updated = await storage.updateAttraction(id, { imageUrl } as any);
+      if (!updated) return res.status(404).json({ error: "Attraction not found" });
       res.json({ url: imageUrl, attraction: updated });
     }
   );
@@ -925,7 +928,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json({ success: true, site: updated });
   });
 
-  // ── Admin: Site Image Upload — stored as base64 in DB (survives redeploys) ──────
+  // ── Admin: Site Image Upload — R2 CDN (falls back to base64 if R2 not configured) ──────
   app.post(
     "/api/admin/sites/:id/image",
     requireAdmin,
@@ -933,15 +936,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     async (req: any, res) => {
       const id = parseInt(req.params.id);
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      // Compress before storing — reduces DB size and serves faster
       const rawBuf = req.file.buffer ?? fs.readFileSync(req.file.path);
       const { buf, mime } = await compressImage(rawBuf, req.file.mimetype || "image/jpeg");
-      const b64 = buf.toString("base64");
-      const dataUri = `data:${mime};base64,${b64}`;
-      const imageUrl = `${RAILWAY_BASE}/api/images/db/site/${id}`;
-      const updated = await storage.updateSite(id, { imageUrl: dataUri } as any);
-      if (!updated) return res.status(404).json({ error: "Site not found" });
       if (req.file.path) try { fs.unlinkSync(req.file.path); } catch (_) {}
+      let imageUrl: string;
+      if (isR2Configured()) {
+        imageUrl = await uploadToR2(buf, mime, "sites");
+      } else {
+        const b64 = buf.toString("base64");
+        imageUrl = `data:${mime};base64,${b64}`;
+      }
+      const updated = await storage.updateSite(id, { imageUrl } as any);
+      if (!updated) return res.status(404).json({ error: "Site not found" });
       res.json({ url: imageUrl, site: updated });
     }
   );
@@ -953,20 +959,25 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const rawBuf = req.file.buffer ?? fs.readFileSync(req.file.path);
     const { buf, mime } = await compressImage(rawBuf, req.file.mimetype || "image/jpeg");
-    const b64 = buf.toString("base64");
-    const dataUri = `data:${mime};base64,${b64}`;
     if (req.file.path) try { fs.unlinkSync(req.file.path); } catch (_) {}
     const site = await storage.getSiteById(id);
     if (!site) return res.status(404).json({ error: "Site not found" });
     const existing: string[] = (site as any).images || [];
-    const updated = await storage.updateSite(id, { images: [...existing, dataUri] } as any);
-    // Return serve URLs (not data URIs) so the frontend renders efficiently
-    const newIndex = existing.length;
-    const serveUrl = `${RAILWAY_BASE}/api/images/db/site/${id}/gallery/${newIndex}`;
-    const serveImages = ((updated as any)?.images || []).map((_: any, idx: number) =>
-      `${RAILWAY_BASE}/api/images/db/site/${id}/gallery/${idx}`
-    );
-    res.json({ images: serveImages, newUrl: serveUrl });
+    // Upload to R2 — store the public CDN URL directly (no base64 in DB)
+    let newUrl: string;
+    if (isR2Configured()) {
+      newUrl = await uploadToR2(buf, mime, "sites");
+    } else {
+      newUrl = `data:${mime};base64,${buf.toString("base64")}`;
+    }
+    const allImages = [...existing, newUrl];
+    const updated = await storage.updateSite(id, { images: allImages } as any);
+    // If this is the first image, also set it as the hero
+    if (existing.length === 0) {
+      await storage.updateSite(id, { imageUrl: newUrl } as any);
+    }
+    const storedImages = ((updated as any)?.images || allImages);
+    res.json({ images: storedImages, newUrl });
   });
 
   // DELETE /api/admin/sites/:id/gallery/:index — remove image at index
@@ -978,18 +989,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const site = await storage.getSiteById(id);
     if (!site) return res.status(404).json({ error: "Site not found" });
     const existing: string[] = [...((site as any).images || [])];
-    existing.splice(idx, 1);
-    // Update images AND sync imageUrl to the new gallery[0] (or null if empty)
+    const [removed] = existing.splice(idx, 1);
+    // Delete from R2 if it's an R2 URL
+    if (removed) await deleteFromR2(removed);
     await storage.updateSite(id, { images: existing } as any);
-    const serveImages = existing.map((_: any, i: number) =>
-      `${RAILWAY_BASE}/api/images/db/site/${id}/gallery/${i}`
-    );
-    const newImageUrl = serveImages[0] || null;
+    const newImageUrl = existing[0] || null;
     await storage.updateSite(id, { imageUrl: newImageUrl } as any);
-    res.json({ images: serveImages, imageUrl: newImageUrl });
+    res.json({ images: existing, imageUrl: newImageUrl });
   });
 
-  // PUT /api/admin/sites/:id/gallery/reorder — reorder gallery images (drag-and-drop)
+  // PUT /api/admin/sites/:id/gallery/reorder — reorder gallery images
   // Body: { order: number[] }  — array of old indices in the new desired order
   // gallery[0] after reorder becomes the new hero image.
   app.put("/api/admin/sites/:id/gallery/reorder", requireAdmin, async (req, res) => {
@@ -1005,13 +1014,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
     const reordered = order.map(i => existing[i]);
     existing.forEach((img, i) => { if (!order.includes(i)) reordered.push(img); });
-    const serveImages = reordered.map((_: any, idx: number) =>
-      `${RAILWAY_BASE}/api/images/db/site/${id}/gallery/${idx}`
-    );
-    const newImageUrl = serveImages[0] || null;
-    // Single atomic update — images array and imageUrl together
+    const newImageUrl = reordered[0] || null;
+    // R2 URLs are stored directly — no positional serve URLs needed
     await storage.updateSite(id, { images: reordered, imageUrl: newImageUrl } as any);
-    res.json({ images: serveImages, imageUrl: newImageUrl });
+    res.json({ images: reordered, imageUrl: newImageUrl });
   });
 
   // POST /api/admin/attractions/:id/gallery  — add an image to the gallery
@@ -1020,19 +1026,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const rawBuf = req.file.buffer ?? fs.readFileSync(req.file.path);
     const { buf, mime } = await compressImage(rawBuf, req.file.mimetype || "image/jpeg");
-    const b64 = buf.toString("base64");
-    const dataUri = `data:${mime};base64,${b64}`;
     if (req.file.path) try { fs.unlinkSync(req.file.path); } catch (_) {}
     const attr = await storage.getAttractionById(id);
     if (!attr) return res.status(404).json({ error: "Attraction not found" });
     const existing: string[] = (attr as any).images || [];
-    const updated = await storage.updateAttraction(id, { images: [...existing, dataUri] } as any);
-    const newIndex = existing.length;
-    const serveUrl = `${RAILWAY_BASE}/api/images/db/attraction/${id}/gallery/${newIndex}`;
-    const serveImages = ((updated as any)?.images || []).map((_: any, idx: number) =>
-      `${RAILWAY_BASE}/api/images/db/attraction/${id}/gallery/${idx}`
-    );
-    res.json({ images: serveImages, newUrl: serveUrl });
+    let newUrl: string;
+    if (isR2Configured()) {
+      newUrl = await uploadToR2(buf, mime, "attractions");
+    } else {
+      newUrl = `data:${mime};base64,${buf.toString("base64")}`;
+    }
+    const allImages = [...existing, newUrl];
+    const updated = await storage.updateAttraction(id, { images: allImages } as any);
+    if (existing.length === 0) {
+      await storage.updateAttraction(id, { imageUrl: newUrl } as any);
+    }
+    const storedImages = ((updated as any)?.images || allImages);
+    res.json({ images: storedImages, newUrl });
   });
 
   // DELETE /api/admin/attractions/:id/gallery/:index — remove image at index
@@ -1043,18 +1053,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const attr = await storage.getAttractionById(id);
     if (!attr) return res.status(404).json({ error: "Attraction not found" });
     const existing: string[] = [...((attr as any).images || [])];
-    existing.splice(idx, 1);
-    // Update images AND sync imageUrl to the new gallery[0] (or null if empty)
+    const [removed] = existing.splice(idx, 1);
+    if (removed) await deleteFromR2(removed);
     await storage.updateAttraction(id, { images: existing } as any);
-    const serveImages = existing.map((_: any, i: number) =>
-      `${RAILWAY_BASE}/api/images/db/attraction/${id}/gallery/${i}`
-    );
-    const newImageUrl = serveImages[0] || null;
+    const newImageUrl = existing[0] || null;
     await storage.updateAttraction(id, { imageUrl: newImageUrl } as any);
-    res.json({ images: serveImages, imageUrl: newImageUrl });
+    res.json({ images: existing, imageUrl: newImageUrl });
   });
 
-  // PUT /api/admin/attractions/:id/gallery/reorder — reorder gallery images (drag-and-drop)
+  // PUT /api/admin/attractions/:id/gallery/reorder — reorder gallery images
   app.put("/api/admin/attractions/:id/gallery/reorder", requireAdmin, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
@@ -1068,13 +1075,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
     const reordered = order.map(i => existing[i]);
     existing.forEach((img, i) => { if (!order.includes(i)) reordered.push(img); });
-    const serveImages = reordered.map((_: any, idx: number) =>
-      `${RAILWAY_BASE}/api/images/db/attraction/${id}/gallery/${idx}`
-    );
-    const newImageUrl = serveImages[0] || null;
-    // Single atomic update — images array and imageUrl together
+    const newImageUrl = reordered[0] || null;
     await storage.updateAttraction(id, { images: reordered, imageUrl: newImageUrl } as any);
-    res.json({ images: serveImages, imageUrl: newImageUrl });
+    res.json({ images: reordered, imageUrl: newImageUrl });
   });
 
   // POST /api/admin/upload-image — generic image upload (returns data URI for immediate use)
