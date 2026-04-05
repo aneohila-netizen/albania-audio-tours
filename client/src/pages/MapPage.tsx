@@ -79,6 +79,22 @@ export default function MapPage() {
   const markersRef = useRef<LeafletMarker[]>([]);
   const mapReadyRef = useRef(false);
 
+  // iOS Safari viewport height fix — 100vh includes hidden browser chrome on iOS
+  // window.innerHeight is the actual visible height. Update on resize + orientation.
+  const [mapHeight, setMapHeight] = useState(
+    typeof window !== 'undefined' ? window.innerHeight : 0
+  );
+  useEffect(() => {
+    const update = () => setMapHeight(window.innerHeight);
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', () => setTimeout(update, 100));
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+    };
+  }, []);
+
   const [selectedPin, setSelectedPin] = useState<PinItem | null>(null);
   const [showVisitModal, setShowVisitModal] = useState(false);
   const [layerMode, setLayerMode] = useState<LayerMode>("destinations");
@@ -358,9 +374,12 @@ export default function MapPage() {
       await import("leaflet.markercluster");
       if (!mounted || !mapRef.current) return;
 
+      // Mobile screens are smaller — zoom 7.5 frames Albania properly
+      // zoom 7 shows the full Balkans region on a phone screen
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
       const map = L.map(mapRef.current, {
         center: [41.0, 20.2],
-        zoom: 7,
+        zoom: isMobile ? 7.5 : 7,
         zoomControl: false, // we add it manually at bottomright
       });
       // Industry standard: zoom controls bottom-right on mobile maps
@@ -665,7 +684,14 @@ export default function MapPage() {
   };
 
   return (
-    <div className="relative" style={{ height: "calc(100vh - 114px)" }}>
+    <div className="relative" style={{
+      // mapHeight = window.innerHeight (actual visible area, iOS-safe)
+      // Subtract: banner (36px) + top navbar (56px) + mobile bottom nav (56px on mobile, 0 on desktop)
+      // On desktop (md+) there is no bottom nav, so subtract only 92px
+      height: mapHeight > 0
+        ? `${mapHeight - (window.innerWidth < 768 ? 148 : 92)}px`
+        : 'calc(100vh - 114px)', // fallback before JS runs
+    }}>
       {/* Map */}
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} data-testid="map-container" />
 
