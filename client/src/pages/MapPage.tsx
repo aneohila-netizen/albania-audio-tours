@@ -668,7 +668,7 @@ export default function MapPage() {
   };
 
   return (
-    <div className="relative" style={{ height: "calc(100dvh - 114px)" }}>
+    <div className="relative" style={{ height: "calc(var(--app-height, 100svh) - var(--header-height, 114px))" }}>
       {/* Map */}
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} data-testid="map-container" />
 
