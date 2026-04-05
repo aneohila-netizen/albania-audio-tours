@@ -506,14 +506,31 @@ export default function MapPage() {
         map.setView([lat, lng], Math.max(map.getZoom(), 14), { animate: true });
       }
 
-      // ── Nearest tour (API-driven) ─────────────────
+      // ── Region check — Albania + Kosovo bounding box ────────────────────
+      // If the visitor is outside Albania/Kosovo we:
+      //   1. Skip map.setView() — keep the map showing Albania, not their city
+      //   2. Default nearestTour to Tirana so all CTAs point somewhere useful
+      const inAlbania = lat >= 39.6 && lat <= 42.7 && lng >= 19.2 && lng <= 21.1;
+      const inKosovo  = lat >= 41.8 && lat <= 43.3 && lng >= 20.0 && lng <= 21.8;
+      const inRegion  = inAlbania || inKosovo;
+
+      if (!inRegion) {
+        // Visitor is abroad — default to Tirana as the featured destination
+        const tirana = DESTINATIONS.find(d => d.slug === "tirana");
+        const tirana1st = allItineraries.find(it => it.siteSlug === "tirana");
+        setNearestTour({
+          slug: "tirana",
+          name: tirana1st?.name ?? tirana?.nameEn ?? "Tirana",
+          distM: tirana ? haversineM(lat, lng, tirana.lat, tirana.lng) : 999999,
+        });
+        // Do not re-center the map — Albania view stays in frame
+        return;
+      }
+
+      // ── Nearest tour (API-driven) — visitor is in Albania / Kosovo ─────────
       // Find the published tour whose destination is closest to current position.
-      // Uses allItineraries fetched from /api/itineraries — automatically includes
-      // any new tours added in the future without code changes.
       if (allItineraries.length > 0) {
-        // Build a deduplicated set of destination slugs that have a tour
         const slugsWithTours = [...new Set(allItineraries.map(it => it.siteSlug))];
-        // Match each slug to a destination with known coordinates
         let bestSlug = "";
         let bestName = "";
         let bestDist = Infinity;
@@ -524,7 +541,6 @@ export default function MapPage() {
           if (d < bestDist) {
             bestDist = d;
             bestSlug = slug;
-            // Use the first itinerary name for this slug as the CTA label
             const firstTour = allItineraries.find(it => it.siteSlug === slug);
             bestName = firstTour?.name ?? dest.nameEn ?? slug;
           }
