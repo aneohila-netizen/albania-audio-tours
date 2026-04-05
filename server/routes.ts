@@ -1404,6 +1404,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ── Legacy path redirects ─────────────────────────────────────────────────────
+  // /lander was the old GoDaddy forwarding destination — redirect to homepage.
+  app.get('/lander', (_req, res) => res.redirect(301, 'https://albaniaaudiotours.com/#/'));
+
   // ── App Settings ────────────────────────────────────────────────────────────
 
   // Public: read a single setting value (no auth — used by the banner)
