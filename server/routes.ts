@@ -233,35 +233,43 @@ const AUDIO_LANGS = ['En','Al','Gr','It','Es','De','Fr','Ar','Sl'] as const;
 // Strip large data URIs and replace with lightweight serve URLs.
 // KEY RULE: gallery[0] is always the hero image shown to visitors.
 // imageUrl is kept for legacy compatibility but gallery takes precedence.
+const R2_PUBLIC_BASE = (process.env.R2_PUBLIC_URL || "https://pub-d0a61558630844848afa90674031b6a8.r2.dev").replace(/\/$/, "");
+
+function isR2Url(url: string): boolean {
+  return url?.startsWith(R2_PUBLIC_BASE);
+}
+
 function stripImageData(obj: any, type: 'attraction'|'site'): any {
   if (!obj) return obj;
   const out = { ...obj };
 
-  // Replace imageUrl data URI with a proper serve URL
-  if (out.imageUrl && out.imageUrl.startsWith('data:')) {
-    out.imageUrl = `${RAILWAY_BASE}/api/images/db/${type}/${obj.id}`;
-  }
-  // Clear ONLY stale self-referencing serve URLs that point to the legacy single-image endpoint
-  // (those are now superseded by gallery[0]). Keep gallery serve URLs — they are valid.
-  // A stale URL looks like: .../api/images/db/site/1  (no /gallery/ segment)
+  // R2 URLs are stored directly — pass them through unchanged
+  // Only legacy base64 data URIs need to be replaced with serve URLs
   if (out.imageUrl) {
-    const hasGallery = out.imageUrl.includes('/gallery/');
-    const isServeUrl = out.imageUrl.includes('/api/images/db/');
-    const isLegacyRailway = out.imageUrl.includes('railway.app') && isServeUrl && !hasGallery;
-    if (isServeUrl && !hasGallery && !isLegacyRailway) {
-      // Stale single-image serve URL — clear it so gallery[0] takes over below
-      out.imageUrl = null;
+    if (out.imageUrl.startsWith('data:')) {
+      // Legacy base64 — replace with positional serve URL
+      out.imageUrl = `${RAILWAY_BASE}/api/images/db/${type}/${obj.id}`;
+    } else if (isR2Url(out.imageUrl)) {
+      // R2 URL — pass through as-is, it's a direct CDN URL
+    } else {
+      // Stale single-image serve URL (no /gallery/) — clear so gallery[0] takes over
+      const hasGallery = out.imageUrl.includes('/gallery/');
+      const isServeUrl = out.imageUrl.includes('/api/images/db/');
+      if (isServeUrl && !hasGallery) {
+        out.imageUrl = null;
+      }
     }
-    // Note: gallery serve URLs (/api/images/db/.../gallery/N) are kept as-is
   }
 
-  // Replace gallery data URIs with serve URLs
+  // Process gallery array
   if (Array.isArray(out.images) && out.images.length > 0) {
-    out.images = out.images.map((img: string, idx: number) =>
-      img && img.startsWith('data:')
-        ? `${RAILWAY_BASE}/api/images/db/${type}/${obj.id}/gallery/${idx}`
-        : img
-    );
+    out.images = out.images.map((img: string, idx: number) => {
+      if (!img) return img;
+      if (isR2Url(img)) return img;  // R2 URL — pass through
+      if (img.startsWith('data:'))   // Legacy base64 — replace with serve URL
+        return `${RAILWAY_BASE}/api/images/db/${type}/${obj.id}/gallery/${idx}`;
+      return img; // Any other URL (legacy serve URL) — pass through
+    });
     // gallery[0] is always the canonical hero image
     if (!out.imageUrl) {
       out.imageUrl = out.images[0];
@@ -295,10 +303,12 @@ async function runStartupImageCleanup(): Promise<void> {
   try {
     const isExternal = (url: string | null | undefined): boolean => {
       if (!url) return false;
-      // Keep valid gallery serve URLs — these are admin-uploaded
+      // Keep valid gallery serve URLs — these are admin-uploaded (legacy)
       if (url.includes('/api/images/db/') && url.includes('/gallery/')) return false;
       // Keep data URIs (raw uploaded images not yet migrated)
       if (url.startsWith('data:')) return false;
+      // Keep R2 CDN URLs — these are admin-uploaded images on Cloudflare
+      if (isR2Url(url)) return false;
       // Everything else (Unsplash, picsum, http(s):// external) is external placeholder
       return url.startsWith('http://') || url.startsWith('https://');
     };

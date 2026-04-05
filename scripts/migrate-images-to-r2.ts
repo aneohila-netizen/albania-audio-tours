@@ -55,7 +55,7 @@ function patchJson(url: string, body: any): Promise<any> {
     const options = {
       hostname: parsed.hostname,
       path: parsed.pathname + parsed.search,
-      method: "PATCH",
+      method: "PUT",
       headers: {
         "Content-Type": "application/json",
         "Content-Length": Buffer.byteLength(payload),
