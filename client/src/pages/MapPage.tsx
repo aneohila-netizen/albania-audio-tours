@@ -983,6 +983,15 @@ export default function MapPage() {
               pointerEvents: "none",
             }}
           >
+            {/* Fade-out on right edge — signals hidden pills to scroll (Google Maps / Airbnb pattern) */}
+            <div style={{ position: "relative" }}>
+            <div style={{
+              position: "absolute", top: 0, right: 0, bottom: 0,
+              width: "2.5rem",
+              background: "linear-gradient(to right, transparent, hsl(var(--background)/0.92))",
+              pointerEvents: "none",
+              zIndex: 1,
+            }} />
             <div
               className="flex gap-1.5 overflow-x-auto"
               style={{
@@ -991,6 +1000,7 @@ export default function MapPage() {
                 msOverflowStyle: "none",
                 WebkitOverflowScrolling: "touch",
                 paddingBottom: "2px",
+                paddingRight: "2rem", // ensures last pill doesn't hide under fade
               }}
             >
               {cats.map(({ key, emoji, label, count }) => {
@@ -1035,6 +1045,7 @@ export default function MapPage() {
                 );
               })}
             </div>
+            </div> {/* end fade wrapper */}
           </div>
         );
       })()}
