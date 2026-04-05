@@ -1193,24 +1193,66 @@ export default function MapPage() {
             title: "Explore Nearby",
             body: "Tap \"Share Location\" and the map instantly shows the attractions closest to where you are right now. No planning needed — perfect if you just arrived.",
             hint: "\"Share Location\" button is at the top-left of the map",
+            visual: (
+              <button
+                onClick={() => { dismissOnboarding(); setAutoCenter(true); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border bg-card hover:bg-muted transition-colors"
+              >
+                <Locate size={12} className="text-primary" />
+                Share Location
+              </button>
+            ),
           },
           {
             emoji: "🏖️",
             title: "Filter by what you love",
-            body: "Use the category pills just below the map controls to show only what interests you: Beach, Castle, Nature, Historic Town and more. One tap — the map updates instantly.",
+            body: "Tap any category pill to instantly filter the map. Try one:",
             hint: "Pill bar sits below the Share Location button",
+            visual: (
+              <div className="flex flex-wrap gap-1.5">
+                {[{label:"🏖️ Beach",val:"Beach"},{label:"🌿 Nature",val:"Nature"},{label:"🏰 Castle",val:"Castle"},{label:"🏛️ Historic Town",val:"Historic Town"}].map(({label,val}) => (
+                  <button
+                    key={val}
+                    onClick={() => { dismissOnboarding(); setLayerMode("destinations"); setCategoryFilter(val); }}
+                    className="px-2.5 py-1 rounded-full text-[11px] font-semibold border border-border bg-card hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ),
           },
           {
             emoji: "🏙️",
             title: "Browse all 43 destinations",
-            body: "Switch to the Destinations view (top-right toggle) to open a searchable list of every destination in Albania — with descriptions, photos, and walking routes.",
+            body: "Switch to the Destinations view to open a searchable list of every destination in Albania — with descriptions, photos, and walking routes.",
             hint: "\"Destinations\" toggle is at the top-right of the map",
+            visual: (
+              <button
+                onClick={() => { dismissOnboarding(); setLayerMode("destinations"); setShowDestPanel(true); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+              >
+                <span>🗺️</span>
+                Browse Destinations
+              </button>
+            ),
           },
           {
             emoji: "🎧",
             title: "Start an audio tour",
             body: "Tap any pin on the map, then press Play to hear the story of that place. Audio works offline — no signal needed once it loads.",
             hint: "Tap a pin → see the story panel → press Play",
+            visual: (
+              <button
+                onClick={() => { dismissOnboarding(); navigate("/sites/tirana"); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+              >
+                <Headphones size={12} />
+                Start Tirana Tour
+              </button>
+            ),
           },
         ];
         const step = STEPS[onboardStep];
@@ -1259,6 +1301,10 @@ export default function MapPage() {
                   </button>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">{step.body}</p>
+                {/* Visual interactive sample — hot-linked to the actual action */}
+                {(step as any).visual && (
+                  <div className="pt-0.5">{(step as any).visual}</div>
+                )}
                 <div className="flex items-center gap-1.5 bg-primary/8 rounded-lg px-3 py-1.5">
                   <span className="text-[10px] text-primary font-medium">{"→"} {step.hint}</span>
                 </div>
