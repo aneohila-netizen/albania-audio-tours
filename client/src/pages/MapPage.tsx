@@ -358,12 +358,9 @@ export default function MapPage() {
       await import("leaflet.markercluster");
       if (!mounted || !mapRef.current) return;
 
-      // Mobile screens need a slightly higher zoom to show Albania properly
-      // (zoom 7 shows all of Balkans on a small screen — too zoomed out)
-      const isMobile = window.innerWidth < 768;
       const map = L.map(mapRef.current, {
         center: [41.0, 20.2],
-        zoom: isMobile ? 7.5 : 7,
+        zoom: 7,
         zoomControl: false, // we add it manually at bottomright
       });
       // Industry standard: zoom controls bottom-right on mobile maps
@@ -668,7 +665,7 @@ export default function MapPage() {
   };
 
   return (
-    <div className="relative" style={{ height: "calc(var(--app-height, 100svh) - var(--header-height, 114px))" }}>
+    <div className="relative" style={{ height: "calc(100vh - 114px)" }}>
       {/* Map */}
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} data-testid="map-container" />
 

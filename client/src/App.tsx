@@ -166,11 +166,8 @@ function AppRoutes() {
           {/* Public routes */}
           <Route>
             <div className="flex flex-col min-h-screen bg-background text-foreground">
-              {/* data-header-measure: JS reads offsetHeight to set --header-height CSS var */}
-              <div data-header-measure="true">
-                <LaunchBanner />
-                <NavBar />
-              </div>
+              <LaunchBanner />
+              <NavBar />
               <main className="flex-none"> {/* map page controls its own height; pb-28 added per-page */}
                 <Switch>
                   <Route path="/" component={MapPage} />
