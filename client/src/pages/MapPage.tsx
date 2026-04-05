@@ -695,78 +695,30 @@ export default function MapPage() {
       {/* Map */}
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} data-testid="map-container" />
 
-      {/* 1a: Entry hero CTA — shown on first visit, dismissed after interaction */}
+      {/* Compact explore pill — bottom-left, single line, dismissible */}
       {!heroDismissed && !selectedPin && (
-        <div className="absolute bottom-4 left-3 right-3 z-[999] pointer-events-none">
-          <div className="bg-card/96 backdrop-blur-sm border border-primary/20 rounded-2xl shadow-2xl p-4 pointer-events-auto">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-primary mb-0.5">🎧 Free during launch · Subscription coming soon</p>
-                <p className="font-bold text-base leading-tight mb-1">Discover Albania — at your own pace</p>
-                {/* 3-step explainer: answers "what is this?" in one glance */}
-                <div className="flex items-center gap-3 my-2">
-                  <div className="flex flex-col items-center gap-0.5 text-center flex-1">
-                    <span className="text-base">📍</span>
-                    <span className="text-[10px] text-muted-foreground leading-tight">Tap a pin</span>
-                  </div>
-                  <span className="text-muted-foreground/40 text-xs">→</span>
-                  <div className="flex flex-col items-center gap-0.5 text-center flex-1">
-                    <span className="text-base">🎧</span>
-                    <span className="text-[10px] text-muted-foreground leading-tight">Hear the story</span>
-                  </div>
-                  <span className="text-muted-foreground/40 text-xs">→</span>
-                  <div className="flex flex-col items-center gap-0.5 text-center flex-1">
-                    <span className="text-base">🗺️</span>
-                    <span className="text-[10px] text-muted-foreground leading-tight">Track your journey</span>
-                  </div>
-                </div>
-                <p className="text-[11px] text-muted-foreground mb-3">
-                  Free during launch · Works offline · 43 destinations · 10 walking tours
-                </p>
-                <div className="flex gap-2 flex-wrap">
-                  {/* Primary CTA: nearest tour when GPS is on, else Tirana fallback */}
-                  <button
-                    onClick={() => {
-                      const dest = nearestTour?.slug ?? "tirana";
-                      navigate(`/sites/${dest}`);
-                      setHeroDismissed(true);
-                    }}
-                    className="hero-cta-pulse flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-                    style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
-                    aria-label={nearestTour ? `Start nearest tour: ${nearestTour.name}` : "Start Tirana Tour"}
-                  >
-                    <Headphones size={14} />
-                    {nearestTour
-                      ? `Start ${DESTINATIONS.find(d => d.slug === nearestTour.slug)?.nameEn ?? nearestTour.slug} Tour`
-                      : "Start Tirana Tour"}
-                  </button>
-                  <button
-                    onClick={() => { navigate("/sites"); setHeroDismissed(true); }}
-                    className="px-4 py-2 rounded-lg text-sm font-medium border border-border hover:bg-muted transition-colors"
-                  >
-                    Browse All
-                  </button>
-                </div>
-                {/* Contextual hint: show distance to nearest tour when GPS is active */}
-                {nearestTour && nearestTour.distM < 50000 && (
-                  <p className="text-xs text-primary/70 mt-2 flex items-center gap-1">
-                    <span>📍</span>
-                    <span>
-                      {nearestTour.distM < 1000
-                        ? `${Math.round(nearestTour.distM)}m from the nearest tour`
-                        : `${(nearestTour.distM / 1000).toFixed(1)}km from the nearest tour`}
-                    </span>
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={() => setHeroDismissed(true)}
-                className="p-1 rounded-lg hover:bg-muted shrink-0 -mt-1 -mr-1"
-                aria-label="Dismiss"
-              >
-                <X size={14} />
-              </button>
-            </div>
+        <div className="absolute bottom-4 left-3 z-[999]">
+          <div className="flex items-center gap-1 bg-card/96 backdrop-blur-sm border border-primary/20 rounded-full shadow-lg pl-3 pr-1 py-1">
+            <Headphones size={13} className="text-primary flex-shrink-0" />
+            <button
+              onClick={() => {
+                const dest = nearestTour?.slug ?? "tirana";
+                navigate(`/sites/${dest}`);
+                setHeroDismissed(true);
+              }}
+              className="text-sm font-semibold text-foreground hover:text-primary transition-colors px-1 whitespace-nowrap"
+            >
+              {nearestTour
+                ? `Explore ${DESTINATIONS.find(d => d.slug === nearestTour.slug)?.nameEn ?? nearestTour.slug}`
+                : "Explore Albania"}
+            </button>
+            <button
+              onClick={() => setHeroDismissed(true)}
+              className="p-1 rounded-full hover:bg-muted flex-shrink-0"
+              aria-label="Dismiss"
+            >
+              <X size={13} className="text-muted-foreground" />
+            </button>
           </div>
         </div>
       )}
