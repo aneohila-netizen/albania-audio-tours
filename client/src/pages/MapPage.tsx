@@ -79,19 +79,39 @@ export default function MapPage() {
   const markersRef = useRef<LeafletMarker[]>([]);
   const mapReadyRef = useRef(false);
 
-  // iOS Safari viewport height fix — 100vh includes hidden browser chrome on iOS
-  // window.innerHeight is the actual visible height. Update on resize + orientation.
-  const [mapHeight, setMapHeight] = useState(
-    typeof window !== 'undefined' ? window.innerHeight : 0
-  );
+  // ── Cross-browser map height fix ─────────────────────────────────────────────────
+  // Measures the actual rendered height of the header (banner + navbar)
+  // and the bottom nav bar, then computes map height as:
+  //   window.innerHeight - headerHeight - bottomNavHeight
+  // window.innerHeight is used (not 100vh) — it reflects the actual visible
+  // area on iOS Safari and all Android browsers regardless of browser chrome.
+  // ResizeObserver on the header detects banner dismiss / orientation changes.
+  const mapWrapperRef = useRef<HTMLDivElement>(null);
+  const [mapHeight, setMapHeight] = useState(0);
+
   useEffect(() => {
-    const update = () => setMapHeight(window.innerHeight);
-    update();
-    window.addEventListener('resize', update);
-    window.addEventListener('orientationchange', () => setTimeout(update, 100));
+    function calcHeight() {
+      const header = document.querySelector('[data-header-measure]') as HTMLElement | null;
+      const bottomNav = document.querySelector('.md\\:hidden.flex.items-center.border-t') as HTMLElement | null;
+      const headerH = header ? header.getBoundingClientRect().height : 92;
+      const bottomH = bottomNav ? bottomNav.getBoundingClientRect().height : 0;
+      const h = window.innerHeight - headerH - bottomH;
+      if (h > 100) setMapHeight(h);
+    }
+    calcHeight();
+    // ResizeObserver on header catches banner dismiss and font-size changes
+    const header = document.querySelector('[data-header-measure]');
+    let ro: ResizeObserver | null = null;
+    if (header && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => calcHeight());
+      ro.observe(header);
+    }
+    window.addEventListener('resize', calcHeight);
+    window.addEventListener('orientationchange', () => setTimeout(calcHeight, 150));
     return () => {
-      window.removeEventListener('resize', update);
-      window.removeEventListener('orientationchange', update);
+      ro?.disconnect();
+      window.removeEventListener('resize', calcHeight);
+      window.removeEventListener('orientationchange', calcHeight);
     };
   }, []);
 
@@ -374,9 +394,11 @@ export default function MapPage() {
       await import("leaflet.markercluster");
       if (!mounted || !mapRef.current) return;
 
-      // Mobile screens are smaller — zoom 7.5 frames Albania properly
-      // zoom 7 shows the full Balkans region on a phone screen
-      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+      // Use screen.width (physical CSS pixels) as it is more reliable than
+      // window.innerWidth on high-DPI Android Chrome where innerWidth can be
+      // larger than expected due to viewport scaling differences.
+      const screenW = typeof screen !== 'undefined' ? Math.min(screen.width, screen.height) : window.innerWidth;
+      const isMobile = screenW < 768;
       const map = L.map(mapRef.current, {
         center: [41.0, 20.2],
         zoom: isMobile ? 7.5 : 7,
@@ -684,14 +706,11 @@ export default function MapPage() {
   };
 
   return (
-    <div className="relative" style={{
-      // mapHeight = window.innerHeight (actual visible area, iOS-safe)
-      // Subtract: banner (36px) + top navbar (56px) + mobile bottom nav (56px on mobile, 0 on desktop)
-      // On desktop (md+) there is no bottom nav, so subtract only 92px
-      height: mapHeight > 0
-        ? `${mapHeight - (window.innerWidth < 768 ? 148 : 92)}px`
-        : 'calc(100vh - 114px)', // fallback before JS runs
-    }}>
+    <div
+      ref={mapWrapperRef}
+      className="relative flex-1 min-h-0"
+      style={{ height: mapHeight > 0 ? `${mapHeight}px` : 'calc(100svh - 114px)' }}
+    >
       {/* Map */}
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} data-testid="map-container" />
 
@@ -932,7 +951,9 @@ export default function MapPage() {
             style={{
               top: "3.5rem",
               left: "0.75rem",
-              right: "6rem",
+              // 8rem gap from right ensures pills never reach the
+              // Attractions/Destinations layer toggle on any screen width
+              right: "8rem",
               pointerEvents: "none",
             }}
           >
@@ -992,45 +1013,7 @@ export default function MapPage() {
         );
       })()}
 
-      {/* Scroll-down CTA — mobile only, bottom-left above the bottom panel.
-           Google Maps / Apple Maps pattern: labelled pill so first-time visitors
-           immediately understand there is more content below the map. */}
-      <button
-        className="md:hidden absolute z-[1000] flex items-center gap-1.5"
-        style={{
-          bottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)",
-          left: "0.75rem",
-          background: "hsl(var(--card)/0.95)",
-          backdropFilter: "blur(8px)",
-          border: "1px solid hsl(var(--border))",
-          borderRadius: "999px",
-          padding: "7px 14px 7px 10px",
-          boxShadow: "0 2px 12px rgba(0,0,0,0.22)",
-          cursor: "pointer",
-          fontSize: "12px",
-          fontWeight: 600,
-          color: "hsl(var(--foreground))",
-          lineHeight: 1.2,
-        }}
-        aria-label="Browse destinations below"
-        onClick={() => {
-          const mapEl = document.querySelector("[data-testid='map-container']")?.parentElement?.parentElement;
-          if (mapEl) {
-            const rect = mapEl.getBoundingClientRect();
-            window.scrollBy({ top: rect.height + 200, behavior: "smooth" });
-          } else {
-            window.scrollBy({ top: window.innerHeight, behavior: "smooth" });
-          }
-        }}
-      >
-        {/* Down-arrow icon */}
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"
-          style={{ color: "hsl(var(--primary))" }}>
-          <path d="M7 2v9M3.5 7.5L7 11l3.5-3.5" stroke="currentColor" strokeWidth="2"
-            strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-        Browse destinations
-      </button>
+      {/* Browse destinations button removed — redundant with scrolling, was covering the Start Exploring pill */}
 
       {/* Layer toggle */}
       <div className="absolute top-3 right-3 z-[1000]">
