@@ -699,18 +699,16 @@ export default function MapPage() {
       {!heroDismissed && !selectedPin && (
         <div className="absolute bottom-4 left-3 z-[999]">
           <div className="flex items-center gap-1 bg-card/96 backdrop-blur-sm border border-primary/20 rounded-full shadow-lg pl-3 pr-1 py-1">
-            <Headphones size={13} className="text-primary flex-shrink-0" />
+            <Locate size={13} className="text-primary flex-shrink-0" />
             <button
               onClick={() => {
-                const dest = nearestTour?.slug ?? "tirana";
-                navigate(`/sites/${dest}`);
+                // Trigger GPS — map centers on user and nearest tour becomes available
+                setAutoCenter(true);
                 setHeroDismissed(true);
               }}
               className="text-sm font-semibold text-foreground hover:text-primary transition-colors px-1 whitespace-nowrap"
             >
-              {nearestTour
-                ? `Explore ${DESTINATIONS.find(d => d.slug === nearestTour.slug)?.nameEn ?? nearestTour.slug}`
-                : "Explore Albania"}
+              Start Exploring
             </button>
             <button
               onClick={() => setHeroDismissed(true)}
