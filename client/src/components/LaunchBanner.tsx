@@ -86,8 +86,8 @@ export default function LaunchBanner() {
       className="relative flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium text-white"
       style={{
         background: showCountdown
-          ? "linear-gradient(90deg, #1a1a2e 0%, #b45309 50%, #1a1a2e 100%)"
-          : "linear-gradient(90deg, #1a1a2e 0%, #c0392b 50%, #1a1a2e 100%)",
+          ? "linear-gradient(90deg, #7c2d12 0%, #c2410c 50%, #7c2d12 100%)"
+          : "linear-gradient(90deg, #7f1d1d 0%, #b91c1c 50%, #7f1d1d 100%)",
         minHeight: "36px",
       }}
     >
@@ -96,7 +96,7 @@ export default function LaunchBanner() {
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "linear-gradient(90deg, transparent 20%, rgba(255,255,255,0.12) 50%, transparent 80%)",
+            "linear-gradient(90deg, transparent 20%, rgba(255,255,255,0.22) 50%, transparent 80%)",
           backgroundSize: "200% 100%",
           animation: "bannerShimmer 4s infinite linear",
         }}
@@ -109,15 +109,25 @@ export default function LaunchBanner() {
             <span className="font-semibold">Free access ends in </span>
             <span
               className="font-black tracking-wide px-1.5 py-0.5 rounded"
-              style={{ background: "rgba(255,255,255,0.15)" }}
+              style={{ background: "rgba(255,255,255,0.28)", color: "#fff", letterSpacing: "0.04em" }}
             >
               {formatCountdown(timeLeft)}
             </span>
             {freeUntilFormatted && (
-              <span className="opacity-70 ml-1.5">— free until {freeUntilFormatted}</span>
+              <span className="ml-1.5" style={{ opacity: 0.9 }}>— free until {freeUntilFormatted}</span>
             )}
             <Link href="/subscriptions">
-              <a className="ml-2 underline font-semibold opacity-90 hover:opacity-100 relative">
+              <a
+                className="ml-2 font-bold hover:opacity-100 relative"
+                style={{
+                  background: "rgba(255,255,255,0.22)",
+                  padding: "1px 8px",
+                  borderRadius: "4px",
+                  opacity: 1,
+                  textDecoration: "none",
+                  border: "1px solid rgba(255,255,255,0.35)",
+                }}
+              >
                 View plans →
               </a>
             </Link>
