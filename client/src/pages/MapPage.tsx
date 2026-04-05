@@ -7,7 +7,7 @@ import type { Destination, Attraction } from "@/lib/staticData";
 import VisitModal from "@/components/VisitModal";
 import { apiRequest } from "@/lib/queryClient";
 import { getSessionId } from "@/lib/session";
-import { MapPin, X, Layers, Locate, LocateFixed, Headphones, ChevronRight, ArrowRight, Search } from "lucide-react";
+import { MapPin, X, Layers, Locate, LocateFixed, Headphones, ChevronRight, ChevronUp, ArrowRight, Search } from "lucide-react";
 // Leaflet marker cluster — groups overlapping pins into numbered bubbles
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
@@ -669,49 +669,77 @@ export default function MapPage() {
       {/* Map */}
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} data-testid="map-container" />
 
-      {/* 1a: Entry hero CTA — shown on first visit, dismissed after interaction */}
+      {/* ── EXPLORE ENTRY — Bottom sheet (mobile) + FAB chip (desktop) ────────────── */}
       {!heroDismissed && !selectedPin && (
-        <div className="absolute bottom-4 left-3 right-3 z-[999] pointer-events-none">
-          <div className="bg-card/96 backdrop-blur-sm border border-primary/20 rounded-2xl shadow-2xl p-4 pointer-events-auto">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-primary mb-0.5">🎧 Free during launch · Subscription coming soon</p>
-                <p className="font-bold text-base leading-tight mb-1">Discover Albania — at your own pace</p>
-                {/* 3-step explainer: answers "what is this?" in one glance */}
-                <div className="flex items-center gap-3 my-2">
-                  <div className="flex flex-col items-center gap-0.5 text-center flex-1">
-                    <span className="text-base">📍</span>
-                    <span className="text-[10px] text-muted-foreground leading-tight">Tap a pin</span>
-                  </div>
-                  <span className="text-muted-foreground/40 text-xs">→</span>
-                  <div className="flex flex-col items-center gap-0.5 text-center flex-1">
-                    <span className="text-base">🎧</span>
-                    <span className="text-[10px] text-muted-foreground leading-tight">Hear the story</span>
-                  </div>
-                  <span className="text-muted-foreground/40 text-xs">→</span>
-                  <div className="flex flex-col items-center gap-0.5 text-center flex-1">
-                    <span className="text-base">🗺️</span>
-                    <span className="text-[10px] text-muted-foreground leading-tight">Track your journey</span>
-                  </div>
+        <>
+          {/* ──── MOBILE: collapsed bottom sheet, expands on tap ────────────────────── */}
+          <div className="md:hidden absolute bottom-4 left-3 right-3 z-[999]">
+            {/* Collapsed pill — shown by default */}
+            <div
+              id="explore-sheet"
+              className="explore-sheet-wiggle bg-card/96 backdrop-blur-sm border border-primary/20 rounded-2xl shadow-xl overflow-hidden"
+            >
+              {/* Handle bar + pill summary */}
+              <button
+                onClick={() => {
+                  const sheet = document.getElementById("explore-sheet-body");
+                  const chevron = document.getElementById("explore-chevron");
+                  if (sheet) sheet.classList.toggle("hidden");
+                  if (chevron) chevron.classList.toggle("rotate-180");
+                }}
+                className="w-full flex items-center justify-between px-4 py-3 gap-3"
+                aria-label="Expand explore panel"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-base flex-shrink-0">🎧</span>
+                  <span className="font-semibold text-sm truncate">
+                    {nearestTour
+                      ? `Nearby: ${DESTINATIONS.find(d => d.slug === nearestTour.slug)?.nameEn ?? nearestTour.slug}`
+                      : "Explore Albania"}
+                  </span>
+                  <span className="text-[10px] text-primary font-medium bg-primary/10 px-1.5 py-0.5 rounded-full flex-shrink-0">Free</span>
                 </div>
-                <p className="text-[11px] text-muted-foreground mb-3">
-                  Free during launch · Works offline · 43 destinations · 10 walking tours
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <ChevronUp id="explore-chevron" size={16} className="text-muted-foreground transition-transform duration-200" />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setHeroDismissed(true); }}
+                    className="p-1 rounded-lg hover:bg-muted"
+                    aria-label="Dismiss"
+                  >
+                    <X size={14} className="text-muted-foreground" />
+                  </button>
+                </div>
+              </button>
+
+              {/* Expanded body — hidden by default, toggled on tap */}
+              <div id="explore-sheet-body" className="hidden px-4 pb-4 border-t border-border/50">
+                <p className="text-[11px] text-muted-foreground mt-3 mb-3">
+                  43 destinations · 10 walking tours · Works offline
                 </p>
                 <div className="flex gap-2 flex-wrap">
-                  {/* Primary CTA: nearest tour when GPS is on, else Tirana fallback */}
+                  {/* Quick Start: share location + go to nearest */}
                   <button
                     onClick={() => {
-                      const dest = nearestTour?.slug ?? "tirana";
-                      navigate(`/sites/${dest}`);
+                      setAutoCenter(true);
                       setHeroDismissed(true);
                     }}
-                    className="hero-cta-pulse flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
                     style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
-                    aria-label={nearestTour ? `Start nearest tour: ${nearestTour.name}` : "Start Tirana Tour"}
+                  >
+                    <Locate size={14} />
+                    Quick Start — Near Me
+                  </button>
+                  {/* Start a specific tour */}
+                  <button
+                    onClick={() => {
+                      navigate(`/sites/${nearestTour?.slug ?? "tirana"}`);
+                      setHeroDismissed(true);
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border border-border hover:bg-muted transition-colors"
                   >
                     <Headphones size={14} />
                     {nearestTour
-                      ? `Start ${DESTINATIONS.find(d => d.slug === nearestTour.slug)?.nameEn ?? nearestTour.slug} Tour`
+                      ? `${DESTINATIONS.find(d => d.slug === nearestTour.slug)?.nameEn ?? nearestTour.slug} Tour`
                       : "Start Tirana Tour"}
                   </button>
                   <button
@@ -721,7 +749,6 @@ export default function MapPage() {
                     Browse All
                   </button>
                 </div>
-                {/* Contextual hint: show distance to nearest tour when GPS is active */}
                 {nearestTour && nearestTour.distM < 50000 && (
                   <p className="text-xs text-primary/70 mt-2 flex items-center gap-1">
                     <span>📍</span>
@@ -733,16 +760,69 @@ export default function MapPage() {
                   </p>
                 )}
               </div>
-              <button
-                onClick={() => setHeroDismissed(true)}
-                className="p-1 rounded-lg hover:bg-muted shrink-0 -mt-1 -mr-1"
-                aria-label="Dismiss"
-              >
-                <X size={14} />
-              </button>
             </div>
           </div>
-        </div>
+
+          {/* ──── DESKTOP: compact floating FAB chip, bottom-left, above map controls ──── */}
+          <div className="hidden md:flex absolute bottom-6 left-4 z-[999] flex-col items-start gap-2">
+            <div className="explore-sheet-wiggle bg-card/96 backdrop-blur-sm border border-primary/20 rounded-2xl shadow-xl overflow-hidden">
+              {/* Collapsed chip */}
+              <button
+                onClick={() => {
+                  const body = document.getElementById("explore-fab-body");
+                  if (body) body.classList.toggle("hidden");
+                }}
+                className="flex items-center gap-2 px-4 py-2.5"
+                aria-label="Explore nearby"
+              >
+                <Headphones size={15} className="text-primary flex-shrink-0" />
+                <span className="font-semibold text-sm">
+                  {nearestTour
+                    ? `Explore ${DESTINATIONS.find(d => d.slug === nearestTour.slug)?.nameEn ?? nearestTour.slug}`
+                    : "Explore Albania"}
+                </span>
+                <ChevronUp id="fab-chevron" size={14} className="text-muted-foreground ml-1" />
+                <button
+                  onClick={(e) => { e.stopPropagation(); setHeroDismissed(true); }}
+                  className="p-0.5 rounded hover:bg-muted ml-1"
+                  aria-label="Dismiss"
+                >
+                  <X size={12} className="text-muted-foreground" />
+                </button>
+              </button>
+
+              {/* Expanded body — hidden by default */}
+              <div id="explore-fab-body" className="hidden border-t border-border/50 px-4 py-3">
+                <p className="text-[11px] text-muted-foreground mb-2">43 destinations · 10 walking tours</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => { setAutoCenter(true); setHeroDismissed(true); }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                    style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                  >
+                    <Locate size={12} />
+                    Near Me
+                  </button>
+                  <button
+                    onClick={() => { navigate(`/sites/${nearestTour?.slug ?? "tirana"}`); setHeroDismissed(true); }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-muted transition-colors"
+                  >
+                    <Headphones size={12} />
+                    {nearestTour
+                      ? `${DESTINATIONS.find(d => d.slug === nearestTour.slug)?.nameEn ?? nearestTour.slug} Tour`
+                      : "Tirana Tour"}
+                  </button>
+                  <button
+                    onClick={() => { navigate("/sites"); setHeroDismissed(true); }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-muted transition-colors"
+                  >
+                    Browse All
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* GPS error toast */}
