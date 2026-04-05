@@ -5,7 +5,7 @@
  * - Click any pin → popup with "Get directions from my location" link
  * - Multiple itineraries per page (collapsible)
  */
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Map, ChevronDown, ChevronUp, Clock, Route, Navigation, Flag } from "lucide-react";
 import { RAILWAY_URL } from "@/lib/queryClient";
 
@@ -369,25 +369,63 @@ export default function ItineraryCard({ siteSlug, centerLat = 41.3275, centerLng
 
   if (!loaded || itineraries.length === 0) return null;
 
+  // Collapsed by default when there are multiple tours (they block the page).
+  // Single tour stays open so the user sees it immediately.
+  const [sectionOpen, setSectionOpen] = React.useState(itineraries.length === 1);
+
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Map size={15} className="text-primary" />
-        <h2 className="text-sm font-semibold">
-          {itineraries.length === 1 ? "Tour Itinerary" : "Tour Itineraries (" + itineraries.length + ")"}
-        </h2>
-      </div>
-      {itineraries.map(function(it, idx) {
-        return (
-          <SingleItinerary
-            key={it.id}
-            it={it}
-            centerLat={centerLat}
-            centerLng={centerLng}
-            defaultOpen={idx === 0 && itineraries.length === 1}
-          />
-        );
-      })}
+    <div className="rounded-xl border border-border overflow-hidden">
+      {/* ── Collapsible header ── */}
+      <button
+        onClick={() => setSectionOpen(v => !v)}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-primary/5 hover:bg-primary/10 transition-colors"
+        aria-expanded={sectionOpen}
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Map size={16} className="text-primary flex-shrink-0" />
+          <div className="text-left min-w-0">
+            <p className="text-sm font-semibold leading-tight">
+              {itineraries.length === 1
+                ? "Guided Walking Tour"
+                : `${itineraries.length} Curated Walking Tours`}
+            </p>
+            <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+              {itineraries.length === 1
+                ? "Self-guided audio tour prepared by AlbaniaAudioTours"
+                : "Self-guided audio tours prepared by AlbaniaAudioTours — tap to explore"}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+            {itineraries.length === 1 ? "1 tour" : `${itineraries.length} tours`}
+          </span>
+          <svg
+            width="14" height="14"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+            className={"text-muted-foreground transition-transform duration-200" + (sectionOpen ? " rotate-180" : "")}
+          >
+            <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+      </button>
+
+      {/* ── Tour list ── */}
+      {sectionOpen && (
+        <div className="px-3 py-3 space-y-3 border-t border-border">
+          {itineraries.map(function(it, idx) {
+            return (
+              <SingleItinerary
+                key={it.id}
+                it={it}
+                centerLat={centerLat}
+                centerLng={centerLng}
+                defaultOpen={idx === 0 && itineraries.length === 1}
+              />
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

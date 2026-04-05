@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useApp } from "@/App";
 import { useQuery } from "@tanstack/react-query";
@@ -10,7 +10,7 @@ import PaywallGate from "@/components/PaywallGate";
 import BookWithGuide from "@/components/BookWithGuide";
 import StarRatingDisplay from "@/components/StarRatingDisplay";
 import ItineraryCard from "@/components/ItineraryCard";
-import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb, Navigation, LayoutGrid, List } from "lucide-react";
+import { ArrowLeft, MapPin, Star, Clock, ChevronRight, ChevronDown, Lightbulb, Navigation, LayoutGrid, List } from "lucide-react";
 import GallerySlideshow from "@/components/GallerySlideshow";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLangText } from "@/lib/i18n";
@@ -37,6 +37,7 @@ export default function DestinationPage() {
   const [, params] = useRoute("/sites/:dest");
   const [, navigate] = useLocation();
   const [showFullDesc, setShowFullDesc] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
   const [attrFilter, setAttrFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const { lang, visitedSiteIds } = useApp();
@@ -151,6 +152,40 @@ export default function DestinationPage() {
         <AudioPlayer site={dest} />
         <ItineraryCard siteSlug={dest.slug} centerLat={dest.lat} centerLng={dest.lng} />
       </PaywallGate>
+
+      {/* ── Map & Directions — compact expandable row ── */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <button
+          onClick={() => setMapOpen(v => !v)}
+          className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
+          aria-expanded={mapOpen}
+        >
+          <div className="flex items-center gap-2.5">
+            <MapPin size={15} className="text-primary flex-shrink-0" />
+            <div className="text-left">
+              <p className="text-sm font-semibold leading-tight">Map &amp; Directions</p>
+              <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">View location · Get directions to {name}</p>
+            </div>
+          </div>
+          <ChevronDown
+            size={15}
+            className={"text-muted-foreground transition-transform duration-200" + (mapOpen ? " rotate-180" : "")}
+          />
+        </button>
+        {mapOpen && (
+          <div className="border-t border-border">
+            <MiniMap lat={dest.lat} lng={dest.lng} label={name} />
+            <a
+              href={`https://www.google.com/maps?q=${dest.lat},${dest.lng}`}
+              target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-2 p-3 text-sm text-primary hover:bg-muted transition-colors border-t border-border"
+            >
+              <Navigation size={14} />
+              {`Get Directions to ${name}`}
+            </a>
+          </div>
+        )}
+      </div>
 
       {/* Description — FREE forever as promised */}
       <div>
@@ -410,16 +445,6 @@ export default function DestinationPage() {
           <p className="text-sm">Attractions coming soon.</p>
         </div>
       )}
-
-      {/* Mini-map + Get Directions */}
-      <div className="rounded-xl border border-border overflow-hidden">
-        <MiniMap lat={dest.lat} lng={dest.lng} label={name} />
-        <a href={`https://www.google.com/maps?q=${dest.lat},${dest.lng}`} target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-2 p-3 text-sm text-primary hover:bg-muted transition-colors border-t border-border">
-          <Navigation size={14} />
-          {`Get Directions to ${name}`}
-        </a>
-      </div>
 
       <BackToTop />
     </div>
