@@ -415,6 +415,19 @@
   animation: hero-cta-bounce 0.8s ease-in-out 0.6s both;
 }
 
+/* ── Start Exploring pill — breathing glow pulse, repeats every 3s ──
+   Draws attention without being distracting. Stops on hover. */
+@keyframes start-exploring-glow {
+  0%, 100% { box-shadow: 0 2px 12px rgba(192, 57, 43, 0.45), 0 0 0 0 rgba(192, 57, 43, 0.35); }
+  50%       { box-shadow: 0 4px 20px rgba(192, 57, 43, 0.7),  0 0 0 6px rgba(192, 57, 43, 0); }
+}
+.start-exploring-pill {
+  animation: start-exploring-glow 2.8s ease-in-out 1s infinite;
+}
+.start-exploring-pill:hover {
+  animation: none;
+}
+
 /* Push Leaflet zoom control above sticky audio player (approx 7rem) */
 /* Desktop: stays bottom-right, clear of WhatsApp */
 .leaflet-bottom.leaflet-right .leaflet-control-zoom {

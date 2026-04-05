@@ -714,27 +714,33 @@ export default function MapPage() {
       {/* Map */}
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} data-testid="map-container" />
 
-      {/* Compact explore pill — bottom-left, single line, dismissible */}
+      {/* Start Exploring pill — primary CTA, bottom-left, dismissible */}
       {!heroDismissed && !selectedPin && (
         <div className="absolute bottom-4 left-3 z-[999]">
-          <div className="flex items-center gap-1 bg-card/96 backdrop-blur-sm border border-primary/20 rounded-full shadow-lg pl-3 pr-1 py-1">
-            <Locate size={13} className="text-primary flex-shrink-0" />
+          <div
+            className="start-exploring-pill flex items-center gap-1.5 rounded-full pl-3 pr-1 py-1.5"
+            style={{
+              background: "hsl(var(--primary))",
+              border: "2px solid rgba(255,255,255,0.25)",
+            }}
+          >
+            <Locate size={14} className="text-white flex-shrink-0" />
             <button
               onClick={() => {
-                // Trigger GPS — map centers on user and nearest tour becomes available
                 setAutoCenter(true);
                 setHeroDismissed(true);
               }}
-              className="text-sm font-semibold text-foreground hover:text-primary transition-colors px-1 whitespace-nowrap"
+              className="text-sm font-bold text-white whitespace-nowrap px-1 tracking-wide"
+              style={{ textShadow: "0 1px 2px rgba(0,0,0,0.2)" }}
             >
               Start Exploring
             </button>
             <button
               onClick={() => setHeroDismissed(true)}
-              className="p-1 rounded-full hover:bg-muted flex-shrink-0"
+              className="p-1 rounded-full hover:bg-white/20 flex-shrink-0 ml-0.5"
               aria-label="Dismiss"
             >
-              <X size={13} className="text-muted-foreground" />
+              <X size={13} className="text-white/80" />
             </button>
           </div>
         </div>
