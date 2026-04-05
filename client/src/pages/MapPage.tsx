@@ -88,6 +88,10 @@ export default function MapPage() {
   // ResizeObserver on the header detects banner dismiss / orientation changes.
   const mapWrapperRef = useRef<HTMLDivElement>(null);
   const [mapHeight, setMapHeight] = useState(0);
+  // userPannedRef: true when the user has manually dragged the map while
+  // GPS Following was active. Prevents GPS ticks from re-centering the view.
+  // Reset to false when the user taps the Following button again.
+  const userPannedRef = useRef(false);
 
   useEffect(() => {
     function calcHeight() {
@@ -407,6 +411,13 @@ export default function MapPage() {
       // Industry standard: zoom controls bottom-right on mobile maps
       L.control.zoom({ position: "bottomright" }).addTo(map);
 
+      // When the user manually drags the map while GPS Following is active,
+      // pause re-centering (Google Maps / Apple Maps pattern).
+      // The blue dot stays visible — only the auto-pan is paused.
+      map.on('dragstart', () => {
+        userPannedRef.current = true;
+      });
+
       L.tileLayer(
         "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
         {
@@ -489,7 +500,11 @@ export default function MapPage() {
         });
         blueDotRef.current = L.marker([lat, lng], { icon: blueDotIcon, zIndexOffset: 1000 }).addTo(map);
       }
-      map.setView([lat, lng], Math.max(map.getZoom(), 14), { animate: true });
+      // Only re-center if the user hasn't manually panned away.
+      // If they have panned, just update the dot position — don't move the view.
+      if (!userPannedRef.current) {
+        map.setView([lat, lng], Math.max(map.getZoom(), 14), { animate: true });
+      }
 
       // ── Nearest tour (API-driven) ─────────────────
       // Find the published tour whose destination is closest to current position.
@@ -562,7 +577,11 @@ export default function MapPage() {
     };
   }, [autoCenter]);
 
-  const toggleAutoCenter = () => setAutoCenter(v => !v);
+  const toggleAutoCenter = () => {
+    // Reset the panned flag so tapping the button re-locks to GPS position
+    userPannedRef.current = false;
+    setAutoCenter(v => !v);
+  };
 
   // ── Handle mark visited ───────────────────────────────────────────────────
   const handleMarkVisited = async () => {
@@ -727,6 +746,7 @@ export default function MapPage() {
             <Locate size={14} className="text-white flex-shrink-0" />
             <button
               onClick={() => {
+                userPannedRef.current = false;
                 setAutoCenter(true);
                 setHeroDismissed(true);
               }}
@@ -1195,7 +1215,7 @@ export default function MapPage() {
             hint: "\"Share Location\" button is at the top-left of the map",
             visual: (
               <button
-                onClick={() => { dismissOnboarding(); setAutoCenter(true); }}
+                onClick={() => { dismissOnboarding(); userPannedRef.current = false; setAutoCenter(true); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border bg-card hover:bg-muted transition-colors"
               >
                 <Locate size={12} className="text-primary" />
