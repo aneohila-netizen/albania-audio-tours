@@ -165,6 +165,16 @@ export default function DestinationPage() {
         </button>
       </div>
 
+      {/* Mini-map + Get Directions — below description, above attractions */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <MiniMap lat={dest.lat} lng={dest.lng} label={name} />
+        <a href={`https://www.google.com/maps?q=${dest.lat},${dest.lng}`} target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-2 p-3 text-sm text-primary hover:bg-muted transition-colors border-t border-border">
+          <Navigation size={14} />
+          {`Get Directions to ${name}`}
+        </a>
+      </div>
+
       {/* Book with a guide */}
       <BookWithGuide shopifyUrl={(dest as any).shopifyUrl || ""} siteName={name} />
 
@@ -410,16 +420,6 @@ export default function DestinationPage() {
           <p className="text-sm">Attractions coming soon.</p>
         </div>
       )}
-
-      {/* Mini-map + Get Directions */}
-      <div className="rounded-xl border border-border overflow-hidden">
-        <MiniMap lat={dest.lat} lng={dest.lng} label={name} />
-        <a href={`https://www.google.com/maps?q=${dest.lat},${dest.lng}`} target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-2 p-3 text-sm text-primary hover:bg-muted transition-colors border-t border-border">
-          <Navigation size={14} />
-          {`Get Directions to ${name}`}
-        </a>
-      </div>
 
       <BackToTop />
     </div>
