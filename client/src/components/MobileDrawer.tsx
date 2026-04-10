@@ -33,7 +33,7 @@ interface Props {
 }
 
 const COLLAPSED_H = 28;   // px — just the handle bar
-const EXPANDED_H  = 210;  // px — handle + CTA card + footer links
+const EXPANDED_H  = 280;  // px — handle + larger CTA card + footer links (C3: increased from 210)
 
 export default function MobileDrawer({ nearestTour, destinations, cmsLinks = [] }: Props) {
   const [, navigate] = useLocation();
@@ -155,7 +155,7 @@ export default function MobileDrawer({ nearestTour, destinations, cmsLinks = [] 
         {/* ── Nearest destination CTA card ─────────────────────────── */}
         {featuredDest && (
           <div
-            className="flex items-center gap-3 rounded-xl border border-border bg-background p-2.5 mb-3 cursor-pointer active:bg-muted transition-colors"
+            className="flex items-center gap-3 rounded-xl border border-border bg-background p-3 mb-3 cursor-pointer active:bg-muted transition-colors"
             onClick={handleExplore}
           >
             {/* Thumbnail */}
@@ -163,11 +163,11 @@ export default function MobileDrawer({ nearestTour, destinations, cmsLinks = [] 
               <img
                 src={featuredImg}
                 alt={featuredName}
-                className="w-14 h-14 rounded-lg object-cover shrink-0"
+                className="w-20 h-20 rounded-xl object-cover shrink-0"
                 loading="lazy"
               />
             ) : (
-              <div className="w-14 h-14 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 text-2xl">
+              <div className="w-20 h-20 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 text-3xl">
                 🇦🇱
               </div>
             )}

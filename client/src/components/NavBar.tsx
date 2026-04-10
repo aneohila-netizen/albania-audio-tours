@@ -181,20 +181,35 @@ export default function NavBar() {
           </div>
         )}
 
+        {/* C2: Mobile always-visible search bar — replaces the magnifier icon on mobile */}
+        {!searchOpen && (
+          <div className="md:hidden flex-1 min-w-0 mx-1" ref={searchRef}>
+            <div
+              className="flex items-center gap-1.5 bg-card border border-border/60 rounded-xl px-2.5 py-1.5 shadow-sm w-full cursor-text"
+              onClick={() => setSearchOpen(true)}
+            >
+              <Search size={14} className="text-muted-foreground shrink-0" />
+              <span className="flex-1 text-sm text-muted-foreground/60 truncate select-none">
+                Search destinations, tours…
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Right controls — hidden on mobile when search open */}
         <div className={`flex items-center gap-2 ${searchOpen ? "hidden md:flex" : ""}`}>
 
           {/* ── Global Search ───────────────────────────────────────── */}
           <div className={`relative ${searchOpen ? "flex-1 md:flex-none" : ""}`} ref={searchRef}>
-            {/* Search button — expands to input on click (desktop keeps inline expand) */}
+            {/* Desktop: icon button that expands to input on click */}
             {!searchOpen ? (
               <button
                 onClick={() => setSearchOpen(true)}
-                className="w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                className="hidden md:flex w-8 h-8 rounded-full items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 aria-label="Search destinations and attractions"
                 title="Search"
               >
-                <Search size={20} className="sm:w-4 sm:h-4" />
+                <Search size={18} />
               </button>
             ) : (
               <div className="flex items-center gap-1 bg-card border border-primary/30 rounded-xl px-2.5 py-1.5 shadow-md w-full md:w-56">

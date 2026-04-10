@@ -85,23 +85,13 @@ export default function LaunchBanner() {
     <div
       className="relative flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium"
       style={{
-        // Amber/yellow — high contrast against the red navbar, industry standard
-        // for limited-time announcement banners (Spotify, Linear, Vercel)
-        background: "#F59E0B",
-        color: "#1C1917",  // near-black text on amber = ~8:1 contrast ratio (WCAG AAA)
+        // C1: Match bottom nav background color — clean, same family as the nav
+        background: "hsl(42, 18%, 96%)",
+        color: "hsl(220, 25%, 12%)",  // --foreground: near-black, high contrast
         minHeight: "36px",
       }}
     >
-      {/* Shimmer sweep — subtle gold highlight */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            "linear-gradient(90deg, transparent 20%, rgba(255,255,255,0.20) 50%, transparent 80%)",
-          backgroundSize: "200% 100%",
-          animation: "bannerShimmer 4s infinite linear",
-        }}
-      />
+      {/* Shimmer removed (was designed for amber bg; not needed on light bg) */}
 
       {showCountdown ? (
         <>
@@ -110,7 +100,7 @@ export default function LaunchBanner() {
             <span className="font-semibold">Free access ends in </span>
             <span
               className="font-black tracking-wide px-1.5 py-0.5 rounded"
-              style={{ background: "rgba(0,0,0,0.12)", color: "#1C1917" }}
+              style={{ background: "hsl(var(--primary))", color: "#fff" }}
             >
               {formatCountdown(timeLeft)}
             </span>
