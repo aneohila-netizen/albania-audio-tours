@@ -96,7 +96,7 @@ export default function MapPage() {
   useEffect(() => {
     function calcHeight() {
       const header = document.querySelector('[data-header-measure]') as HTMLElement | null;
-      const bottomNav = document.querySelector('.md\\:hidden.flex.items-center.border-t') as HTMLElement | null;
+      const bottomNav = document.querySelector('[data-bottom-nav]') as HTMLElement | null;
       const headerH = header ? header.getBoundingClientRect().height : 92;
       const bottomH = bottomNav ? bottomNav.getBoundingClientRect().height : 0;
       const h = window.innerHeight - headerH - bottomH;
@@ -173,8 +173,28 @@ export default function MapPage() {
   const triggeredPoiRef = useRef<Set<string>>(new Set()); // avoid re-triggering same POI
   const { t, lang, visitedSiteIds, markVisited } = useApp();
   const { loadTrack } = useAudioPlayer();
+
   const DESTINATIONS = useDestinations();
   const ATTRACTIONS = useAttractions();
+
+  // Change 5: preload nearest destination audio in background after GPS lock
+  // When nearestTour is set, silently download its audio URL into browser cache.
+  // By the time user taps "Play Audio", the file is ready — no loading wait.
+  const preloadedAudioRef = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => {
+    if (!nearestTour || !DESTINATIONS.length) return;
+    const dest = DESTINATIONS.find(d => d.slug === nearestTour.slug);
+    if (!dest) return;
+    const langField = `audioUrl${lang.charAt(0).toUpperCase() + lang.slice(1)}`;
+    const audioUrl = (dest as any)[langField] || (dest as any).audioUrlEn || null;
+    if (!audioUrl) return;
+    // Preload via hidden Audio element — browser fetches and caches at URL level
+    const audio = new Audio();
+    audio.preload = "auto";
+    audio.src = audioUrl;
+    preloadedAudioRef.current = audio;
+    return () => { audio.src = ""; };
+  }, [nearestTour?.slug, lang, DESTINATIONS]);
 
   // Helper: name/desc in current language (supports all 9 langs)
   const destName = (d: Destination) => getLangText(d, "name", lang);
@@ -991,12 +1011,14 @@ export default function MapPage() {
           <div
             className="absolute z-[1000]"
             style={{
+              // Change 1: full-width pill bar on its own row below Share Location button row
+              // top matches Share Location button height (~2.75rem button + 0.75rem gap = ~3.5rem)
               top: "3.5rem",
-              left: "0.75rem",
-              // 8rem gap from right ensures pills never reach the
-              // Attractions/Destinations layer toggle on any screen width
-              right: "8rem",
+              left: 0,
+              right: 0,
               pointerEvents: "none",
+              paddingLeft: "0.5rem",
+              paddingRight: "0.5rem",
             }}
           >
             {/* Fade-out on right edge — signals hidden pills to scroll (Google Maps / Airbnb pattern) */}

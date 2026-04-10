@@ -100,6 +100,7 @@ export default function NavBar() {
   }, []);
 
   return (
+    <>
     <header className="sticky top-0 z-[2000] border-b border-border bg-background/95 backdrop-blur-sm">
       <div className="flex items-center justify-between px-4 h-14 max-w-7xl mx-auto">
         {/* Logo */}
@@ -141,12 +142,51 @@ export default function NavBar() {
           })}
         </nav>
 
-        {/* Right controls — flex-1 on mobile when search open so it fills the gap */}
-        <div className={`flex items-center gap-2 ${searchOpen ? "flex-1 min-w-0" : ""}`}>
+        {/* Mobile full-width search overlay — shows when searchOpen on mobile */}
+        {searchOpen && (
+          <div className="md:hidden flex-1 min-w-0 relative" ref={searchRef}>
+            <div className="flex items-center gap-1.5 bg-card border border-primary/30 rounded-xl px-3 py-2 shadow-md w-full">
+              <Search size={15} className="text-muted-foreground shrink-0" />
+              <input
+                ref={searchInputRef}
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                onKeyDown={e => e.key === "Escape" && setSearchOpen(false)}
+                placeholder="Search destinations, tours…"
+                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60 min-w-0"
+                aria-label="Search"
+              />
+              <button onClick={() => { setSearchOpen(false); setSearchQuery(""); }} className="text-muted-foreground hover:text-foreground">
+                <X size={15} />
+              </button>
+            </div>
+            {searchResults.length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 rounded-xl border border-border bg-card shadow-xl overflow-hidden z-[3000]">
+                {searchResults.map((r, i) => (
+                  <a key={i} href={r.type === "destination" ? `${window.location.href.split("#")[0]}#/sites/${r.slug}` : `${window.location.href.split("#")[0]}#/sites/${r.destSlug}/${r.slug}`} onClick={() => setSearchOpen(false)} className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted transition-colors border-b border-border/40 last:border-0">
+                    <span className="text-base shrink-0">{r.type === "destination" ? "📍" : "🎯"}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{r.name}</p>
+                      <p className="text-xs text-muted-foreground capitalize truncate">{r.type === "destination" ? "Destination" : "Attraction"} · {r.sub}</p>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            )}
+            {searchQuery.trim().length >= 2 && searchResults.length === 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 rounded-xl border border-border bg-card shadow-xl z-[3000] px-4 py-3">
+                <p className="text-sm text-muted-foreground">No results for "{searchQuery}"</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Right controls — hidden on mobile when search open */}
+        <div className={`flex items-center gap-2 ${searchOpen ? "hidden md:flex" : ""}`}>
 
           {/* ── Global Search ───────────────────────────────────────── */}
           <div className={`relative ${searchOpen ? "flex-1 md:flex-none" : ""}`} ref={searchRef}>
-            {/* Search button — expands to input on click */}
+            {/* Search button — expands to input on click (desktop keeps inline expand) */}
             {!searchOpen ? (
               <button
                 onClick={() => setSearchOpen(true)}
@@ -280,8 +320,15 @@ export default function NavBar() {
         </div>
       </div>
 
-      {/* Mobile bottom nav — pill-style active tab, clear separation, better icons */}
-      <nav className="md:hidden flex items-center border-t border-border bg-background px-2 py-1.5 gap-1">
+    </header>
+
+      {/* ── Mobile bottom nav — fixed to bottom of screen, Google Maps style ── */}
+      {/* data-bottom-nav: MapPage reads this to calculate available map height   */}
+      <nav
+        data-bottom-nav
+        className="md:hidden fixed bottom-0 left-0 right-0 z-[2000] flex items-center border-t border-border bg-background/95 backdrop-blur-sm px-2 gap-1"
+        style={{ paddingBottom: "max(0.375rem, env(safe-area-inset-bottom))", paddingTop: "0.375rem" }}
+      >
         {mobileNavItems.map(({ href, icon: Icon, label }) => {
           const active = location === href || (href !== "/" && location.startsWith(href));
           const isSubscribe = href === "/subscriptions";
@@ -300,14 +347,8 @@ export default function NavBar() {
                 }`}
                 style={{ minHeight: 48, minWidth: 0 }}
               >
-                <Icon
-                  size={20}
-                  strokeWidth={active ? 2.2 : 1.8}
-                />
-                <span
-                  className="leading-none text-center font-medium whitespace-nowrap"
-                  style={{ fontSize: "10px" }}
-                >
+                <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
+                <span className="leading-none text-center font-medium whitespace-nowrap" style={{ fontSize: "10px" }}>
                   {label}
                 </span>
               </a>
@@ -315,6 +356,6 @@ export default function NavBar() {
           );
         })}
       </nav>
-    </header>
+    </>
   );
 }

@@ -117,7 +117,7 @@ function DynamicFooter() {
   }, []);
 
   return (
-    <footer className="border-t border-border px-4 py-4 text-center space-y-1.5" style={{ fontSize: "var(--text-xs)", color: "hsl(var(--muted-foreground))" }}>
+    <footer className="border-t border-border px-4 py-4 text-center space-y-1.5 mb-[4.5rem] md:mb-0" style={{ fontSize: "var(--text-xs)", color: "hsl(var(--muted-foreground))" }}>
       <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
         <a href="#/blog" className="hover:text-primary transition-colors">Blog</a>
                   <a href="#/subscriptions" className="hover:text-primary transition-colors font-medium" style={{color:"hsl(var(--primary))"}}>Subscribe</a>
@@ -138,7 +138,7 @@ function DynamicFooter() {
 }
 
 function AppRoutes() {
-  const [, navigate] = useLocation();
+  const [routeLocation, navigate] = useLocation();
   const [ratingState, setRatingState] = useState<{
     siteId: number; siteSlug: string; siteName: string; trigger: "completion" | "exit"; listenedSeconds: number;
   } | null>(null);
@@ -171,7 +171,8 @@ function AppRoutes() {
                 <LaunchBanner />
                 <NavBar />
               </div>
-              <main className="flex-none"> {/* map page controls its own height; pb-28 added per-page */}
+              {/* pb-[4.5rem] on mobile = clears the fixed bottom nav (48px + safe area) */}
+              <main className="flex-none pb-0 md:pb-0"> {/* map page controls its own height */}
                 <Switch>
                   <Route path="/" component={MapPage} />
                   <Route path="/sites" component={SitesPage} />
@@ -189,7 +190,8 @@ function AppRoutes() {
               <Route path="/p/:slug" component={CmsPageRenderer} />
                 </Switch>
               </main>
-              <DynamicFooter />
+              {/* Footer hidden on map/landing page; shown on all other pages */}
+              {routeLocation !== "/" && <DynamicFooter />}
             </div>
 
             {/* WhatsApp floating button — bottom right, clears zoom controls and audio player */}
