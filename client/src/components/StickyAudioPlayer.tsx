@@ -356,10 +356,15 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
       {OfflineBanner}
       {children}
 
-      {/* ── Sticky player ── */}
+      {/* ── Sticky player ──
+           Fix: sits above the fixed bottom nav (z-2000) by using z-2001
+           and offsetting bottom by --bottom-nav-h (56px on mobile, 0 on desktop). */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-2xl"
-        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        className="fixed left-0 right-0 z-[2001] bg-card border-t border-border shadow-2xl"
+        style={{
+          bottom: "var(--bottom-nav-h, 56px)",
+          paddingBottom: 0,
+        }}
         role="region"
         aria-label="Audio guide player"
       >
