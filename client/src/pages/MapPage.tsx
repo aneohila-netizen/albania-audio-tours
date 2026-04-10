@@ -13,6 +13,7 @@ import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { useAudioPlayer } from "@/components/StickyAudioPlayer";
 import { getLangText } from "@/lib/i18n";
+import MobileDrawer from "@/components/MobileDrawer";
 
 type LeafletLib = any;
 type LeafletMap = any;
@@ -99,7 +100,10 @@ export default function MapPage() {
       const bottomNav = document.querySelector('[data-bottom-nav]') as HTMLElement | null;
       const headerH = header ? header.getBoundingClientRect().height : 92;
       const bottomH = bottomNav ? bottomNav.getBoundingClientRect().height : 0;
-      const h = window.innerHeight - headerH - bottomH;
+      // R3a: on desktop reserve ~56px for footer so it's always visible in viewport
+      const isMobileScreen = window.innerWidth < 768;
+      const footerReserve = isMobileScreen ? 0 : 72;
+      const h = window.innerHeight - headerH - bottomH - footerReserve;
       if (h > 100) setMapHeight(h);
     }
     calcHeight();
@@ -424,8 +428,9 @@ export default function MapPage() {
       const screenW = typeof screen !== 'undefined' ? Math.min(screen.width, screen.height) : window.innerWidth;
       const isMobile = screenW < 768;
       const map = L.map(mapRef.current, {
-        center: [41.0, 20.2],
-        zoom: isMobile ? 7.5 : 7,
+        center: [41.3, 20.2],
+        // R3b: desktop zoom tighter so Albania+Kosovo fills the screen
+        zoom: isMobile ? 7.5 : 7.8,
         zoomControl: false, // we add it manually at bottomright
       });
       // Industry standard: zoom controls bottom-right on mobile maps
@@ -928,31 +933,60 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* GPS locate button — pulses until activated to guide the user */}
-      <div className="absolute top-3 left-3 z-[1000]">
-        {/* Inner wrapper is relative so locate-ring span positions against the button */}
-        <div className="relative inline-flex">
-        {/* Outer glow ring — only when GPS is off, draws attention without being intrusive */}
-        {!autoCenter && (
-          <span
-            className="locate-ring pointer-events-none"
-            aria-hidden="true"
-          />
-        )}
-        <button
-          onClick={toggleAutoCenter}
-          className={`relative flex items-center gap-1.5 px-3 py-2 rounded-xl border shadow-md text-xs font-semibold transition-all duration-300 ${
-            autoCenter
-              ? "bg-blue-600 text-white border-blue-700 scale-100"
-              : "bg-card/95 backdrop-blur border-blue-300 text-blue-600 hover:text-blue-700 hover:border-blue-400 locate-btn-pulse"
-          }`}
-          aria-label={autoCenter ? "Stop following my location" : "Share your location to find tours near you"}
-          title={autoCenter ? "Auto-center ON — tap to stop" : "Share your location to discover nearby tours"}
-        >
-          {autoCenter ? <LocateFixed size={14} /> : <Locate size={14} />}
-          {autoCenter ? "Following" : "Share Location"}
-        </button>
+      {/* R1: Single responsive top row — Share Location LEFT, Attractions/Destinations RIGHT
+           flex layout guarantees they never overlap on any screen width.
+           min-w-0 + shrink allow each side to compress if screen is narrow.         */}
+      <div className="absolute top-3 left-3 right-3 z-[1000] flex items-center justify-between gap-2 pointer-events-none">
+
+        {/* Share Location button — left */}
+        <div className="relative inline-flex shrink-0 pointer-events-auto">
+          {!autoCenter && (
+            <span className="locate-ring pointer-events-none" aria-hidden="true" />
+          )}
+          <button
+            onClick={toggleAutoCenter}
+            className={`relative flex items-center gap-1.5 px-3 py-2 rounded-xl border shadow-md text-xs font-semibold transition-all duration-300 ${
+              autoCenter
+                ? "bg-blue-600 text-white border-blue-700 scale-100"
+                : "bg-card/95 backdrop-blur border-blue-300 text-blue-600 hover:text-blue-700 hover:border-blue-400 locate-btn-pulse"
+            }`}
+            aria-label={autoCenter ? "Stop following my location" : "Share your location to find tours near you"}
+            title={autoCenter ? "Auto-center ON — tap to stop" : "Share your location to discover nearby tours"}
+            style={{ whiteSpace: "nowrap" }}
+          >
+            {autoCenter ? <LocateFixed size={14} /> : <Locate size={14} />}
+            {autoCenter ? "Following" : "Share Location"}
+          </button>
         </div>
+
+        {/* Attractions / Destinations toggle — right */}
+        <div className="pointer-events-auto shrink-0">
+          <div className="flex items-center gap-1 rounded-xl border border-border bg-card/95 backdrop-blur p-1 shadow-md">
+            <button
+              onClick={() => { setLayerMode("attractions"); setShowDestPanel(false); setCategoryFilter("all"); setAttrCategoryFilter("all"); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                layerMode === "attractions"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              style={{ whiteSpace: "nowrap" }}
+            >
+              <MapPin size={12} /> Attractions
+            </button>
+            <button
+              onClick={() => { setLayerMode("destinations"); setShowDestPanel(true); setAttrCategoryFilter("all"); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                layerMode === "destinations"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              style={{ whiteSpace: "nowrap" }}
+            >
+              <Layers size={12} /> Destinations
+            </button>
+          </div>
+        </div>
+
       </div>
 
       {/* ── Category filter pill bar ────────────────────────────────────────────────
@@ -1088,33 +1122,7 @@ export default function MapPage() {
         );
       })()}
 
-      {/* Browse destinations button removed — redundant with scrolling, was covering the Start Exploring pill */}
-
-      {/* Layer toggle */}
-      <div className="absolute top-3 right-3 z-[1000]">
-        <div className="flex items-center gap-1 rounded-xl border border-border bg-card/95 backdrop-blur p-1 shadow-md">
-          <button
-            onClick={() => { setLayerMode("attractions"); setShowDestPanel(false); setCategoryFilter("all"); setAttrCategoryFilter("all"); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-              layerMode === "attractions"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <MapPin size={12} /> Attractions
-          </button>
-          <button
-            onClick={() => { setLayerMode("destinations"); setShowDestPanel(true); setAttrCategoryFilter("all"); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-              layerMode === "destinations"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Layers size={12} /> Destinations
-          </button>
-        </div>
-      </div>
+      {/* Layer toggle merged into R1 row above — removed from here */}
 
       {/* Selected pin panel */}
       {selectedPin && (
@@ -1478,6 +1486,13 @@ export default function MapPage() {
           </div>
         </div>
       )}
+
+      {/* R2: Mobile slide-up drawer — handle + nearest destination CTA + footer links
+           Only rendered on mobile (MobileDrawer has md:hidden).                         */}
+      <MobileDrawer
+        nearestTour={nearestTour}
+        destinations={DESTINATIONS}
+      />
 
     </div>
   );

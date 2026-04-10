@@ -117,16 +117,35 @@ function DynamicFooter() {
   }, []);
 
   return (
-    <footer className="border-t border-border px-4 py-4 text-center space-y-1.5 mb-[4.5rem] md:mb-0" style={{ fontSize: "var(--text-xs)", color: "hsl(var(--muted-foreground))" }}>
-      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
-        <a href="#/blog" className="hover:text-primary transition-colors">Blog</a>
-                  <a href="#/subscriptions" className="hover:text-primary transition-colors font-medium" style={{color:"hsl(var(--primary))"}}>Subscribe</a>
+    <footer
+      className="border-t border-border px-4 py-3 text-center space-y-1"
+      style={{ fontSize: "var(--text-xs)", color: "hsl(var(--muted-foreground))" }}
+    >
+      {/* R3a: links row + R3c: WhatsApp icon in footer on desktop */}
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+        <a href="#/blog"          className="hover:text-primary transition-colors">Blog</a>
+        <a href="#/subscriptions" className="hover:text-primary transition-colors font-medium" style={{ color: "hsl(var(--primary))" }}>Subscribe</a>
         {cmsLinks.map(p => (
           <a key={p.id} href={`#/p/${p.slug}`} className="hover:text-primary transition-colors">{p.title}</a>
         ))}
-        <a href="#/contact" className="hover:text-primary transition-colors">Contact</a>
-        <a href="#/terms" className="hover:text-primary transition-colors">Terms of Service</a>
+        <a href="#/contact"       className="hover:text-primary transition-colors">Contact</a>
+        <a href="#/terms"         className="hover:text-primary transition-colors">Terms</a>
         <a href="#/refund-policy" className="hover:text-primary transition-colors">Refund Policy</a>
+
+        {/* R3c: WhatsApp inline in desktop footer — hidden on mobile (uses floating button) */}
+        <a
+          href="https://wa.me/355686064077"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Chat with us on WhatsApp"
+          className="hidden md:inline-flex items-center gap-1.5 text-green-600 hover:text-green-700 font-medium transition-colors"
+        >
+          <svg width="14" height="14" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <path d="M16 2C8.268 2 2 8.268 2 16c0 2.4.636 4.65 1.748 6.6L2 30l7.6-1.72A13.94 13.94 0 0016 30c7.732 0 14-6.268 14-14S23.732 2 16 2z" fill="#25D366"/>
+            <path d="M23.5 19.9c-.3-.15-1.77-.87-2.04-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.27-.47-2.42-1.5-.89-.8-1.5-1.78-1.67-2.08-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51H12.5c-.2 0-.52.07-.79.37-.27.3-1.02 1-1.02 2.43 0 1.43 1.05 2.82 1.2 3.02.15.2 2.06 3.14 4.99 4.4.7.3 1.24.48 1.67.62.7.22 1.33.19 1.83.12.56-.08 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.12-.27-.2-.57-.35z" fill="white"/>
+          </svg>
+          WhatsApp
+        </a>
       </div>
       <div>
         <span>AlbaTour — Albania Self-Guided Audio Tours</span>
@@ -190,22 +209,25 @@ function AppRoutes() {
               <Route path="/p/:slug" component={CmsPageRenderer} />
                 </Switch>
               </main>
-              {/* Footer hidden on map/landing page; shown on all other pages */}
-              {routeLocation !== "/" && <DynamicFooter />}
+              {/* R3a: Desktop footer always visible (even on map page).
+                   Mobile: hidden on map page (MobileDrawer handles it);
+                   shown on other pages with bottom padding for fixed nav. */}
+              <div className={routeLocation === "/" ? "hidden md:block" : "block"}>
+                <DynamicFooter />
+              </div>
             </div>
 
-            {/* WhatsApp floating button — bottom right, clears zoom controls and audio player */}
+            {/* WhatsApp floating button — mobile only (desktop uses footer link R3c) */}
             <a
               href="https://wa.me/355686064077"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Chat with us on WhatsApp"
               title="Chat on WhatsApp"
+              className="md:hidden"
               style={{
                 position: "fixed",
-                // RIGHT side. Zoom is now on LEFT on mobile, so no overlap.
-                // On desktop zoom is right at ~11.5rem — WhatsApp at 8rem is below it.
-                bottom: "8rem",
+                bottom: "5rem", // above fixed bottom nav
                 right: "0.75rem",
                 left: "auto",
                 zIndex: 1500,

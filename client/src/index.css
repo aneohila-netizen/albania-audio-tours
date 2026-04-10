@@ -4,6 +4,8 @@
 
 @layer base {
   :root {
+    /* Bottom nav height — used by MobileDrawer to position above nav */
+    --bottom-nav-h: 56px;
     /* Albania-inspired palette: deep Adriatic teal, warm stone, eagle red */
     --background: 42 18% 96%;
     --foreground: 220 25% 12%;
