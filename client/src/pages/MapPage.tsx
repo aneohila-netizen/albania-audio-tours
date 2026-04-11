@@ -5,7 +5,7 @@ import type { TourSite } from "@shared/schema";
 import { useDestinations, useAttractions } from "@/lib/useApiData";
 import type { Destination, Attraction } from "@/lib/staticData";
 import VisitModal from "@/components/VisitModal";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, RAILWAY_URL } from "@/lib/queryClient";
 import { getSessionId } from "@/lib/session";
 import { MapPin, X, Layers, Locate, LocateFixed, Headphones, ChevronRight, ArrowRight, Search } from "lucide-react";
 // Leaflet marker cluster — groups overlapping pins into numbered bubbles
@@ -189,10 +189,9 @@ export default function MapPage() {
     if (!nearestTour || !DESTINATIONS.length) return;
     const dest = DESTINATIONS.find(d => d.slug === nearestTour.slug);
     if (!dest) return;
-    const langField = `audioUrl${lang.charAt(0).toUpperCase() + lang.slice(1)}`;
-    const audioUrl = (dest as any)[langField] || (dest as any).audioUrlEn || null;
-    if (!audioUrl) return;
-    // Preload via hidden Audio element — browser fetches and caches at URL level
+    // Use /api/audio/serve endpoint — same as handlePlayFromPin and AudioPlayer.
+    // audioUrl* fields are stripped from API responses so we build the URL directly.
+    const audioUrl = `${RAILWAY_URL}/api/audio/serve/site/${dest.id}/${lang}`;
     const audio = new Audio();
     audio.preload = "auto";
     audio.src = audioUrl;
@@ -745,17 +744,19 @@ export default function MapPage() {
   const handlePlayFromPin = () => {
     if (!selectedPin) return;
     const data = selectedPin.data;
-    const descField = `desc${lang.charAt(0).toUpperCase() + lang.slice(1)}`;
-    const text = (data as any)[descField] || (data as any).descEn || "";
     const nameField = `name${lang.charAt(0).toUpperCase() + lang.slice(1)}`;
     const siteName = (data as any)[nameField] || (data as any).nameEn || "";
-    const storedAudioField = `audioUrl${lang.charAt(0).toUpperCase() + lang.slice(1)}`;
-    const storedUrl = (data as any)[storedAudioField] || (data as any).audioUrlEn || null;
-    // Fix 1a: load track WITHOUT navigating away.
-    // Previously navigate(detailPath) was called here — this unmounted the player,
-    // discarded the preloaded audio and triggered a fresh 40-50s TTS generation.
-    // Now we start playback immediately on the map page (storedUrl is already cached
-    // by the preload effect). The visitor stays on the map with the player showing.
+    const descField = `desc${lang.charAt(0).toUpperCase() + lang.slice(1)}`;
+    const text = (data as any)[descField] || (data as any).descEn || "";
+
+    // Exact copy of AudioPlayer.handlePlay on the Destination page:
+    // Use /api/audio/serve/:type/:id/:lang as storedUrl.
+    // This endpoint reads the stored R2/DB audio directly — same male voice
+    // (charon), same speed, instant playback. audioUrl* fields are stripped from
+    // public API responses so we can't read them from selectedPin.data.
+    const entityType = selectedPin.type === "destination" ? "site" : "attraction";
+    const storedUrl = `${RAILWAY_URL}/api/audio/serve/${entityType}/${data.id}/${lang}`;
+
     loadTrack({
       siteId: data.id,
       siteSlug: data.slug,
@@ -764,7 +765,7 @@ export default function MapPage() {
       text,
       storedUrl,
     });
-    setSelectedPin(null); // close the popup — player appears above nav
+    setSelectedPin(null); // close popup — player appears above nav
   };
 
   return (
