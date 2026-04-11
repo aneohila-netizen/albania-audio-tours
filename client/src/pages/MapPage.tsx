@@ -428,13 +428,14 @@ export default function MapPage() {
       const screenW = typeof screen !== 'undefined' ? Math.min(screen.width, screen.height) : window.innerWidth;
       const isMobile = screenW < 768;
       const map = L.map(mapRef.current, {
-        center: [41.3, 20.2],
-        // R3b: desktop zoom tighter so Albania+Kosovo fills the screen
-        zoom: isMobile ? 7.5 : 7.8,
-        zoomControl: false, // we add it manually at bottomright
+        center: [41.0, 20.2],
+        // Fix 4: mobile zoom 6.8 shows full Albania+Kosovo with minimal border space
+        // Desktop zoom 7.8 stays tighter (larger screen has more room)
+        zoom: isMobile ? 6.8 : 7.8,
+        zoomControl: false, // we add it manually with custom position
       });
-      // Industry standard: zoom controls bottom-right on mobile maps
-      L.control.zoom({ position: "bottomright" }).addTo(map);
+      // Fix 3b: zoom at left side — positioned via CSS to vertical center
+      L.control.zoom({ position: "bottomleft" }).addTo(map);
 
       // When the user manually drags the map while GPS Following is active,
       // pause re-centering (Google Maps / Apple Maps pattern).
@@ -750,9 +751,11 @@ export default function MapPage() {
     const siteName = (data as any)[nameField] || (data as any).nameEn || "";
     const storedAudioField = `audioUrl${lang.charAt(0).toUpperCase() + lang.slice(1)}`;
     const storedUrl = (data as any)[storedAudioField] || (data as any).audioUrlEn || null;
-    const detailPath = selectedPin.type === "destination"
-      ? `/sites/${selectedPin.data.slug}`
-      : `/sites/${(selectedPin as any).dest.slug}/${selectedPin.data.slug}`;
+    // Fix 1a: load track WITHOUT navigating away.
+    // Previously navigate(detailPath) was called here — this unmounted the player,
+    // discarded the preloaded audio and triggered a fresh 40-50s TTS generation.
+    // Now we start playback immediately on the map page (storedUrl is already cached
+    // by the preload effect). The visitor stays on the map with the player showing.
     loadTrack({
       siteId: data.id,
       siteSlug: data.slug,
@@ -761,8 +764,7 @@ export default function MapPage() {
       text,
       storedUrl,
     });
-    navigate(detailPath);
-    setSelectedPin(null);
+    setSelectedPin(null); // close the popup — player appears above nav
   };
 
   return (
@@ -776,7 +778,7 @@ export default function MapPage() {
 
       {/* Start Exploring pill — primary CTA, bottom-left, dismissible */}
       {!heroDismissed && !selectedPin && (
-        <div className="absolute bottom-4 left-3 z-[999]">
+        <div className="absolute left-3 z-[999]" style={{ bottom: "44px" }}>{/* Fix 3c: above drawer 28px + 16px gap */}
           <div
             className="start-exploring-pill flex items-center gap-1.5 rounded-full pl-3 pr-1 py-1.5"
             style={{
@@ -1127,8 +1129,8 @@ export default function MapPage() {
       {/* Selected pin panel */}
       {selectedPin && (
         <div
-          className="absolute bottom-0 left-0 right-0 z-[1000] side-panel"
-          style={{ maxHeight: "60vh" }}
+          className="absolute left-0 right-0 z-[1000] side-panel"
+          style={{ bottom: "28px", maxHeight: "60vh" }}
           data-testid="site-panel"
         >
           <div className="bg-card border-t border-border rounded-t-2xl shadow-xl overflow-y-auto max-h-full">

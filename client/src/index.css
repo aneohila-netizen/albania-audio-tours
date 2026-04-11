@@ -448,13 +448,17 @@
    Leaflet places zoom in .leaflet-bottom.leaflet-right, so we reposition the
    entire right-bottom corner and shift zoom left using negative right + left trick. */
 @media (max-width: 768px) {
-  /* Pull the zoom control out of the right corner and place it on the left */
+  /* Fix 3b: zoom control at left side, vertically centered in the map */
+  .leaflet-bottom.leaflet-left .leaflet-control-zoom,
   .leaflet-bottom.leaflet-right .leaflet-control-zoom {
     position: fixed !important;
     right: auto !important;
     left: 0.75rem !important;
-    bottom: 7rem !important;
+    bottom: auto !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
     margin: 0 !important;
+    z-index: 1000 !important;
   }
   /* Larger, finger-friendly touch targets */
   .leaflet-control-zoom-in,

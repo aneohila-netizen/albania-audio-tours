@@ -263,14 +263,7 @@ export default function NavBar() {
             )}
           </div>
 
-          {/* Points display */}
-          <div className="points-badge hidden sm:flex items-center gap-1" data-testid="total-points">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-              <path d="M6 1L7.5 4.5H11L8 6.5L9.5 10L6 8L2.5 10L4 6.5L1 4.5H4.5L6 1Z" />
-            </svg>
-            {totalPoints} pts
-          </div>
-
+          {/* Fix 3a: Mobile order — Language first (after logo), then pts, dark, settings */}
           {/* Language switcher — compact dropdown */}
           <div className="relative" ref={langRef}>
             <button
@@ -309,6 +302,14 @@ export default function NavBar() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Points display — Fix 3a: after language, visible on mobile too */}
+          <div className="points-badge flex items-center gap-1" data-testid="total-points">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+              <path d="M6 1L7.5 4.5H11L8 6.5L9.5 10L6 8L2.5 10L4 6.5L1 4.5H4.5L6 1Z" />
+            </svg>
+            {totalPoints} pts
           </div>
 
           {/* Dark mode toggle */}

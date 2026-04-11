@@ -539,7 +539,7 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
       {/* ── Transcript modal ── */}
       {showTranscript && (
         <div
-          className="fixed inset-0 z-[60] bg-black/50 flex items-end"
+          className="fixed inset-0 z-[2100] bg-black/50 flex items-end"
           onClick={() => setShowTranscript(false)}
           role="dialog"
           aria-modal="true"
