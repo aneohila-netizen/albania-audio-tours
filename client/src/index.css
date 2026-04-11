@@ -437,11 +437,19 @@
   animation: none;
 }
 
-/* Push Leaflet zoom control above sticky audio player (approx 7rem) */
-/* Desktop: stays bottom-right, clear of WhatsApp */
-.leaflet-bottom.leaflet-right .leaflet-control-zoom {
-  margin-bottom: 7rem;
-  margin-right: 0.75rem;
+/* Desktop: zoom at left side, vertically centered — clear of Start Exploring button */
+@media (min-width: 769px) {
+  .leaflet-bottom.leaflet-left .leaflet-control-zoom,
+  .leaflet-bottom.leaflet-right .leaflet-control-zoom {
+    position: fixed !important;
+    left: 0.75rem !important;
+    right: auto !important;
+    bottom: auto !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    margin: 0 !important;
+    z-index: 1000 !important;
+  }
 }
 
 /* Mobile: move zoom to bottom-LEFT so WhatsApp (bottom-right) never overlaps.
