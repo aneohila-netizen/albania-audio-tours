@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useApp } from "@/App";
-import { useDestinations, useAttractions } from "@/lib/useApiData";
+import { useDestinations, useAttractions, useDestinationsLoading } from "@/lib/useApiData";
 import type { Destination } from "@/lib/staticData";
 import { Search, MapPin, Star, ChevronRight, LayoutGrid, List } from "lucide-react";
 import { getLangText } from "@/lib/i18n";
@@ -47,6 +47,7 @@ export default function SitesPage() {
 
   const DESTINATIONS = useDestinations();
   const ATTRACTIONS = useAttractions();
+  const isLoadingDestinations = useDestinationsLoading();
 
   // Build category list from actual data — expand comma-separated multi-categories.
   // Each destination may have "city,historic-town" so we expand and deduplicate.
@@ -75,7 +76,7 @@ export default function SitesPage() {
             Destinations
           </h1>
           <p className="text-sm text-muted-foreground">
-            {filtered.length} destinations to explore
+            {isLoadingDestinations ? "Loading destinations…" : `${filtered.length} destinations to explore`}
           </p>
         </div>
 
@@ -322,7 +323,24 @@ export default function SitesPage() {
         </div>
       )}
 
-      {filtered.length === 0 && (
+      {/* Loading skeleton — shown while initial fetch is in-flight */}
+      {isLoadingDestinations && filtered.length === 0 && (
+        <div className="space-y-3 mt-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="flex gap-3 p-4 rounded-xl border border-border bg-card animate-pulse">
+              <div className="w-24 h-20 rounded-lg bg-muted shrink-0" />
+              <div className="flex-1 space-y-2 py-1">
+                <div className="h-4 bg-muted rounded w-2/5" />
+                <div className="h-3 bg-muted rounded w-1/4" />
+                <div className="h-3 bg-muted rounded w-3/4" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* True empty state — only shown after data has loaded */}
+      {!isLoadingDestinations && filtered.length === 0 && (
         <div className="text-center py-16 text-muted-foreground">
           <Search size={40} className="mx-auto mb-4 opacity-30" />
           <p className="font-medium">No destinations found</p>

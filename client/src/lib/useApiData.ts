@@ -66,16 +66,25 @@ export function useDestinations(): Destination[] {
   const { data: apiSites } = useQuery<TourSite[]>({
     queryKey: ["railway", "sites"],
     queryFn: () => railwayFetch<TourSite[]>("/api/sites"),
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,  // 5 min — aligned with QueryClient default
+    gcTime:   30 * 60_000,  // keep in cache 30 min after last use
   });
 
-  // API loaded → use it entirely (includes any admin-created destinations)
   if (apiSites && apiSites.length > 0) {
     return apiSites.map(siteToDestination);
   }
-
-  // Still loading or failed → return empty (no Unsplash placeholders)
   return [];
+}
+
+/** Returns true while the sites query is in-flight (no cached data yet) */
+export function useDestinationsLoading(): boolean {
+  const { isFetching, data } = useQuery<TourSite[]>({
+    queryKey: ["railway", "sites"],
+    queryFn: () => railwayFetch<TourSite[]>("/api/sites"),
+    staleTime: 5 * 60_000,
+    gcTime:   30 * 60_000,
+  });
+  return isFetching && (!data || data.length === 0);
 }
 
 /** Returns attractions — API is authoritative, staticData is loading fallback */
