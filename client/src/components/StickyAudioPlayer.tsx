@@ -460,6 +460,7 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
                       href={`${window.location.href.split("#")[0]}#${track.detailPath}`}
                       className="font-semibold underline text-primary"
                       style={{ cursor: "pointer" }}
+                      onClick={() => clearTrack()} // stop TTS + cancel any in-flight audio before navigating
                     >
                       tap Details
                     </a>
