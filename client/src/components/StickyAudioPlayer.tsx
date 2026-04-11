@@ -24,6 +24,7 @@ export interface AudioTrack {
   nextStopName?: string | null;
   stopIndex?: number | null;   // e.g. 2 (1-based)
   totalStops?: number | null;  // e.g. 8
+  detailPath?: string | null;  // link to destination/attraction page (shown in TTS fallback banner)
 }
 
 interface AudioPlayerContextType {
@@ -92,6 +93,8 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const listenedRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Stable ref to loadTrack so attachAudio's error handler can call it without stale closure
+  const loadTrackRef = useRef<((t: AudioTrack) => void) | null>(null);
 
   // Track listened time while playing
   useEffect(() => {
@@ -130,7 +133,7 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
     setListenedSeconds(0);
   }, []);
 
-  const attachAudio = useCallback((url: string) => {
+  const attachAudio = useCallback((url: string, sourceTrack?: AudioTrack) => {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
 
     const audio = new Audio(url);
@@ -150,7 +153,12 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
     audio.addEventListener("error", () => {
       setIsPlaying(false);
       setIsLoading(false);
-      setError("Audio failed to load.");
+      // If the stored URL 404'd, fall through to TTS generation automatically
+      if (sourceTrack?.storedUrl && sourceTrack.text) {
+        loadTrackRef.current?.({ ...sourceTrack, storedUrl: null });
+      } else {
+        setError("Audio failed to load.");
+      }
     });
     audio.addEventListener("waiting", () => setIsLoading(true));
     audio.addEventListener("canplay", () => setIsLoading(false));
@@ -158,7 +166,15 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
     setIsLoading(true);
     audio.play()
       .then(() => { setIsPlaying(true); setIsLoading(false); })
-      .catch(() => { setIsLoading(false); setError("Playback blocked. Tap Play to start."); });
+      .catch((e: any) => {
+        setIsLoading(false);
+        // NotAllowedError = autoplay policy — user must tap Play manually
+        if (e?.name === "NotAllowedError") {
+          setError("Tap \u25b6 to start playback.");
+        }
+        // Other errors (404, network): the audio element error event handles these
+        // by setting "Audio failed to load." — user can Retry
+      });
   }, [speed]);
 
   // Notify parent when completed
@@ -173,9 +189,9 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
     setTrack(newTrack);
     setCollapsed(false);
 
-    // Use stored URL if available
+    // Use stored URL if available — pass track so error handler can fall through to TTS
     if (newTrack.storedUrl) {
-      attachAudio(newTrack.storedUrl);
+      attachAudio(newTrack.storedUrl, newTrack);
       return;
     }
 
@@ -239,6 +255,9 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
       setError(e.message || "Audio generation failed. Check your connection.");
     }
   }, [teardown, attachAudio]);
+
+  // Keep ref in sync so attachAudio error handler always has latest loadTrack
+  loadTrackRef.current = loadTrack;
 
   const clearTrack = useCallback(() => {
     teardown();
@@ -429,11 +448,25 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
 
         {!collapsed && (
           <div className="px-4 pb-3 space-y-2">
-            {/* Generating hint */}
+            {/* Generating hint — shown when storedUrl was null and TTS is running */}
             {isGenerating && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                 <Loader2 size={11} className="animate-spin shrink-0" />
-                Preparing audio guide…
+                <span>
+                  ⏳ Audio preview takes ~30 sec to generate. 
+                  For instant playback —{" "}
+                  {track?.detailPath ? (
+                    <a
+                      href={`${window.location.href.split("#")[0]}#${track.detailPath}`}
+                      className="font-semibold underline text-primary"
+                      style={{ cursor: "pointer" }}
+                    >
+                      tap Details
+                    </a>
+                  ) : (
+                    <span className="font-semibold">tap Details</span>
+                  )}
+                </span>
               </div>
             )}
 

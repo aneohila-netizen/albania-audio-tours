@@ -741,22 +741,28 @@ export default function MapPage() {
     }
   };
 
-  const handlePlayFromPin = () => {
+  const handlePlayFromPin = async () => {
     if (!selectedPin) return;
     const data = selectedPin.data;
     const nameField = `name${lang.charAt(0).toUpperCase() + lang.slice(1)}`;
     const siteName = (data as any)[nameField] || (data as any).nameEn || "";
     const descField = `desc${lang.charAt(0).toUpperCase() + lang.slice(1)}`;
     const text = (data as any)[descField] || (data as any).descEn || "";
-
-    // Exact copy of AudioPlayer.handlePlay on the Destination page:
-    // Use /api/audio/serve/:type/:id/:lang as storedUrl.
-    // This endpoint reads the stored R2/DB audio directly — same male voice
-    // (charon), same speed, instant playback. audioUrl* fields are stripped from
-    // public API responses so we can't read them from selectedPin.data.
     const entityType = selectedPin.type === "destination" ? "site" : "attraction";
-    const storedUrl = `${RAILWAY_URL}/api/audio/serve/${entityType}/${data.id}/${lang}`;
+    const serveUrl = `${RAILWAY_URL}/api/audio/serve/${entityType}/${data.id}/${lang}`;
 
+    // Check if pre-generated audio exists for this destination + language.
+    // HEAD request is fast (no body) — avoids loading a 404 into <audio>.
+    // If audio exists: instant playback from stored MP3 (same as Resume on dest page).
+    // If not: storedUrl = null — StickyAudioPlayer falls through to TTS generation
+    //         and shows the "~30 sec" notice with a Details link.
+    let storedUrl: string | null = null;
+    try {
+      const probe = await fetch(serveUrl, { method: "HEAD" });
+      if (probe.ok) storedUrl = serveUrl;
+    } catch { /* network error — fall through to TTS */ }
+
+    setSelectedPin(null); // close popup before loadTrack so player renders cleanly
     loadTrack({
       siteId: data.id,
       siteSlug: data.slug,
@@ -764,8 +770,11 @@ export default function MapPage() {
       lang,
       text,
       storedUrl,
+      // Pass destination path so the TTS fallback banner can link to Details
+      detailPath: selectedPin.type === "destination"
+        ? `/sites/${data.slug}`
+        : `/sites/${(selectedPin as any).dest?.slug}/${data.slug}`,
     });
-    setSelectedPin(null); // close popup — player appears above nav
   };
 
   return (
