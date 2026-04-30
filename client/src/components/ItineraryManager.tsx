@@ -3,6 +3,7 @@
  * The map is rendered in an always-mounted iframe-like div using a plain
  * script injection pattern so Leaflet never fights with React rendering.
  */
+import "leaflet/dist/leaflet.css";
 import { useState, useEffect, useRef } from "react";
 import {
   Plus, Trash2, Edit2, Save, X, MapPin,
@@ -102,41 +103,59 @@ function LeafletMap({ mapId, centerLat, centerLng, waypoints, onWaypointsChange 
     tileRef.current = L.tileLayer(url, { attribution: attr, maxZoom: 19 }).addTo(map);
   }, [isSat]);
 
-    useEffect(() => {
-    const L = (window as any).L;
-    if (!L) return;
+  useEffect(() => {
+    let mounted = true;
 
-    // If already init'd for this mapId, destroy first
-    if (mapRef.current) { try { mapRef.current.remove(); } catch {} mapRef.current = null; }
+    const initMap = (leaflet: any) => {
+      const L = leaflet.default ?? leaflet;
+      // Store on window so the satellite toggle useEffect can access it
+      (window as any).L = L;
 
-    const div = document.getElementById(mapId);
-    if (!div) return;
+      if (!mounted) return;
+      if (mapRef.current) { try { mapRef.current.remove(); } catch {} mapRef.current = null; }
 
-    mapRef.current = L.map(div, { zoomControl: true }).setView([centerLat, centerLng], 15);
-    tileRef.current = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-      attribution: "© CartoDB", maxZoom: 19,
-    }).addTo(mapRef.current);
+      const div = document.getElementById(mapId);
+      if (!div) return;
 
-    mapRef.current.on("click", (e: any) => {
-      const cur = waypointsRef.current;
-      const n = cur.length;
-      onChangeRef.current([...cur, {
-        order: n + 1,
-        lat: parseFloat(e.latlng.lat.toFixed(6)),
-        lng: parseFloat(e.latlng.lng.toFixed(6)),
-        title: n === 0 ? "Start" : `Stop ${n + 1}`,
-        description: "",
-      }]);
-    });
+      // Fix default icon paths
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+        iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+      });
 
-    // Invalidate after any CSS transition finishes (tab open etc.)
-    setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 350);
+      mapRef.current = L.map(div, { zoomControl: true }).setView([centerLat, centerLng], 15);
+      tileRef.current = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+        attribution: "© CartoDB", maxZoom: 19,
+      }).addTo(mapRef.current);
+
+      mapRef.current.on("click", (e: any) => {
+        if (!mounted) return;
+        const cur = waypointsRef.current;
+        const n = cur.length;
+        onChangeRef.current([...cur, {
+          order: n + 1,
+          lat: parseFloat(e.latlng.lat.toFixed(6)),
+          lng: parseFloat(e.latlng.lng.toFixed(6)),
+          title: n === 0 ? "Start" : `Stop ${n + 1}`,
+          description: "",
+        }]);
+      });
+
+      // Invalidate after tab CSS transition finishes
+      setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 100);
+      setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 400);
+    };
+
+    import("leaflet").then(initMap).catch(console.error);
 
     return () => {
+      mounted = false;
       if (mapRef.current) { try { mapRef.current.remove(); } catch {} mapRef.current = null; }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapId]); // stable id — only re-run if the map instance changes
+  }, [mapId]);
 
   // Redraw markers + polyline whenever waypoints change
   useEffect(() => {
