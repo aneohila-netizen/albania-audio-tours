@@ -101,7 +101,6 @@ async function translateWithGemini(text: string, targetLang: string): Promise<st
   };
   const langName = langNames[targetLang] || targetLang;
 
-  // Use fetch to call Gemini REST API
   const prompt = `Translate the following tourism description text into ${langName}.
 Keep the tone warm, friendly, and natural — like a knowledgeable local guide speaking to a visitor.
 Do NOT use em-dashes (—), avoid ellipses (...), avoid parentheses where possible.
@@ -110,26 +109,52 @@ Write in complete natural sentences. Do not add any explanation or commentary, o
 Text to translate:
 ${text}`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-  const body = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
-  };
+  // Try models in order: 2.5-flash first, then 1.5-flash as fallback
+  const models = [
+    "gemini-2.5-flash",
+    "gemini-1.5-flash",
+  ];
 
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-  if (!resp.ok) {
-    const err = await resp.text();
-    throw new Error(`Gemini API error ${resp.status}: ${err}`);
+  for (const model of models) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+    const body = {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
+    };
+
+    // Retry up to 3 times with exponential backoff for 429/503
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (resp.ok) {
+        const data = await resp.json() as any;
+        const translated = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        return translated.trim();
+      }
+
+      const status = resp.status;
+      // Retry on overload/rate-limit errors
+      if ((status === 429 || status === 503 || status === 500) && attempt < 3) {
+        const delay = attempt * 3000; // 3s, 6s
+        console.warn(`[translate] ${model} attempt ${attempt} failed (${status}), retrying in ${delay}ms...`);
+        await sleep(delay);
+        continue;
+      }
+
+      // For this model, give up and try next model
+      const errText = await resp.text();
+      console.warn(`[translate] ${model} failed permanently (${status}): ${errText.slice(0, 120)}`);
+      break;
+    }
   }
 
-  const data = await resp.json() as any;
-  const translated = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  return translated.trim();
+  throw new Error("Translation failed: all models unavailable. Please try again in a few minutes.");
 }
 
 // ─── Listen counter (in-memory, resets on redeploy — future: persist to DB) ───────────
