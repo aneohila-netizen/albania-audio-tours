@@ -191,8 +191,65 @@ function LeafletMap({ mapId, centerLat, centerLng, waypoints, onWaypointsChange 
 
   const count = waypoints.length;
 
+  // Geocoding search using Nominatim (free, no API key)
+  const handleSearch = async () => {
+    const input = document.getElementById(mapId + "-search") as HTMLInputElement;
+    const query = input?.value?.trim();
+    if (!query || !mapRef.current) return;
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,
+        { headers: { "Accept-Language": "en" } }
+      );
+      const data = await res.json();
+      if (data && data[0]) {
+        const lat = parseFloat(data[0].lat);
+        const lng = parseFloat(data[0].lon);
+        mapRef.current.setView([lat, lng], 16);
+      } else {
+        alert("Location not found. Try a different search term.");
+      }
+    } catch {
+      alert("Search failed. Check your connection.");
+    }
+  };
+
   return (
     <div className="space-y-2">
+      {/* ── Map toolbar: search + satellite toggle ── */}
+      <div className="flex gap-2 items-center flex-wrap">
+        {/* Geocoding search */}
+        <div className="flex gap-1 flex-1 min-w-0">
+          <input
+            id={mapId + "-search"}
+            type="text"
+            placeholder="Search place or address..."
+            className="flex-1 h-8 rounded-md border border-border bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary min-w-0"
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleSearch(); } }}
+          />
+          <button
+            type="button"
+            onClick={handleSearch}
+            className="h-8 px-3 rounded-md bg-primary text-white text-xs font-semibold hover:bg-primary/90 shrink-0"
+          >
+            Search
+          </button>
+        </div>
+        {/* Satellite toggle */}
+        <button
+          type="button"
+          onClick={() => setIsSat(s => !s)}
+          className={`h-8 px-3 rounded-md text-xs font-semibold border shrink-0 transition-colors ${
+            isSat
+              ? "bg-primary text-white border-primary"
+              : "bg-background text-foreground border-border hover:bg-muted"
+          }`}
+        >
+          {isSat ? "🛰 Satellite" : "🗺 Satellite"}
+        </button>
+      </div>
+
+      {/* Instruction row */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
           Click the map to add stop #{count + 1}. Drag pins to reposition.
