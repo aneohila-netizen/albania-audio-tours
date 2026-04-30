@@ -165,7 +165,7 @@ export default function SitesPage() {
                       onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
                     />
                   ) : null}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                  {/* gradient overlay removed V1 */}
                   <div className="absolute top-3 left-3">
                     <span
                       className="text-xs font-semibold px-2 py-0.5 rounded-full text-white"

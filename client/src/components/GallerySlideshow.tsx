@@ -130,8 +130,7 @@ export default function GallerySlideshow({
         );
       })}
 
-      {/* Overlay gradient */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
+      {/* Overlay gradient removed V1 */}
 
       {/* Navigation arrows — only show with 2+ images */}
       {showControls && allImages.length > 1 && (

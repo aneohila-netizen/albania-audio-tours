@@ -317,7 +317,7 @@ export default function DestinationPage() {
                             {CATEGORY_EMOJI[attr.category.split(",")[0].trim()] || "📍"}
                           </div>
                         )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                        {/* gradient overlay removed V1 */}
                         {isVisited && (
                           <div className="absolute top-2 right-2 rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: "#2D7A22", color: "white" }}>
                             ✓ Visited
