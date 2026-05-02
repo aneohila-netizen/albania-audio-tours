@@ -10,7 +10,10 @@ import { apiRequest } from "@/lib/queryClient";
 import { ArrowLeft, Calendar, User } from "lucide-react";
 import { Link } from "wouter";
 
-const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
+// Use relative URL so it works on both albaniaaudiotours.com and railway preview
+const API_BASE = typeof window !== "undefined" && window.location.hostname !== "localhost"
+  ? ""
+  : "https://albania-audio-tours-production.up.railway.app";
 
 interface CmsPage {
   id: number;
@@ -33,7 +36,7 @@ export default function CmsPageRenderer() {
   const { data: page, isLoading, isError } = useQuery<CmsPage>({
     queryKey: ["/api/cms/pages", slug],
     queryFn: async () => {
-      const res = await fetch(`${RAILWAY_URL}/api/cms/pages/${slug}`);
+      const res = await fetch(`${API_BASE}/api/cms/pages/${slug}`);
       if (!res.ok) throw new Error("Not found");
       return res.json();
     },

@@ -5,6 +5,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
+import { registerSeoRoutes } from "./seo";
 import { createServer } from "http";
 
 const app = express();
@@ -80,6 +81,11 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // SEO routes (/p/:slug, /sitemap.xml, /robots.txt) — registered BEFORE
+  // the API routes and the catch-all static handler so real URLs are served
+  // as server-rendered HTML that Google can index without executing JS.
+  registerSeoRoutes(app);
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
