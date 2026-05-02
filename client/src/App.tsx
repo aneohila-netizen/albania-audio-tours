@@ -36,6 +36,7 @@ const ContactPage          = lazy(() => import("@/pages/ContactPage"));
 const TermsPage            = lazy(() => import("@/pages/TermsPage"));
 const RefundPage           = lazy(() => import("@/pages/RefundPage"));
 const BlogPage             = lazy(() => import("@/pages/BlogPage"));
+const DestinationGuidesPage = lazy(() => import("@/pages/DestinationGuidesPage"));
 const SubscriptionsPage    = lazy(() => import("@/pages/SubscriptionsPage"));
 const ActivatePage         = lazy(() => import("@/pages/ActivatePage"));
 const ResetPasswordPage    = lazy(() => import("@/pages/ResetPasswordPage"));
@@ -207,6 +208,7 @@ function DynamicFooter() {
       {/* R3a: links row + R3c: WhatsApp icon in footer on desktop */}
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
         <a href="#/blog"          className="hover:text-primary transition-colors">Blog</a>
+        <a href="#/guides"        className="hover:text-primary transition-colors">Destination Guides</a>
         <a href="#/subscriptions" className="hover:text-primary transition-colors font-medium" style={{ color: "hsl(var(--primary))" }}>Subscribe</a>
         {cmsLinks.map(p => (
           <a key={p.id} href={`#/p/${p.slug}`} className="hover:text-primary transition-colors">{p.title}</a>
@@ -286,6 +288,7 @@ function AppRoutes() {
               <Route path="/terms" component={TermsPage} />
               <Route path="/refund-policy" component={RefundPage} />
               <Route path="/blog" component={BlogPage} />
+              <Route path="/guides" component={DestinationGuidesPage} />
               <Route path="/subscriptions" component={SubscriptionsPage} />
               <Route path="/activate" component={ActivatePage} />
               <Route path="/reset-password" component={ResetPasswordPage} />

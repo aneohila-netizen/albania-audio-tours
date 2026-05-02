@@ -191,6 +191,7 @@ export default function MobileDrawer({ nearestTour, destinations, cmsLinks = [] 
         {/* ── Footer links ─────────────────────────────────────────── */}
         <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5" style={{ fontSize: 11 }}>
           <a href="#/blog"          className="text-muted-foreground hover:text-primary transition-colors">Blog</a>
+          <a href="#/guides"        className="text-muted-foreground hover:text-primary transition-colors">Destination Guides</a>
           <a href="#/subscriptions" className="font-semibold hover:text-primary transition-colors" style={{ color: "hsl(var(--primary))" }}>Subscribe</a>
           {cmsLinks.map(p => (
             <a key={p.id} href={`#/p/${p.slug}`} className="text-muted-foreground hover:text-primary transition-colors">{p.title}</a>
