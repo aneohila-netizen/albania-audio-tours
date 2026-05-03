@@ -154,7 +154,11 @@ function renderLandingPage(page: {
   <title>${title}</title>
   <meta name="description" content="${desc}" />
   ${keywords ? `<meta name="keywords" content="${keywords}" />` : ""}
-  <link rel="canonical" href="${canonical}" />
+
+  <!-- Canonical: English version is always the canonical for each destination.
+       Non-English pages point to the English version to consolidate ranking signals.
+       hreflang tells Google which language each URL serves (handled separately). -->
+  <link rel="canonical" href="${esc(`${SITE_URL}/p/${hasLangVariants ? slugBase + '-en' : page.slug}`)}" />
 
   <!-- hreflang alternates -->
   ${hreflangBlock}
