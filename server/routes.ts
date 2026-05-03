@@ -76,14 +76,15 @@ async function transcodeToMp3(inputBuf: Buffer, inputFormat?: string): Promise<B
 const AUDIO_DIR_LAZY = path.join(process.cwd(), "data", "audio");
 
 // ─── Supported languages ─────────────────────────────────────────────────────
-const SUPPORTED_LANGS = ["en", "al", "gr", "it", "es", "de", "fr", "ar", "sl", "pt", "cn"] as const;
+// "sl" (Slovenian) replaced by "ru" (Russian) — Slovenian kept for backward compat during migration
+const SUPPORTED_LANGS = ["en", "al", "gr", "it", "es", "de", "fr", "ar", "ru", "pt", "cn"] as const;
 type SupportedLang = typeof SUPPORTED_LANGS[number];
 
 function audioField(lang: SupportedLang): string {
   const map: Record<SupportedLang, string> = {
     en: "audioUrlEn", al: "audioUrlAl", gr: "audioUrlGr",
     it: "audioUrlIt", es: "audioUrlEs", de: "audioUrlDe",
-    fr: "audioUrlFr", ar: "audioUrlAr", sl: "audioUrlSl",
+    fr: "audioUrlFr", ar: "audioUrlAr", ru: "audioUrlRu",
   };
   return map[lang];
 }
@@ -95,7 +96,7 @@ async function translateWithGemini(text: string, targetLang: string): Promise<st
   const langNames: Record<string, string> = {
     al: "Albanian", gr: "Greek", it: "Italian", es: "Spanish",
     de: "German", fr: "French", ar: "Arabic",
-    sl: "Slovenian (standard Slavic reference language)",
+    ru: "Russian",
     pt: "Portuguese",
     cn: "Simplified Chinese",
   };
