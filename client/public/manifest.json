@@ -1,6 +1,6 @@
 {
-  "name": "AlbaTour — Albania Audio Tours",
-  "short_name": "AlbaTour",
+  "name": "AlbaniaAudioTours — Self-Guided Audio Tours of Albania",
+  "short_name": "AlbaniaAudioTours",
   "description": "Self-guided audio tours of Albania. Explore Tirana, Berat, Butrint and more.",
   "start_url": "/#/",
   "display": "standalone",
@@ -21,7 +21,11 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["travel", "entertainment", "navigation"],
+  "categories": [
+    "travel",
+    "entertainment",
+    "navigation"
+  ],
   "lang": "en",
   "scope": "/"
 }

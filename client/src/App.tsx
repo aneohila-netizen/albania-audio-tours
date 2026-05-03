@@ -233,7 +233,7 @@ function DynamicFooter() {
         </a>
       </div>
       <div>
-        <span>AlbaTour — Albania Self-Guided Audio Tours</span>
+        <span>AlbaniaAudioTours — Self-Guided Audio Tours of Albania</span>
         {"  ·  "}
         <span>&#169; {new Date().getFullYear()} All Rights Reserved</span>
       </div>
