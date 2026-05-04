@@ -144,6 +144,9 @@ function renderLandingPage(page: {
     ? new Date(page.publishedAt).toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric" })
     : "";
 
+  // CTA text localised per language (was missing — caused 500 error)
+  const cta = CTA_HEADINGS[langCode] || CTA_HEADINGS["en"];
+
   return `<!DOCTYPE html>
 <html lang="${LANGUAGES.find(l => l.code === langCode)?.hreflangCode || "en"}" dir="${dir}">
 <head>
