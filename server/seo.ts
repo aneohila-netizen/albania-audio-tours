@@ -38,6 +38,43 @@ const LANGUAGES: { code: string; label: string; hreflangCode: string }[] = [
 // Direction per language (for <html dir="">)
 const RTL_LANGS = new Set(["ar"]);
 
+// Localised CTA text [heading, subtext, audio-btn, book-btn]
+const CTA_HEADINGS: Record<string, [string, string, string, string]> = {
+  en: ["Ready to Explore Albania?",
+       "Listen to this destination's audio tour free \u2014 or book a private guided experience.",
+       "Open Audio Tour", "Book a Guided Tour"],
+  al: ["Eksploroni Shqip\u00ebrin\u00eb me ekspert\u00eb vendor\u00eb",
+       "D\u00ebgjoni turin audio falas \u2014 ose rezervoni eksperienc\u00eb private me udh\u00ebrr\u00ebfyes.",
+       "Hap Turneu Audio", "Rezervo nje Tur"],
+  de: ["Albanien entdecken \u2014 mit einem lokalen Experten",
+       "Kostenlose Audio-Tour anh\u00f6ren oder eine private gef\u00fchrte Tour buchen.",
+       "Audio-Tour \u00f6ffnen", "Gef\u00fchrte Tour buchen"],
+  it: ["Esplora l'Albania con un esperto locale",
+       "Ascolta la visita audio gratuita \u2014 o prenota un'esperienza con guida privata.",
+       "Apri Audio Tour", "Prenota un Tour"],
+  fr: ["D\u00e9couvrez l'Albanie avec un expert local",
+       "\u00c9coutez la visite audio gratuite \u2014 ou r\u00e9servez une exp\u00e9rience guid\u00e9e priv\u00e9e.",
+       "Ouvrir l'Audio Tour", "R\u00e9server un Tour"],
+  es: ["Explora Albania con un experto local",
+       "Escucha el audio tour gratuito \u2014 o reserva una experiencia guiada privada.",
+       "Abrir Audio Tour", "Reservar un Tour"],
+  gr: ["\u0395\u03be\u03b5\u03c1\u03b5\u03c5\u03bd\u03ae\u03c3\u03c4\u03b5 \u03c4\u03b7\u03bd \u0391\u03bb\u03b2\u03b1\u03bd\u03af\u03b1 \u03bc\u03b5 \u03ad\u03bd\u03b1\u03bd \u03c4\u03bf\u03c0\u03b9\u03ba\u03cc \u03b5\u03bc\u03c0\u03b5\u03b9\u03c1\u03bf\u03b3\u03bd\u03ce\u03bc\u03bf\u03bd\u03b1",
+       "\u0391\u03ba\u03bf\u03cd\u03c3\u03c4\u03b5 \u03b4\u03c9\u03c1\u03b5\u03ac\u03bd \u03be\u03b5\u03bd\u03ac\u03b3\u03b7\u03c3\u03b7 \u03ae\u03c7\u03bf\u03c5 \u2014 \u03ae \u03ba\u03bb\u03b5\u03af\u03c3\u03c4\u03b5 \u03b9\u03b4\u03b9\u03c9\u03c4\u03b9\u03ba\u03ae \u03be\u03b5\u03bd\u03ac\u03b3\u03b7\u03c3\u03b7.",
+       "\u0391\u03bd\u03bf\u03b9\u03c7\u03c4\u03ae Audio Tour", "\u039a\u03bb\u03b5\u03af\u03c3\u03c4\u03b5 \u03a4\u03bf\u03c5\u03c1"],
+  ru: ["\u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 \u0434\u043b\u044f \u0441\u0435\u0431\u044f \u0410\u043b\u0431\u0430\u043d\u0438\u044e",
+       "\u0411\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u044b\u0439 \u0430\u0443\u0434\u0438\u043e\u0433\u0438\u0434 \u2014 \u0438\u043b\u0438 \u0437\u0430\u043a\u0430\u0436\u0438\u0442\u0435 \u0447\u0430\u0441\u0442\u043d\u0443\u044e \u044d\u043a\u0441\u043a\u0443\u0440\u0441\u0438\u044e \u0441 \u0433\u0438\u0434\u043e\u043c.",
+       "\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0410\u0443\u0434\u0438\u043e\u0442\u0443\u0440", "\u0417\u0430\u0431\u0440\u043e\u043d\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0422\u0443\u0440"],
+  ar: ["\u0627\u0643\u062a\u0634\u0641 \u0623\u0644\u0628\u0627\u0646\u064a\u0627 \u0645\u0639 \u062e\u0628\u064a\u0631 \u0645\u062d\u0644\u064a",
+       "\u0627\u0633\u062a\u0645\u0639 \u0625\u0644\u0649 \u0627\u0644\u062c\u0648\u0644\u0629 \u0627\u0644\u0635\u0648\u062a\u064a\u0629 \u0645\u062c\u0627\u0646\u064b\u0627 \u2014 \u0623\u0648 \u0627\u062d\u062c\u0632 \u062c\u0648\u0644\u0629 \u062e\u0627\u0635\u0629 \u0645\u0639 \u0645\u0631\u0634\u062f.",
+       "\u0641\u062a\u062d \u0627\u0644\u062c\u0648\u0644\u0629 \u0627\u0644\u0635\u0648\u062a\u064a\u0629", "\u0627\u062d\u062c\u0632 \u062c\u0648\u0644\u0629"],
+  pt: ["Explore a Alb\u00e2nia com um especialista local",
+       "Ou\u00e7a o audio tour gratuito \u2014 ou reserve uma experi\u00eancia com guia privado.",
+       "Abrir Audio Tour", "Reservar Tour"],
+  cn: ["\u4e0e\u5f53\u5730\u4e13\u5bb6\u4e00\u8d77\u63a2\u7d22\u963f\u5c14\u5df4\u5c3c\u4e9a",
+       "\u514d\u8d39\u6536\u542c\u97f3\u9891\u5bfc\u89c8\u2014\u2014\u6216\u9884\u8ba2\u79c1\u4eba\u5bfc\u6e38\u4f53\u9a8c\u3002",
+       "\u6253\u5f00\u97f3\u9891\u5bfc\u89c8", "\u9884\u8ba2\u5bfc\u6e38\u884c"],
+};
+
 // ── Helper: escape HTML special characters ─────────────────────────────────
 function esc(s: string): string {
   return (s || "")
