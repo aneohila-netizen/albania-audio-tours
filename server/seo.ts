@@ -108,7 +108,8 @@ function buildHreflang(slugBase: string, langs: string[]): string {
 // ── Extract FAQ items from <details>/<summary> HTML ────────────────────────
 function extractFaqItems(html: string): Array<{q: string; a: string}> {
   const items: Array<{q: string; a: string}> = [];
-  // Match <details>...<summary>Q</summary>...A...</details>
+
+  // Pattern 1: <details>/<summary> (standard HTML5 accordion)
   const detailsRe = /<details[^>]*>(.*?)<\/details>/gis;
   const summaryRe = /<summary[^>]*>(.*?)<\/summary>/is;
   let m: RegExpExecArray | null;
@@ -120,6 +121,22 @@ function extractFaqItems(html: string): Array<{q: string; a: string}> {
     const a = stripHtml(inner.replace(sumMatch[0], "")).trim();
     if (q && a) items.push({ q, a });
   }
+
+  // Pattern 2: <h3>Question</h3><p>Answer</p> inside a section containing "FAQ"
+  // Find the FAQ section boundary first
+  const faqStart = html.search(/<[hH][23][^>]*>[^<]*(FAQ|Frequently|Questions)/i);
+  if (faqStart >= 0 && items.length === 0) {
+    const faqSection = html.slice(faqStart);
+    // Match pairs of <h3>Q</h3><p>A</p>
+    const pairRe = /<h3[^>]*>(.*?)<\/h3>\s*<p[^>]*>(.*?)<\/p>/gis;
+    let pm: RegExpExecArray | null;
+    while ((pm = pairRe.exec(faqSection)) !== null && items.length < 8) {
+      const q = stripHtml(pm[1]).trim();
+      const a = stripHtml(pm[2]).trim();
+      if (q && a && q.length < 200) items.push({ q, a });
+    }
+  }
+
   return items;
 }
 
