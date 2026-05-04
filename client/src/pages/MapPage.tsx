@@ -149,6 +149,13 @@ export default function MapPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Auto-dismiss the hero strip after 8 seconds
+  useEffect(() => {
+    if (alreadySeen) return;
+    const timer = setTimeout(() => setHeroDismissed(true), 8000);
+    return () => clearTimeout(timer);
+  }, []);
+
   function dismissOnboarding() {
     try { sessionStorage.setItem("alb_onboarded", "1"); } catch {}
     setShowOnboarding(false);
@@ -778,11 +785,54 @@ export default function MapPage() {
   };
 
   return (
-    <div
-      ref={mapWrapperRef}
-      className="relative flex-1 min-h-0"
-      style={{ height: mapHeight > 0 ? `${mapHeight}px` : 'calc(100svh - 114px)' }}
-    >
+    <div ref={mapWrapperRef} className="relative flex-1 min-h-0"
+      style={{ height: mapHeight > 0 ? `${mapHeight}px` : 'calc(100svh - 114px)' }}>
+
+      {/* P2-B: Hero value-prop strip — shown on first visit (not in sessionStorage),
+           collapses after 8 s or on dismiss. Explains the product to desktop visitors
+           who skip the Quick Guide modal. Absolute-positioned over the map, top edge. */}
+      {!alreadySeen && !heroDismissed && (
+        <div
+          className="absolute top-2 left-1/2 z-[1000]"
+          style={{ transform: 'translateX(-50%)', width: 'min(560px, calc(100vw - 24px))' }}
+        >
+          <div
+            className="rounded-xl px-4 py-3 flex items-center gap-3 shadow-lg"
+            style={{
+              background: 'rgba(15,23,42,0.92)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255,255,255,0.12)'
+            }}
+          >
+            <span style={{ fontSize: 22, flexShrink: 0 }}>🎧</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p className="font-bold text-white" style={{ fontSize: 13, margin: 0, lineHeight: 1.3 }}>
+                Free Self-Guided Audio Tours of Albania
+              </p>
+              <p className="text-white/70" style={{ fontSize: 11, margin: '2px 0 0' }}>
+                Tap a destination • GPS triggers stories • 24 sites • 11 languages
+              </p>
+            </div>
+            <a
+              href="#/guides"
+              className="text-white/90 font-semibold whitespace-nowrap"
+              style={{
+                fontSize: 11, background: 'hsl(var(--primary))', padding: '5px 10px',
+                borderRadius: 6, textDecoration: 'none', flexShrink: 0
+              }}
+            >
+              Guides
+            </a>
+            <button
+              onClick={() => setHeroDismissed(true)}
+              className="text-white/50 hover:text-white/90 flex-shrink-0"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: '0 2px' }}
+              aria-label="Dismiss"
+            >×</button>
+          </div>
+        </div>
+      )}
+
       {/* Map */}
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} data-testid="map-container" />
 
