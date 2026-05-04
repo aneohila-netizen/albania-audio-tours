@@ -105,33 +105,96 @@ function buildHreflang(slugBase: string, langs: string[]): string {
 }
 
 // ── Build JSON-LD schema ───────────────────────────────────────────────────
+// ── Extract FAQ items from <details>/<summary> HTML ────────────────────────
+function extractFaqItems(html: string): Array<{q: string; a: string}> {
+  const items: Array<{q: string; a: string}> = [];
+  // Match <details>...<summary>Q</summary>...A...</details>
+  const detailsRe = /<details[^>]*>(.*?)<\/details>/gis;
+  const summaryRe = /<summary[^>]*>(.*?)<\/summary>/is;
+  let m: RegExpExecArray | null;
+  while ((m = detailsRe.exec(html)) !== null) {
+    const inner = m[1];
+    const sumMatch = summaryRe.exec(inner);
+    if (!sumMatch) continue;
+    const q = stripHtml(sumMatch[1]).trim();
+    const a = stripHtml(inner.replace(sumMatch[0], "")).trim();
+    if (q && a) items.push({ q, a });
+  }
+  return items;
+}
+
 function buildJsonLd(page: {
   title: string; seoDescription: string; coverImage?: string;
   slug: string; publishedAt?: string; seoKeywords?: string;
+  body?: string; pageType?: string;
 }): string {
-  // Detect if this is a destination page (slug pattern: destination-langcode)
-  const isDestPage = LANGUAGES.some(l => page.slug.endsWith(`-${l.code}`));
+  // Detect page type from slug and pageType field
+  const isDestPage  = LANGUAGES.some(l => page.slug.endsWith(`-${l.code}`));
+  const isBlogPost  = !isDestPage && (page.pageType === "blog" ||
+    ["7-day","best-places","albania-vs","albania-travel","albanian","albania-unesco","albania-travel-guide"]
+      .some(k => page.slug.startsWith(k)));
 
-  const schema: Record<string, unknown> = {
-    "@context": "https://schema.org",
-    "@type": isDestPage ? "TouristAttraction" : "WebPage",
-    "name": page.title,
-    "description": stripHtml(page.seoDescription || ""),
-    "url": `${SITE_URL}/p/${page.slug}`,
-    "image": page.coverImage && !page.coverImage.startsWith("data:") ? page.coverImage : undefined,
-    "inLanguage": "en",
-    "publisher": {
-      "@type": "TravelAgency",
-      "name": "Albanian Eagle Tours",
-      "url": AET_URL,
-    },
-  };
+  const imgUrl = page.coverImage && !page.coverImage.startsWith("data:") ? page.coverImage : undefined;
 
-  if (page.publishedAt) {
-    schema["datePublished"] = page.publishedAt;
+  // ── Primary schema block ──────────────────────────────────────────────────
+  let primarySchema: Record<string, unknown>;
+
+  if (isBlogPost) {
+    // BlogPosting — author, dates, publisher for Google article rich results
+    primarySchema = {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": page.title,
+      "description": stripHtml(page.seoDescription || ""),
+      "url": `${SITE_URL}/p/${page.slug}`,
+      "image": imgUrl,
+      "datePublished": page.publishedAt || new Date().toISOString(),
+      "dateModified":  page.publishedAt || new Date().toISOString(),
+      "author": {
+        "@type": "Organization",
+        "name": "AlbaniaAudioTours",
+        "url": SITE_URL,
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "AlbaniaAudioTours",
+        "url": SITE_URL,
+        "logo": { "@type": "ImageObject", "url": `${SITE_URL}/icon-192.png` },
+      },
+      "mainEntityOfPage": `${SITE_URL}/p/${page.slug}`,
+      "keywords": page.seoKeywords || "",
+    };
+  } else if (isDestPage) {
+    // TouristAttraction — for Google travel/places cards
+    primarySchema = {
+      "@context": "https://schema.org",
+      "@type": "TouristAttraction",
+      "name": page.title,
+      "description": stripHtml(page.seoDescription || ""),
+      "url": `${SITE_URL}/p/${page.slug}`,
+      "image": imgUrl,
+      "inLanguage": "en",
+      "touristType": "Cultural tourists, History enthusiasts, Adventure travelers",
+      "availableLanguage": ["en","sq","de","it","fr","es","el","ru","ar","pt","zh"],
+      "publisher": {
+        "@type": "TravelAgency",
+        "name": "Albanian Eagle Tours",
+        "url": AET_URL,
+      },
+    };
+  } else {
+    primarySchema = {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": page.title,
+      "description": stripHtml(page.seoDescription || ""),
+      "url": `${SITE_URL}/p/${page.slug}`,
+      "image": imgUrl,
+      "publisher": { "@type": "TravelAgency", "name": "Albanian Eagle Tours", "url": AET_URL },
+    };
   }
 
-  // Add BreadcrumbList
+  // ── BreadcrumbList ────────────────────────────────────────────────────────
   const breadcrumb = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -141,8 +204,27 @@ function buildJsonLd(page: {
     ],
   };
 
-  return `<script type="application/ld+json">${JSON.stringify(schema)}</script>\n` +
-         `  <script type="application/ld+json">${JSON.stringify(breadcrumb)}</script>`;
+  let output = `<script type="application/ld+json">${JSON.stringify(primarySchema)}</script>\n` +
+               `  <script type="application/ld+json">${JSON.stringify(breadcrumb)}</script>`;
+
+  // ── FAQPage schema — only when page body has <details> FAQ items ──────────
+  if (page.body) {
+    const faqItems = extractFaqItems(page.body);
+    if (faqItems.length >= 2) {
+      const faqSchema = {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": faqItems.map(item => ({
+          "@type": "Question",
+          "name": item.q,
+          "acceptedAnswer": { "@type": "Answer", "text": item.a },
+        })),
+      };
+      output += `\n  <script type="application/ld+json">${JSON.stringify(faqSchema)}</script>`;
+    }
+  }
+
+  return output;
 }
 
 // ── Render full HTML for a landing page ───────────────────────────────────
@@ -150,7 +232,7 @@ function renderLandingPage(page: {
   slug: string; title: string; excerpt: string; body: string;
   coverImage?: string; seoTitle?: string; seoDescription?: string;
   seoKeywords?: string; author?: string; publishedAt?: string;
-  isPublished?: boolean;
+  isPublished?: boolean; pageType?: string;
 }, langCode: string): string {
 
   const title     = esc(page.seoTitle || page.title);
@@ -218,7 +300,7 @@ function renderLandingPage(page: {
   ${coverImg ? `<meta name="twitter:image" content="${esc(coverImg)}" />` : ""}
 
   <!-- JSON-LD Structured Data -->
-  ${buildJsonLd(page)}
+  ${buildJsonLd({ ...page, body: page.body, pageType: page.pageType })}
 
   <!-- Fonts -->
   <link href="https://api.fontshare.com/v2/css?f[]=zodiak@400,500,700&f[]=general-sans@400,500,600&display=swap" rel="stylesheet" />
@@ -419,7 +501,7 @@ function renderLandingPage(page: {
     <div class="cta-box">
       <h2>${cta[0]}</h2>
       <p>${cta[1]}</p>
-      <a href="${SITE_URL}/#/sites/${hasLangVariants ? slugBase : page.slug}" target="_self">${cta[2]}</a>
+      <a href="${SITE_URL}/#/sites/${hasLangVariants ? slugBase : ""}" target="_self">${cta[2]}</a>
       <a href="${AET_URL}/collections/car-driver" target="_blank" rel="noopener" class="outline">${cta[3]}</a>
     </div>
   </div>

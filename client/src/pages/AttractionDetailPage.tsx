@@ -204,13 +204,17 @@ export default function AttractionDetailPage() {
         <ItineraryCard siteSlug={attraction.slug} centerLat={attraction.lat} centerLng={attraction.lng} />
       </PaywallGate>
 
-      {/* P3-B: Audio Transcript section — labelled for Google indexing & speakable schema.
-           Description text is the audio script Google can read; labelling it as "Audio Guide"
-           helps voice-search and AI engines surface the content. */}
+      {/* Description + Read Free badge — the text transcript is free forever.
+           Badge clarifies to visitors that reading the guide text costs nothing,
+           distinct from the audio player which may be subscription-gated. */}
       <div>
-        {/* Transcript header — visible label tells crawlers this is structured audio content */}
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">🎧 Audio Guide</span>
+          <span
+            className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+            style={{ background: "#dcfce7", color: "#15803d" }}
+          >
+            📖 Read Free — always
+          </span>
         </div>
         <p className={`text-base leading-relaxed text-foreground transition-all ${
           showFullDesc ? "" : "line-clamp-4"
