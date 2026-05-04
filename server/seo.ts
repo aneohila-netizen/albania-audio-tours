@@ -353,12 +353,34 @@ function renderLandingPage(page: {
       ${page.body || ""}
     </div>
 
+    <!-- 3-Step Journey Block (P1-C) -->
+    <div style="margin:40px 0;padding:28px 24px;background:#f8faff;border-radius:12px;border:1px solid #e2e8f0">
+      <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin:0 0 16px">How it works</p>
+      <div style="display:flex;gap:0;flex-wrap:wrap">
+        <div style="flex:1;min-width:160px;padding:0 16px 0 0;border-right:1px solid #e2e8f0;margin-bottom:12px">
+          <div style="font-size:24px;margin-bottom:6px">🎧</div>
+          <div style="font-weight:700;font-size:14px;color:#0f172a;margin-bottom:4px">1. Listen Free</div>
+          <div style="font-size:12px;color:#64748b;line-height:1.5">Open the audio tour on your phone as you explore — GPS triggers each story automatically.</div>
+        </div>
+        <div style="flex:1;min-width:160px;padding:0 16px;border-right:1px solid #e2e8f0;margin-bottom:12px">
+          <div style="font-size:24px;margin-bottom:6px">🗺️</div>
+          <div style="font-weight:700;font-size:14px;color:#0f172a;margin-bottom:4px">2. Follow the Map</div>
+          <div style="font-size:12px;color:#64748b;line-height:1.5">Navigate between sites, earn points, and discover hidden details most visitors miss.</div>
+        </div>
+        <div style="flex:1;min-width:160px;padding:0 16px;margin-bottom:12px">
+          <div style="font-size:24px;margin-bottom:6px">🦅</div>
+          <div style="font-weight:700;font-size:14px;color:#0f172a;margin-bottom:4px">3. Book a Tour</div>
+          <div style="font-size:12px;color:#64748b;line-height:1.5">Want a guide, driver, or full itinerary? Albanian Eagle Tours covers every destination here.</div>
+        </div>
+      </div>
+    </div>
+
     <!-- CTA Block -->
     <div class="cta-box">
-      <h2>Ready to Explore Albania?</h2>
-      <p>Listen to this destination's audio tour free — or book a private guided experience with a local expert.</p>
-      <a href="${SITE_URL}/#/sites" target="_self">🎧 Open Audio Tour</a>
-      <a href="${AET_URL}/collections/car-driver" target="_blank" rel="noopener" class="outline">Car &amp; Driver Tours</a>
+      <h2>${cta[0]}</h2>
+      <p>${cta[1]}</p>
+      <a href="${SITE_URL}/#/sites/${hasLangVariants ? slugBase : page.slug}" target="_self">${cta[2]}</a>
+      <a href="${AET_URL}/collections/car-driver" target="_blank" rel="noopener" class="outline">${cta[3]}</a>
     </div>
   </div>
 
