@@ -2,7 +2,7 @@
 aptPkgs = ["ffmpeg"]
 
 [phases.build]
-cmds = ["npm install --legacy-peer-deps", "npm run build"]
+cmds = ["NODE_ENV=development npm install --legacy-peer-deps", "npm run build"]
 
 [start]
 cmd = "node dist/index.cjs"
