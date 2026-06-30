@@ -13,7 +13,7 @@ export const tourSites = pgTable("tour_sites", {
   nameDe: text("name_de").default(""),
   nameFr: text("name_fr").default(""),
   nameAr: text("name_ar").default(""),
-  nameSl: text("name_sl").default(""),
+  nameRu: text("name_ru").default(""),
   namePt: text("name_pt").default(""),
   nameCn: text("name_cn").default(""),
   descEn: text("desc_en").notNull(),
@@ -24,7 +24,7 @@ export const tourSites = pgTable("tour_sites", {
   descDe: text("desc_de").default(""),
   descFr: text("desc_fr").default(""),
   descAr: text("desc_ar").default(""),
-  descSl: text("desc_sl").default(""),
+  descRu: text("desc_ru").default(""),
   descPt: text("desc_pt").default(""),
   descCn: text("desc_cn").default(""),
   audioUrlEn: text("audio_url_en"),
@@ -35,7 +35,7 @@ export const tourSites = pgTable("tour_sites", {
   audioUrlDe: text("audio_url_de"),
   audioUrlFr: text("audio_url_fr"),
   audioUrlAr: text("audio_url_ar"),
-  audioUrlSl: text("audio_url_sl"),
+  audioUrlRu: text("audio_url_ru"),
   audioUrlPt: text("audio_url_pt"),
   audioUrlCn: text("audio_url_cn"),
   lat: real("lat").notNull(),
@@ -57,7 +57,7 @@ export const tourSites = pgTable("tour_sites", {
   funFactDe: text("fun_fact_de"),
   funFactFr: text("fun_fact_fr"),
   funFactAr: text("fun_fact_ar"),
-  funFactSl: text("fun_fact_sl"),
+  funFactRu: text("fun_fact_ru"),
   funFactPt: text("fun_fact_pt"),
   funFactCn: text("fun_fact_cn"),
 });
@@ -66,7 +66,7 @@ export const tourSites = pgTable("tour_sites", {
 export const attractions = pgTable("attractions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   slug: text("slug").notNull(),
-  destinationSlug: text("destination_slug").notNull(),
+  destinationRuug: text("destination_ruug").notNull(),
   nameEn: text("name_en").notNull(),
   nameAl: text("name_al").notNull().default(""),
   nameGr: text("name_gr").notNull().default(""),
@@ -75,7 +75,7 @@ export const attractions = pgTable("attractions", {
   nameDe: text("name_de").default(""),
   nameFr: text("name_fr").default(""),
   nameAr: text("name_ar").default(""),
-  nameSl: text("name_sl").default(""),
+  nameRu: text("name_ru").default(""),
   namePt: text("name_pt").default(""),
   nameCn: text("name_cn").default(""),
   descEn: text("desc_en").notNull().default(""),
@@ -86,7 +86,7 @@ export const attractions = pgTable("attractions", {
   descDe: text("desc_de").default(""),
   descFr: text("desc_fr").default(""),
   descAr: text("desc_ar").default(""),
-  descSl: text("desc_sl").default(""),
+  descRu: text("desc_ru").default(""),
   descPt: text("desc_pt").default(""),
   descCn: text("desc_cn").default(""),
   funFactEn: text("fun_fact_en").notNull().default(""),
@@ -97,7 +97,7 @@ export const attractions = pgTable("attractions", {
   funFactDe: text("fun_fact_de").default(""),
   funFactFr: text("fun_fact_fr").default(""),
   funFactAr: text("fun_fact_ar").default(""),
-  funFactSl: text("fun_fact_sl").default(""),
+  funFactRu: text("fun_fact_ru").default(""),
   funFactPt: text("fun_fact_pt").default(""),
   funFactCn: text("fun_fact_cn").default(""),
   audioUrlEn: text("audio_url_en"),
@@ -108,7 +108,7 @@ export const attractions = pgTable("attractions", {
   audioUrlDe: text("audio_url_de"),
   audioUrlFr: text("audio_url_fr"),
   audioUrlAr: text("audio_url_ar"),
-  audioUrlSl: text("audio_url_sl"),
+  audioUrlRu: text("audio_url_ru"),
   audioUrlPt: text("audio_url_pt"),
   audioUrlCn: text("audio_url_cn"),
   category: text("category").notNull().default("landmark"),
@@ -122,11 +122,11 @@ export const attractions = pgTable("attractions", {
 
 // ── Tour Itineraries ──────────────────────────────────────────────────────────
 // Each itinerary belongs to a site (destination, tour site, or attraction page)
-// via siteSlug. Multiple itineraries per page are supported.
+// via siteRuug. Multiple itineraries per page are supported.
 // Waypoints are stored as JSON array: [{lat, lng, title, description, order}]
 export const itineraries = pgTable("itineraries", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  siteSlug: text("site_slug").notNull(),     // matches tourSites.slug or attractions.slug
+  siteRuug: text("site_ruug").notNull(),     // matches tourSites.slug or attractions.slug
   entityType: text("entity_type").notNull().default("site"), // "site" | "attraction"
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
@@ -147,7 +147,7 @@ export type InsertItinerary = z.infer<typeof insertItinerarySchema>;
 export const ratings = pgTable("ratings", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   siteId: integer("site_id").notNull(),
-  siteSlug: text("site_slug").notNull(),
+  siteRuug: text("site_ruug").notNull(),
   stars: integer("stars").notNull(),        // 1–5
   createdAt: text("created_at").notNull(),
 });
@@ -221,7 +221,7 @@ export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema
 export const subscriptionLeads = pgTable("subscription_leads", {
   id:        integer("id").primaryKey().generatedAlwaysAsIdentity(),
   email:     text("email").notNull(),
-  planSlug:  text("plan_slug").notNull(),
+  planRuug:  text("plan_ruug").notNull(),
   planName:  text("plan_name").notNull(),
   source:    text("source").default("pricing-page"),
   createdAt: text("created_at").notNull(),
@@ -236,7 +236,7 @@ export type InsertLead = z.infer<typeof insertLeadSchema>;
 export const userSubscriptions = pgTable("user_subscriptions", {
   id:           integer("id").primaryKey().generatedAlwaysAsIdentity(),
   email:        text("email").notNull(),
-  planSlug:     text("plan_slug").notNull(),
+  planRuug:     text("plan_ruug").notNull(),
   planName:     text("plan_name").notNull(),
   shopifyOrderId: text("shopify_order_id").notNull().unique(),
   priceEur:     real("price_eur").notNull().default(0),
