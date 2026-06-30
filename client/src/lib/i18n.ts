@@ -1,4 +1,4 @@
-export type Lang = "en" | "al" | "gr" | "it" | "es" | "de" | "fr" | "ar" | "sl" | "pt" | "cn";
+export type Lang = "en" | "al" | "gr" | "it" | "es" | "de" | "fr" | "ar" | "ru" | "pt" | "cn";
 
 export const LANG_LABELS: Record<Lang, string> = {
   en: "EN",
@@ -9,7 +9,7 @@ export const LANG_LABELS: Record<Lang, string> = {
   de: "DE",
   fr: "FR",
   ar: "AR",
-  sl: "SL",
+  ru: "RU",
   pt: "PT",
   cn: "中文",
 };
@@ -23,7 +23,7 @@ export const LANG_NAMES: Record<Lang, string> = {
   de: "Deutsch",
   fr: "Français",
   ar: "العربية",
-  sl: "Slovenščina",
+  ru: "Русский",
   pt: "Português",
   cn: "中文 (简体)",
 };
@@ -352,7 +352,7 @@ const CN: Translations = {
 
 export const TRANSLATIONS: Record<Lang, Translations> = {
   en: EN, al: AL, gr: GR,
-  it: EN, es: EN, de: EN, fr: EN, ar: EN, sl: EN,
+  it: EN, es: EN, de: EN, fr: EN, ar: EN, ru: EN,
   pt: PT, cn: CN,
 };
 
