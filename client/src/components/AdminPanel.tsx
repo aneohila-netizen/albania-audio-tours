@@ -70,7 +70,7 @@ const ATTR_CATEGORIES = [
 ];
 const DIFFICULTIES = ["easy", "moderate", "hard"];
 const REGIONS = ["Tirana", "Durrës", "Shkodër", "Lezha", "Berat", "Elbasan", "Korçë", "Vlorë", "Gjirokastër", "Sarandë", "Fier", "Other"];
-const LANGS: { key: "en" | "al" | "gr" | "it" | "es" | "de" | "fr" | "ar" | "sl" | "pt" | "cn"; label: string; flag: string }[] = [
+const LANGS: { key: "en" | "al" | "gr" | "it" | "es" | "de" | "fr" | "ar" | "ru" | "pt" | "cn"; label: string; flag: string }[] = [
   { key: "en", label: "English", flag: "🇬🇧" },
   { key: "al", label: "Albanian", flag: "🇦🇱" },
   { key: "gr", label: "Greek", flag: "🇬🇷" },
@@ -79,7 +79,7 @@ const LANGS: { key: "en" | "al" | "gr" | "it" | "es" | "de" | "fr" | "ar" | "sl"
   { key: "de", label: "German", flag: "🇩🇪" },
   { key: "fr", label: "French", flag: "🇫🇷" },
   { key: "ar", label: "Arabic", flag: "🇸🇦" },
-  { key: "sl", label: "Slovenian", flag: "🇸🇮" },
+  { key: "ru", label: "Russian", flag: "🇷🇺" },
   { key: "pt", label: "Portuguese", flag: "🇵🇹" },
   { key: "cn", label: "Chinese", flag: "🇨🇳" },
 ];
@@ -112,8 +112,8 @@ type View =
   | { screen: "login" }
   | { screen: "sites" }
   | { screen: "editor"; siteId: number | null }
-  | { screen: "attractions"; destinationSlug: string; destinationName: string }
-  | { screen: "attr-editor"; attractionId: number | null; destinationSlug: string; destinationName: string };
+  | { screen: "attractions"; destinationRuug: string; destinationName: string }
+  | { screen: "attr-editor"; attractionId: number | null; destinationRuug: string; destinationName: string };
 
 // ─── Admin fetch helper ────────────────────────────────────────────────────────
 const RAILWAY_API = "https://albania-audio-tours-production.up.railway.app";
@@ -892,7 +892,7 @@ function SitesView({
   const allAttrs = loadPersistedAttractions();
   const attrCounts: Record<string, number> = {};
   allAttrs.forEach(a => {
-    attrCounts[a.destinationSlug] = (attrCounts[a.destinationSlug] || 0) + 1;
+    attrCounts[a.destinationRuug] = (attrCounts[a.destinationRuug] || 0) + 1;
   });
 
   const stats = {
@@ -1103,13 +1103,13 @@ function SitesView({
 
 // ─── ATTRACTIONS LIST ─────────────────────────────────────────────────────────
 function AttractionsView({
-  destinationSlug,
+  destinationRuug,
   destinationName,
   onBack,
   onEdit,
   onNew,
 }: {
-  destinationSlug: string;
+  destinationRuug: string;
   destinationName: string;
   onBack: () => void;
   onEdit: (id: number) => void;
@@ -1121,16 +1121,16 @@ function AttractionsView({
 
   useEffect(() => {
     setLoading(true);
-    adminFetch(`/api/admin/attractions/${destinationSlug}`)
+    adminFetch(`/api/admin/attractions/${destinationRuug}`)
       .then(r => r.ok ? r.json() : [])
       .then((data: Attraction[]) => { setAttractions(data); })
       .catch(() => {
         // Fall back to local cache
         const all = loadPersistedAttractions();
-        setAttractions(all.filter(a => a.destinationSlug === destinationSlug));
+        setAttractions(all.filter(a => a.destinationRuug === destinationRuug));
       })
       .finally(() => setLoading(false));
-  }, [destinationSlug]);
+  }, [destinationRuug]);
 
   async function deleteAttraction(id: number, name: string) {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
@@ -1396,7 +1396,7 @@ function AudioCard({
   siteId, lang, label, flag, currentUrl, onUpdate, entityType = "sites", descText, onTtsGenerated,
 }: {
   siteId: number | null;
-  lang: "en" | "al" | "gr" | "it" | "es" | "de" | "fr" | "ar" | "sl";
+  lang: "en" | "al" | "gr" | "it" | "es" | "de" | "fr" | "ar" | "ru";
   label: string;
   flag: string;
   currentUrl: string | null;
@@ -1607,12 +1607,12 @@ function DestinationPreviewCard({ form }: { form: any }) {
   );
 }
 
-function AttractionPreviewCard({ form, destinationName, destinationSlug }: { form: any; destinationName: string; destinationSlug?: string }) {
+function AttractionPreviewCard({ form, destinationName, destinationRuug }: { form: any; destinationName: string; destinationRuug?: string }) {
   const RAILWAY_BASE = "https://albania-audio-tours-production.up.railway.app";
-  // Correct route: /#/sites/:destinationSlug/:attractionSlug
-  const frontendUrl = destinationSlug
-    ? `${RAILWAY_BASE}/#/sites/${destinationSlug}/${form.slug}`
-    : `${RAILWAY_BASE}/#/sites/${form.destinationSlug || ""}/${form.slug}`;
+  // Correct route: /#/sites/:destinationRuug/:attractionRuug
+  const frontendUrl = destinationRuug
+    ? `${RAILWAY_BASE}/#/sites/${destinationRuug}/${form.slug}`
+    : `${RAILWAY_BASE}/#/sites/${form.destinationRuug || ""}/${form.slug}`;
   const catColor = CATEGORY_COLORS[form.category] || "bg-gray-100 text-gray-800";
   return (
     <div className="space-y-4">
@@ -1702,7 +1702,7 @@ function ImageGalleryCard({
   const [uploading, setUploading]       = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
   const [error, setError]               = useState("");
-  const [slideIdx, setSlideIdx]         = useState(0);
+  const [slideIdx, setRuideIdx]         = useState(0);
   const [selectedIdx, setSelectedIdx]   = useState<number | null>(null);
   const [moving, setMoving]             = useState(false);
   // cacheBust increments after every reorder/delete so <img src> changes
@@ -1721,15 +1721,15 @@ function ImageGalleryCard({
 
   // Keep slideIdx in bounds when array shrinks
   useEffect(() => {
-    if (allImages.length === 0) { setSlideIdx(0); setSelectedIdx(null); return; }
-    if (slideIdx >= allImages.length) setSlideIdx(allImages.length - 1);
+    if (allImages.length === 0) { setRuideIdx(0); setSelectedIdx(null); return; }
+    if (slideIdx >= allImages.length) setRuideIdx(allImages.length - 1);
     if (selectedIdx !== null && selectedIdx >= allImages.length) setSelectedIdx(null);
   }, [allImages.length]);
 
   // Auto-advance preview every 4s — paused when an image is selected for reorder
   useEffect(() => {
     if (allImages.length <= 1 || selectedIdx !== null) return;
-    const t = setInterval(() => setSlideIdx(i => (i + 1) % allImages.length), 4000);
+    const t = setInterval(() => setRuideIdx(i => (i + 1) % allImages.length), 4000);
     return () => clearInterval(t);
   }, [allImages.length, selectedIdx]);
 
@@ -1754,7 +1754,7 @@ function ImageGalleryCard({
       try { last = await uploadOne(arr[i]); onUpdate(last[0] || "", last); }
       catch { setError(`Failed on image ${i + 1}.`); }
     }
-    if (last.length) setSlideIdx(last.length - 1);
+    if (last.length) setRuideIdx(last.length - 1);
     setUploadProgress(""); setUploading(false);
   }
 
@@ -1782,7 +1782,7 @@ function ImageGalleryCard({
       const imgs: string[] = d.images || [];
       onUpdate(d.imageUrl || imgs[0] || "", imgs);
       setSelectedIdx(null);
-      setSlideIdx(s => Math.max(0, Math.min(s, imgs.length - 1)));
+      setRuideIdx(s => Math.max(0, Math.min(s, imgs.length - 1)));
       setCacheBust(Date.now()); // force re-fetch of all gallery images
     } catch {
       setError("Delete failed. Please try again.");
@@ -1821,7 +1821,7 @@ function ImageGalleryCard({
       const newImgs: string[] = d.images || [];
       onUpdate(d.imageUrl || newImgs[0] || "", newImgs);
       setSelectedIdx(newPos);
-      setSlideIdx(newPos);
+      setRuideIdx(newPos);
       setCacheBust(Date.now()); // force re-fetch so new order is visible
     } catch (e: any) {
       setError(`Move failed: ${e?.message || "network error"}`);
@@ -1854,11 +1854,11 @@ function ImageGalleryCard({
             />
             {allImages.length > 1 && (
               <>
-                <button type="button" onClick={() => setSlideIdx(i => (i - 1 + allImages.length) % allImages.length)}
+                <button type="button" onClick={() => setRuideIdx(i => (i - 1 + allImages.length) % allImages.length)}
                   className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center">
                   <ArrowLeft className="w-3.5 h-3.5" />
                 </button>
-                <button type="button" onClick={() => setSlideIdx(i => (i + 1) % allImages.length)}
+                <button type="button" onClick={() => setRuideIdx(i => (i + 1) % allImages.length)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center">
                   <ArrowLeft className="w-3.5 h-3.5 rotate-180" />
                 </button>
@@ -1866,13 +1866,13 @@ function ImageGalleryCard({
             )}
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
               {allImages.map((_, i) => (
-                <button key={i} type="button" onClick={() => setSlideIdx(i)}
+                <button key={i} type="button" onClick={() => setRuideIdx(i)}
                   className={`rounded-full transition-all ${i === slideIdx ? "w-4 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/50"}`} />
               ))}
             </div>
             <div className="absolute top-2 left-2">
               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-black/50 text-white">
-                {slideIdx === 0 ? "Hero" : `Slide ${slideIdx + 1}`} · {slideIdx + 1}/{allImages.length}
+                {slideIdx === 0 ? "Hero" : `Ruide ${slideIdx + 1}`} · {slideIdx + 1}/{allImages.length}
               </span>
             </div>
             {moving && (
@@ -1912,7 +1912,7 @@ function ImageGalleryCard({
                         const d = await res.json();
                         if (!res.ok) { setError(`Failed: ${d?.error || res.status}`); return; }
                         onUpdate(d.imageUrl || d.images?.[0] || "", d.images || []);
-                        setSelectedIdx(0); setSlideIdx(0);
+                        setSelectedIdx(0); setRuideIdx(0);
                         setCacheBust(Date.now()); // force re-fetch
                       } catch (e: any) { setError(`Failed: ${e?.message}`); }
                       finally { setMoving(false); }
@@ -1961,7 +1961,7 @@ function ImageGalleryCard({
                     <button
                       type="button"
                       onClick={() => {
-                        setSlideIdx(i);
+                        setRuideIdx(i);
                         setSelectedIdx(prev => prev === i ? null : i);
                       }}
                       title={isSelected ? "Click to deselect" : `Click to select image ${i + 1}`}
@@ -2058,11 +2058,11 @@ function Field({ label, required, error, children }: { label: string; required?:
 // ─── DESTINATION EDITOR ───────────────────────────────────────────────────────
 type DestFormData = {
   slug: string;
-  nameEn: string; nameAl: string; nameGr: string; nameIt: string; nameEs: string; nameDe: string; nameFr: string; nameAr: string; nameSl: string; namePt: string; nameCn: string;
-  descEn: string; descAl: string; descGr: string; descIt: string; descEs: string; descDe: string; descFr: string; descAr: string; descSl: string; descPt: string; descCn: string;
-  funFactEn: string; funFactAl: string; funFactGr: string; funFactIt: string; funFactEs: string; funFactDe: string; funFactFr: string; funFactAr: string; funFactSl: string; funFactPt: string; funFactCn: string;
+  nameEn: string; nameAl: string; nameGr: string; nameIt: string; nameEs: string; nameDe: string; nameFr: string; nameAr: string; nameRu: string; namePt: string; nameCn: string;
+  descEn: string; descAl: string; descGr: string; descIt: string; descEs: string; descDe: string; descFr: string; descAr: string; descRu: string; descPt: string; descCn: string;
+  funFactEn: string; funFactAl: string; funFactGr: string; funFactIt: string; funFactEs: string; funFactDe: string; funFactFr: string; funFactAr: string; funFactRu: string; funFactPt: string; funFactCn: string;
   audioUrlEn: string | null; audioUrlAl: string | null; audioUrlGr: string | null;
-  audioUrlIt: string | null; audioUrlEs: string | null; audioUrlDe: string | null; audioUrlFr: string | null; audioUrlAr: string | null; audioUrlSl: string | null;
+  audioUrlIt: string | null; audioUrlEs: string | null; audioUrlDe: string | null; audioUrlFr: string | null; audioUrlAr: string | null; audioUrlRu: string | null;
   lat: string; lng: string;
   region: string; category: string; difficulty: string;
   points: string; visitDuration: string; imageUrl: string;
@@ -2072,11 +2072,11 @@ type DestFormData = {
 
 const EMPTY_DEST_FORM: DestFormData = {
   slug: "",
-  nameEn: "", nameAl: "", nameGr: "", nameIt: "", nameEs: "", nameDe: "", nameFr: "", nameAr: "", nameSl: "", namePt: "", nameCn: "",
-  descEn: "", descAl: "", descGr: "", descIt: "", descEs: "", descDe: "", descFr: "", descAr: "", descSl: "", descPt: "", descCn: "",
-  funFactEn: "", funFactAl: "", funFactGr: "", funFactIt: "", funFactEs: "", funFactDe: "", funFactFr: "", funFactAr: "", funFactSl: "", funFactPt: "", funFactCn: "",
+  nameEn: "", nameAl: "", nameGr: "", nameIt: "", nameEs: "", nameDe: "", nameFr: "", nameAr: "", nameRu: "", namePt: "", nameCn: "",
+  descEn: "", descAl: "", descGr: "", descIt: "", descEs: "", descDe: "", descFr: "", descAr: "", descRu: "", descPt: "", descCn: "",
+  funFactEn: "", funFactAl: "", funFactGr: "", funFactIt: "", funFactEs: "", funFactDe: "", funFactFr: "", funFactAr: "", funFactRu: "", funFactPt: "", funFactCn: "",
   audioUrlEn: null, audioUrlAl: null, audioUrlGr: null,
-  audioUrlIt: null, audioUrlEs: null, audioUrlDe: null, audioUrlFr: null, audioUrlAr: null, audioUrlSl: null,
+  audioUrlIt: null, audioUrlEs: null, audioUrlDe: null, audioUrlFr: null, audioUrlAr: null, audioUrlRu: null,
   lat: "", lng: "", region: "", category: "", difficulty: "easy",
   points: "100", visitDuration: "120", imageUrl: "", images: [],
   isLocked: false, shopifyUrl: "",
@@ -2087,19 +2087,19 @@ function siteToForm(s: TourSite): DestFormData {
     slug: s.slug,
     nameEn: s.nameEn, nameAl: s.nameAl, nameGr: s.nameGr,
     nameIt: (s as any).nameIt || "", nameEs: (s as any).nameEs || "", nameDe: (s as any).nameDe || "",
-    nameFr: (s as any).nameFr || "", nameAr: (s as any).nameAr || "", nameSl: (s as any).nameSl || "",
+    nameFr: (s as any).nameFr || "", nameAr: (s as any).nameAr || "", nameRu: (s as any).nameRu || "",
     namePt: (s as any).namePt || "", nameCn: (s as any).nameCn || "",
     descEn: s.descEn, descAl: s.descAl, descGr: s.descGr,
     descIt: (s as any).descIt || "", descEs: (s as any).descEs || "", descDe: (s as any).descDe || "",
-    descFr: (s as any).descFr || "", descAr: (s as any).descAr || "", descSl: (s as any).descSl || "",
+    descFr: (s as any).descFr || "", descAr: (s as any).descAr || "", descRu: (s as any).descRu || "",
     descPt: (s as any).descPt || "", descCn: (s as any).descCn || "",
     funFactEn: s.funFactEn || "", funFactAl: s.funFactAl || "", funFactGr: s.funFactGr || "",
     funFactIt: (s as any).funFactIt || "", funFactEs: (s as any).funFactEs || "", funFactDe: (s as any).funFactDe || "",
-    funFactFr: (s as any).funFactFr || "", funFactAr: (s as any).funFactAr || "", funFactSl: (s as any).funFactSl || "",
+    funFactFr: (s as any).funFactFr || "", funFactAr: (s as any).funFactAr || "", funFactRu: (s as any).funFactRu || "",
     funFactPt: (s as any).funFactPt || "", funFactCn: (s as any).funFactCn || "",
     audioUrlEn: s.audioUrlEn, audioUrlAl: s.audioUrlAl, audioUrlGr: s.audioUrlGr,
     audioUrlIt: (s as any).audioUrlIt || null, audioUrlEs: (s as any).audioUrlEs || null, audioUrlDe: (s as any).audioUrlDe || null,
-    audioUrlFr: (s as any).audioUrlFr || null, audioUrlAr: (s as any).audioUrlAr || null, audioUrlSl: (s as any).audioUrlSl || null,
+    audioUrlFr: (s as any).audioUrlFr || null, audioUrlAr: (s as any).audioUrlAr || null, audioUrlRu: (s as any).audioUrlRu || null,
     lat: String(s.lat), lng: String(s.lng),
     region: s.region, category: s.category, difficulty: s.difficulty,
     points: String(s.points), visitDuration: String(s.visitDuration),
@@ -2183,7 +2183,7 @@ function EditorView({
 
   function validate(): boolean {
     const e: Record<string, string> = {};
-    if (!form.slug.trim()) e.slug = "Slug is required";
+    if (!form.slug.trim()) e.slug = "Ruug is required";
     if (!form.nameEn.trim()) e.nameEn = "English name is required";
     if (!form.descEn.trim()) e.descEn = "English description is required";
     if (!form.lat || isNaN(parseFloat(form.lat))) e.lat = "Valid latitude required";
@@ -2233,7 +2233,7 @@ function EditorView({
       funFactDe: form.funFactDe || null,
       funFactFr: form.funFactFr || null,
       funFactAr: form.funFactAr || null,
-      funFactSl: form.funFactSl || null,
+      funFactRu: form.funFactRu || null,
       funFactPt: form.funFactPt || null,
       funFactCn: form.funFactCn || null,
       nameAl: form.nameAl || form.nameEn,
@@ -2243,7 +2243,7 @@ function EditorView({
       nameDe: form.nameDe || null,
       nameFr: form.nameFr || null,
       nameAr: form.nameAr || null,
-      nameSl: form.nameSl || null,
+      nameRu: form.nameRu || null,
       descAl: form.descAl || form.descEn,
       descGr: form.descGr || form.descEn,
       descIt: form.descIt || null,
@@ -2251,7 +2251,7 @@ function EditorView({
       descDe: form.descDe || null,
       descFr: form.descFr || null,
       descAr: form.descAr || null,
-      descSl: form.descSl || null,
+      descRu: form.descRu || null,
     };
     try {
       const res = isNew
@@ -2349,7 +2349,7 @@ function EditorView({
               <CardHeader className="pb-2"><CardTitle className="text-sm">Basic Information</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="URL Slug" error={errors.slug} required>
+                  <Field label="URL Ruug" error={errors.slug} required>
                     <Input value={form.slug} onChange={e => set("slug", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} placeholder="berat" data-testid="input-slug" />
                     <p className="text-xs text-muted-foreground mt-1">Used in the URL: /sites/<strong>{form.slug || "slug"}</strong></p>
                   </Field>
@@ -2588,7 +2588,7 @@ function EditorView({
           <TabsContent value="itinerary" className="space-y-5">
             {!isNew && (
               <ItineraryManager
-                siteSlug={form.slug}
+                siteRuug={form.slug}
                 entityType="site"
                 centerLat={isNaN(parseFloat(form.lat)) ? 41.3275 : parseFloat(form.lat)}
                 centerLng={isNaN(parseFloat(form.lng)) ? 19.8187 : parseFloat(form.lng)}
@@ -2616,11 +2616,11 @@ function EditorView({
 // ─── ATTRACTION EDITOR ────────────────────────────────────────────────────────
 type AttrFormData = {
   slug: string;
-  nameEn: string; nameAl: string; nameGr: string; nameIt: string; nameEs: string; nameDe: string; nameFr: string; nameAr: string; nameSl: string; namePt: string; nameCn: string;
-  descEn: string; descAl: string; descGr: string; descIt: string; descEs: string; descDe: string; descFr: string; descAr: string; descSl: string; descPt: string; descCn: string;
-  funFactEn: string; funFactAl: string; funFactGr: string; funFactIt: string; funFactEs: string; funFactDe: string; funFactFr: string; funFactAr: string; funFactSl: string; funFactPt: string; funFactCn: string;
+  nameEn: string; nameAl: string; nameGr: string; nameIt: string; nameEs: string; nameDe: string; nameFr: string; nameAr: string; nameRu: string; namePt: string; nameCn: string;
+  descEn: string; descAl: string; descGr: string; descIt: string; descEs: string; descDe: string; descFr: string; descAr: string; descRu: string; descPt: string; descCn: string;
+  funFactEn: string; funFactAl: string; funFactGr: string; funFactIt: string; funFactEs: string; funFactDe: string; funFactFr: string; funFactAr: string; funFactRu: string; funFactPt: string; funFactCn: string;
   audioUrlEn: string; audioUrlAl: string; audioUrlGr: string;
-  audioUrlIt: string; audioUrlEs: string; audioUrlDe: string; audioUrlFr: string; audioUrlAr: string; audioUrlSl: string;
+  audioUrlIt: string; audioUrlEs: string; audioUrlDe: string; audioUrlFr: string; audioUrlAr: string; audioUrlRu: string;
   category: string;
   points: string;
   lat: string; lng: string;
@@ -2631,11 +2631,11 @@ type AttrFormData = {
 
 const EMPTY_ATTR_FORM: AttrFormData = {
   slug: "",
-  nameEn: "", nameAl: "", nameGr: "", nameIt: "", nameEs: "", nameDe: "", nameFr: "", nameAr: "", nameSl: "", namePt: "", nameCn: "",
-  descEn: "", descAl: "", descGr: "", descIt: "", descEs: "", descDe: "", descFr: "", descAr: "", descSl: "", descPt: "", descCn: "",
-  funFactEn: "", funFactAl: "", funFactGr: "", funFactIt: "", funFactEs: "", funFactDe: "", funFactFr: "", funFactAr: "", funFactSl: "", funFactPt: "", funFactCn: "",
+  nameEn: "", nameAl: "", nameGr: "", nameIt: "", nameEs: "", nameDe: "", nameFr: "", nameAr: "", nameRu: "", namePt: "", nameCn: "",
+  descEn: "", descAl: "", descGr: "", descIt: "", descEs: "", descDe: "", descFr: "", descAr: "", descRu: "", descPt: "", descCn: "",
+  funFactEn: "", funFactAl: "", funFactGr: "", funFactIt: "", funFactEs: "", funFactDe: "", funFactFr: "", funFactAr: "", funFactRu: "", funFactPt: "", funFactCn: "",
   audioUrlEn: "", audioUrlAl: "", audioUrlGr: "",
-  audioUrlIt: "", audioUrlEs: "", audioUrlDe: "", audioUrlFr: "", audioUrlAr: "", audioUrlSl: "",
+  audioUrlIt: "", audioUrlEs: "", audioUrlDe: "", audioUrlFr: "", audioUrlAr: "", audioUrlRu: "",
   category: "", points: "50", lat: "", lng: "",
   visitDuration: "30", imageUrl: "", images: [],
   isLocked: false, shopifyUrl: "",
@@ -2646,19 +2646,19 @@ function attrToForm(a: Attraction): AttrFormData {
     slug: a.slug,
     nameEn: a.nameEn, nameAl: a.nameAl, nameGr: a.nameGr,
     nameIt: (a as any).nameIt || "", nameEs: (a as any).nameEs || "", nameDe: (a as any).nameDe || "",
-    nameFr: (a as any).nameFr || "", nameAr: (a as any).nameAr || "", nameSl: (a as any).nameSl || "",
+    nameFr: (a as any).nameFr || "", nameAr: (a as any).nameAr || "", nameRu: (a as any).nameRu || "",
     namePt: (a as any).namePt || "", nameCn: (a as any).nameCn || "",
     descEn: a.descEn, descAl: a.descAl, descGr: a.descGr,
     descIt: (a as any).descIt || "", descEs: (a as any).descEs || "", descDe: (a as any).descDe || "",
-    descFr: (a as any).descFr || "", descAr: (a as any).descAr || "", descSl: (a as any).descSl || "",
+    descFr: (a as any).descFr || "", descAr: (a as any).descAr || "", descRu: (a as any).descRu || "",
     descPt: (a as any).descPt || "", descCn: (a as any).descCn || "",
     funFactEn: a.funFactEn || "", funFactAl: a.funFactAl || "", funFactGr: a.funFactGr || "",
     funFactIt: (a as any).funFactIt || "", funFactEs: (a as any).funFactEs || "", funFactDe: (a as any).funFactDe || "",
-    funFactFr: (a as any).funFactFr || "", funFactAr: (a as any).funFactAr || "", funFactSl: (a as any).funFactSl || "",
+    funFactFr: (a as any).funFactFr || "", funFactAr: (a as any).funFactAr || "", funFactRu: (a as any).funFactRu || "",
     funFactPt: (a as any).funFactPt || "", funFactCn: (a as any).funFactCn || "",
     audioUrlEn: a.audioUrlEn || "", audioUrlAl: a.audioUrlAl || "", audioUrlGr: a.audioUrlGr || "",
     audioUrlIt: (a as any).audioUrlIt || "", audioUrlEs: (a as any).audioUrlEs || "", audioUrlDe: (a as any).audioUrlDe || "",
-    audioUrlFr: (a as any).audioUrlFr || "", audioUrlAr: (a as any).audioUrlAr || "", audioUrlSl: (a as any).audioUrlSl || "",
+    audioUrlFr: (a as any).audioUrlFr || "", audioUrlAr: (a as any).audioUrlAr || "", audioUrlRu: (a as any).audioUrlRu || "",
     category: a.category,
     points: String(a.points),
     lat: String(a.lat), lng: String(a.lng),
@@ -2670,13 +2670,13 @@ function attrToForm(a: Attraction): AttrFormData {
 
 function AttrEditorView({
   attractionId,
-  destinationSlug,
+  destinationRuug,
   destinationName,
   onBack,
   onSaved,
 }: {
   attractionId: number | null;
-  destinationSlug: string;
+  destinationRuug: string;
   destinationName: string;
   onBack: () => void;
   onSaved: () => void;
@@ -2757,7 +2757,7 @@ function AttrEditorView({
 
   function validate(): boolean {
     const e: Record<string, string> = {};
-    if (!form.slug.trim()) e.slug = "Slug is required";
+    if (!form.slug.trim()) e.slug = "Ruug is required";
     if (!form.nameEn.trim()) e.nameEn = "English name is required";
     if (!form.descEn.trim()) e.descEn = "English description is required";
     if (!form.lat || isNaN(parseFloat(form.lat))) e.lat = "Valid latitude required";
@@ -2790,18 +2790,18 @@ function AttrEditorView({
     const { images: _excludeAttrImages, ...attrFormWithoutImages } = form as any;
     const payload = {
       slug: form.slug,
-      destinationSlug,
+      destinationRuug,
       nameEn: form.nameEn, nameAl: form.nameAl || form.nameEn, nameGr: form.nameGr || form.nameEn,
       nameIt: form.nameIt || null, nameEs: form.nameEs || null, nameDe: form.nameDe || null,
-      nameFr: form.nameFr || null, nameAr: form.nameAr || null, nameSl: form.nameSl || null,
+      nameFr: form.nameFr || null, nameAr: form.nameAr || null, nameRu: form.nameRu || null,
       namePt: form.namePt || null, nameCn: form.nameCn || null,
       descEn: form.descEn, descAl: form.descAl || form.descEn, descGr: form.descGr || form.descEn,
       descIt: form.descIt || null, descEs: form.descEs || null, descDe: form.descDe || null,
-      descFr: form.descFr || null, descAr: form.descAr || null, descSl: form.descSl || null,
+      descFr: form.descFr || null, descAr: form.descAr || null, descRu: form.descRu || null,
       descPt: form.descPt || null, descCn: form.descCn || null,
       funFactEn: form.funFactEn || "", funFactAl: form.funFactAl || form.funFactEn || "", funFactGr: form.funFactGr || form.funFactEn || "",
       funFactIt: form.funFactIt || null, funFactEs: form.funFactEs || null, funFactDe: form.funFactDe || null,
-      funFactFr: form.funFactFr || null, funFactAr: form.funFactAr || null, funFactSl: form.funFactSl || null,
+      funFactFr: form.funFactFr || null, funFactAr: form.funFactAr || null, funFactRu: form.funFactRu || null,
       funFactPt: form.funFactPt || null, funFactCn: form.funFactCn || null,
       category: form.category,
       points: parseInt(form.points) || 50,
@@ -2813,7 +2813,7 @@ function AttrEditorView({
       audioUrlAl: form.audioUrlAl || null,
       audioUrlGr: form.audioUrlGr || null,
       audioUrlIt: form.audioUrlIt || null, audioUrlEs: form.audioUrlEs || null, audioUrlDe: form.audioUrlDe || null,
-      audioUrlFr: form.audioUrlFr || null, audioUrlAr: form.audioUrlAr || null, audioUrlSl: form.audioUrlSl || null,
+      audioUrlFr: form.audioUrlFr || null, audioUrlAr: form.audioUrlAr || null, audioUrlRu: form.audioUrlRu || null,
     };
 
     try {
@@ -2879,9 +2879,9 @@ function AttrEditorView({
               <CardHeader className="pb-2"><CardTitle className="text-sm">Attraction Information</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="URL Slug" error={errors.slug} required>
+                  <Field label="URL Ruug" error={errors.slug} required>
                     <Input value={form.slug} onChange={e => set("slug", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} placeholder="berat-castle" />
-                    <p className="text-xs text-muted-foreground mt-1">Used in URL: /sites/{destinationSlug}/<strong>{form.slug || "slug"}</strong></p>
+                    <p className="text-xs text-muted-foreground mt-1">Used in URL: /sites/{destinationRuug}/<strong>{form.slug || "slug"}</strong></p>
                   </Field>
                   <Field label="Points (XP)" error={errors.points}>
                     <Input type="number" min="10" max="200" value={form.points} onChange={e => set("points", e.target.value)} />
@@ -3094,7 +3094,7 @@ function AttrEditorView({
 
           {/* Preview */}
           <TabsContent value="preview" className="space-y-5">
-            <AttractionPreviewCard form={form} destinationName={destinationName} destinationSlug={destinationSlug} />
+            <AttractionPreviewCard form={form} destinationName={destinationName} destinationRuug={destinationRuug} />
           </TabsContent>
         </Tabs>
 
@@ -3125,7 +3125,7 @@ export default function AdminPanel() {
         onEdit={id => setView({ screen: "editor", siteId: id })}
         onNew={() => setView({ screen: "editor", siteId: null })}
         onLogout={() => { clearAdminToken(); setView({ screen: "login" }); }}
-        onManageAttractions={(slug, name) => setView({ screen: "attractions", destinationSlug: slug, destinationName: name })}
+        onManageAttractions={(slug, name) => setView({ screen: "attractions", destinationRuug: slug, destinationName: name })}
       />
     );
   }
@@ -3143,11 +3143,11 @@ export default function AdminPanel() {
   if (view.screen === "attractions") {
     return (
       <AttractionsView
-        destinationSlug={view.destinationSlug}
+        destinationRuug={view.destinationRuug}
         destinationName={view.destinationName}
         onBack={() => setView({ screen: "sites" })}
-        onEdit={id => setView({ screen: "attr-editor", attractionId: id, destinationSlug: view.destinationSlug, destinationName: view.destinationName })}
-        onNew={() => setView({ screen: "attr-editor", attractionId: null, destinationSlug: view.destinationSlug, destinationName: view.destinationName })}
+        onEdit={id => setView({ screen: "attr-editor", attractionId: id, destinationRuug: view.destinationRuug, destinationName: view.destinationName })}
+        onNew={() => setView({ screen: "attr-editor", attractionId: null, destinationRuug: view.destinationRuug, destinationName: view.destinationName })}
       />
     );
   }
@@ -3156,10 +3156,10 @@ export default function AdminPanel() {
   return (
     <AttrEditorView
       attractionId={view.attractionId}
-      destinationSlug={view.destinationSlug}
+      destinationRuug={view.destinationRuug}
       destinationName={view.destinationName}
-      onBack={() => setView({ screen: "attractions", destinationSlug: view.destinationSlug, destinationName: view.destinationName })}
-      onSaved={() => setView({ screen: "attractions", destinationSlug: view.destinationSlug, destinationName: view.destinationName })}
+      onBack={() => setView({ screen: "attractions", destinationRuug: view.destinationRuug, destinationName: view.destinationName })}
+      onSaved={() => setView({ screen: "attractions", destinationRuug: view.destinationRuug, destinationName: view.destinationName })}
     />
   );
 }
