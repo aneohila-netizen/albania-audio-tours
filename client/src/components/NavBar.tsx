@@ -26,10 +26,10 @@ export default function NavBar() {
     { href: "/leaderboard",  icon: CreditCard, label: t.leaderboard },
   ];
 
-  const allLangs: Lang[] = ["en", "al", "gr", "it", "es", "de", "fr", "ar", "sl", "pt", "cn"];
+  const allLangs: Lang[] = ["en", "al", "gr", "it", "es", "de", "fr", "ar", "ru", "pt", "cn"];
   const FLAG: Record<Lang, string> = {
     en: "🇬🇧", al: "🇦🇱", gr: "🇬🇷", it: "🇮🇹",
-    es: "🇪🇸", de: "🇩🇪", fr: "🇫🇷", ar: "🇸🇦", sl: "🇸🇮",
+    es: "🇪🇸", de: "🇩🇪", fr: "🇫🇷", ar: "🇸🇦", sl: "🇷🇺",
   };
 
   const [langOpen, setLangOpen] = useState(false);
