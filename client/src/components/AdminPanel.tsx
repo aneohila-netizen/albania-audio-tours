@@ -112,8 +112,8 @@ type View =
   | { screen: "login" }
   | { screen: "sites" }
   | { screen: "editor"; siteId: number | null }
-  | { screen: "attractions"; destinationRuug: string; destinationName: string }
-  | { screen: "attr-editor"; attractionId: number | null; destinationRuug: string; destinationName: string };
+  | { screen: "attractions"; destinationSlug: string; destinationName: string }
+  | { screen: "attr-editor"; attractionId: number | null; destinationSlug: string; destinationName: string };
 
 // ─── Admin fetch helper ────────────────────────────────────────────────────────
 const RAILWAY_API = "https://albania-audio-tours-production.up.railway.app";
@@ -892,7 +892,7 @@ function SitesView({
   const allAttrs = loadPersistedAttractions();
   const attrCounts: Record<string, number> = {};
   allAttrs.forEach(a => {
-    attrCounts[a.destinationRuug] = (attrCounts[a.destinationRuug] || 0) + 1;
+    attrCounts[a.destinationSlug] = (attrCounts[a.destinationSlug] || 0) + 1;
   });
 
   const stats = {
@@ -1103,13 +1103,13 @@ function SitesView({
 
 // ─── ATTRACTIONS LIST ─────────────────────────────────────────────────────────
 function AttractionsView({
-  destinationRuug,
+  destinationSlug,
   destinationName,
   onBack,
   onEdit,
   onNew,
 }: {
-  destinationRuug: string;
+  destinationSlug: string;
   destinationName: string;
   onBack: () => void;
   onEdit: (id: number) => void;
@@ -1121,16 +1121,16 @@ function AttractionsView({
 
   useEffect(() => {
     setLoading(true);
-    adminFetch(`/api/admin/attractions/${destinationRuug}`)
+    adminFetch(`/api/admin/attractions/${destinationSlug}`)
       .then(r => r.ok ? r.json() : [])
       .then((data: Attraction[]) => { setAttractions(data); })
       .catch(() => {
         // Fall back to local cache
         const all = loadPersistedAttractions();
-        setAttractions(all.filter(a => a.destinationRuug === destinationRuug));
+        setAttractions(all.filter(a => a.destinationSlug === destinationSlug));
       })
       .finally(() => setLoading(false));
-  }, [destinationRuug]);
+  }, [destinationSlug]);
 
   async function deleteAttraction(id: number, name: string) {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
@@ -1607,12 +1607,12 @@ function DestinationPreviewCard({ form }: { form: any }) {
   );
 }
 
-function AttractionPreviewCard({ form, destinationName, destinationRuug }: { form: any; destinationName: string; destinationRuug?: string }) {
+function AttractionPreviewCard({ form, destinationName, destinationSlug }: { form: any; destinationName: string; destinationSlug?: string }) {
   const RAILWAY_BASE = "https://albania-audio-tours-production.up.railway.app";
-  // Correct route: /#/sites/:destinationRuug/:attractionRuug
-  const frontendUrl = destinationRuug
-    ? `${RAILWAY_BASE}/#/sites/${destinationRuug}/${form.slug}`
-    : `${RAILWAY_BASE}/#/sites/${form.destinationRuug || ""}/${form.slug}`;
+  // Correct route: /#/sites/:destinationSlug/:attractionSlug
+  const frontendUrl = destinationSlug
+    ? `${RAILWAY_BASE}/#/sites/${destinationSlug}/${form.slug}`
+    : `${RAILWAY_BASE}/#/sites/${form.destinationSlug || ""}/${form.slug}`;
   const catColor = CATEGORY_COLORS[form.category] || "bg-gray-100 text-gray-800";
   return (
     <div className="space-y-4">
@@ -2183,7 +2183,7 @@ function EditorView({
 
   function validate(): boolean {
     const e: Record<string, string> = {};
-    if (!form.slug.trim()) e.slug = "Ruug is required";
+    if (!form.slug.trim()) e.slug = "Slug is required";
     if (!form.nameEn.trim()) e.nameEn = "English name is required";
     if (!form.descEn.trim()) e.descEn = "English description is required";
     if (!form.lat || isNaN(parseFloat(form.lat))) e.lat = "Valid latitude required";
@@ -2349,7 +2349,7 @@ function EditorView({
               <CardHeader className="pb-2"><CardTitle className="text-sm">Basic Information</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="URL Ruug" error={errors.slug} required>
+                  <Field label="URL Slug" error={errors.slug} required>
                     <Input value={form.slug} onChange={e => set("slug", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} placeholder="berat" data-testid="input-slug" />
                     <p className="text-xs text-muted-foreground mt-1">Used in the URL: /sites/<strong>{form.slug || "slug"}</strong></p>
                   </Field>
@@ -2588,7 +2588,7 @@ function EditorView({
           <TabsContent value="itinerary" className="space-y-5">
             {!isNew && (
               <ItineraryManager
-                siteRuug={form.slug}
+                siteSlug={form.slug}
                 entityType="site"
                 centerLat={isNaN(parseFloat(form.lat)) ? 41.3275 : parseFloat(form.lat)}
                 centerLng={isNaN(parseFloat(form.lng)) ? 19.8187 : parseFloat(form.lng)}
@@ -2670,13 +2670,13 @@ function attrToForm(a: Attraction): AttrFormData {
 
 function AttrEditorView({
   attractionId,
-  destinationRuug,
+  destinationSlug,
   destinationName,
   onBack,
   onSaved,
 }: {
   attractionId: number | null;
-  destinationRuug: string;
+  destinationSlug: string;
   destinationName: string;
   onBack: () => void;
   onSaved: () => void;
@@ -2757,7 +2757,7 @@ function AttrEditorView({
 
   function validate(): boolean {
     const e: Record<string, string> = {};
-    if (!form.slug.trim()) e.slug = "Ruug is required";
+    if (!form.slug.trim()) e.slug = "Slug is required";
     if (!form.nameEn.trim()) e.nameEn = "English name is required";
     if (!form.descEn.trim()) e.descEn = "English description is required";
     if (!form.lat || isNaN(parseFloat(form.lat))) e.lat = "Valid latitude required";
@@ -2790,7 +2790,7 @@ function AttrEditorView({
     const { images: _excludeAttrImages, ...attrFormWithoutImages } = form as any;
     const payload = {
       slug: form.slug,
-      destinationRuug,
+      destinationSlug,
       nameEn: form.nameEn, nameAl: form.nameAl || form.nameEn, nameGr: form.nameGr || form.nameEn,
       nameIt: form.nameIt || null, nameEs: form.nameEs || null, nameDe: form.nameDe || null,
       nameFr: form.nameFr || null, nameAr: form.nameAr || null, nameRu: form.nameRu || null,
@@ -2879,9 +2879,9 @@ function AttrEditorView({
               <CardHeader className="pb-2"><CardTitle className="text-sm">Attraction Information</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="URL Ruug" error={errors.slug} required>
+                  <Field label="URL Slug" error={errors.slug} required>
                     <Input value={form.slug} onChange={e => set("slug", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} placeholder="berat-castle" />
-                    <p className="text-xs text-muted-foreground mt-1">Used in URL: /sites/{destinationRuug}/<strong>{form.slug || "slug"}</strong></p>
+                    <p className="text-xs text-muted-foreground mt-1">Used in URL: /sites/{destinationSlug}/<strong>{form.slug || "slug"}</strong></p>
                   </Field>
                   <Field label="Points (XP)" error={errors.points}>
                     <Input type="number" min="10" max="200" value={form.points} onChange={e => set("points", e.target.value)} />
@@ -3094,7 +3094,7 @@ function AttrEditorView({
 
           {/* Preview */}
           <TabsContent value="preview" className="space-y-5">
-            <AttractionPreviewCard form={form} destinationName={destinationName} destinationRuug={destinationRuug} />
+            <AttractionPreviewCard form={form} destinationName={destinationName} destinationSlug={destinationSlug} />
           </TabsContent>
         </Tabs>
 
@@ -3125,7 +3125,7 @@ export default function AdminPanel() {
         onEdit={id => setView({ screen: "editor", siteId: id })}
         onNew={() => setView({ screen: "editor", siteId: null })}
         onLogout={() => { clearAdminToken(); setView({ screen: "login" }); }}
-        onManageAttractions={(slug, name) => setView({ screen: "attractions", destinationRuug: slug, destinationName: name })}
+        onManageAttractions={(slug, name) => setView({ screen: "attractions", destinationSlug: slug, destinationName: name })}
       />
     );
   }
@@ -3143,11 +3143,11 @@ export default function AdminPanel() {
   if (view.screen === "attractions") {
     return (
       <AttractionsView
-        destinationRuug={view.destinationRuug}
+        destinationSlug={view.destinationSlug}
         destinationName={view.destinationName}
         onBack={() => setView({ screen: "sites" })}
-        onEdit={id => setView({ screen: "attr-editor", attractionId: id, destinationRuug: view.destinationRuug, destinationName: view.destinationName })}
-        onNew={() => setView({ screen: "attr-editor", attractionId: null, destinationRuug: view.destinationRuug, destinationName: view.destinationName })}
+        onEdit={id => setView({ screen: "attr-editor", attractionId: id, destinationSlug: view.destinationSlug, destinationName: view.destinationName })}
+        onNew={() => setView({ screen: "attr-editor", attractionId: null, destinationSlug: view.destinationSlug, destinationName: view.destinationName })}
       />
     );
   }
@@ -3156,10 +3156,10 @@ export default function AdminPanel() {
   return (
     <AttrEditorView
       attractionId={view.attractionId}
-      destinationRuug={view.destinationRuug}
+      destinationSlug={view.destinationSlug}
       destinationName={view.destinationName}
-      onBack={() => setView({ screen: "attractions", destinationRuug: view.destinationRuug, destinationName: view.destinationName })}
-      onSaved={() => setView({ screen: "attractions", destinationRuug: view.destinationRuug, destinationName: view.destinationName })}
+      onBack={() => setView({ screen: "attractions", destinationSlug: view.destinationSlug, destinationName: view.destinationName })}
+      onSaved={() => setView({ screen: "attractions", destinationSlug: view.destinationSlug, destinationName: view.destinationName })}
     />
   );
 }
