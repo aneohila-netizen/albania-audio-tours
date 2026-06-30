@@ -1,7 +1,11 @@
 /**
- * CmsPageRenderer — renders any CMS page by slug.
+ * CmsPageRenderer – renders any CMS page by slug.
  * Used for /#/p/:slug routes (landing pages, info pages, custom blog posts).
  * Falls back to 404 if the slug doesn't exist or the page is unpublished.
+ *
+ * Link rewriting: all albanianeagletours.com links in CMS page bodies are
+ * normalised to the correct collection/page URLs. Any AET link that doesn't
+ * match a known pattern falls back to https://albanianeagletours.com/
  */
 
 import { useParams } from "wouter";
@@ -10,7 +14,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { ArrowLeft, Calendar, User } from "lucide-react";
 import { Link } from "wouter";
 
-// Use relative URL so it works on both albaniaaudiotours.com and railway preview
+// Use relative URL so it works on both albaniaudiotours.com and railway preview
 const API_BASE = typeof window !== "undefined" && window.location.hostname !== "localhost"
   ? ""
   : "https://albania-audio-tours-production.up.railway.app";
@@ -28,6 +32,63 @@ interface CmsPage {
   author: string;
   publishedAt: string;
   isPublished: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// AET link rewriting map
+// Maps any broken / old albanianeagletours.com path patterns to the correct URL.
+// The fallback (last entry) catches all remaining AET links.
+// ---------------------------------------------------------------------------
+const AET_LINK_MAP: { pattern: RegExp; replacement: string }[] = [
+  {
+    // City Breaks collection
+    pattern: /https?:\/\/(?:www\.)?albanianeagletours\.com\/(?:collections\/)?(?:albania-city-breaks?|city-breaks?)[^"']*/gi,
+    replacement: "https://albanianeagletours.com/collections/albania-city-breaks",
+  },
+  {
+    // Car & Driver collection
+    pattern: /https?:\/\/(?:www\.)?albanianeagletours\.com\/(?:collections\/)?(?:albania-tours-with-car[^"']*|car-and-driver[^"']*|car-driver[^"']*)/gi,
+    replacement: "https://albanianeagletours.com/collections/albania-tours-with-car-driver-included-popular",
+  },
+  {
+    // Contact / Ask an Expert
+    pattern: /https?:\/\/(?:www\.)?albanianeagletours\.com\/(?:pages\/)?(?:contact[^"']*)/gi,
+    replacement: "https://albanianeagletours.com/pages/contact-us",
+  },
+  {
+    // Guided Tours collection
+    pattern: /https?:\/\/(?:www\.)?albanianeagletours\.com\/(?:collections\/)?(?:guided-tours?[^"']*)/gi,
+    replacement: "https://albanianeagletours.com/collections/guided-tours",
+  },
+  {
+    // Fallback: any remaining albanianeagletours.com link that is broken (404)
+    // We detect 404-prone paths: /contact, /collections/*, /pages/* that are not already matched
+    pattern: /https?:\/\/(?:www\.)?albanianeagletours\.com\/(?:contact|pages\/contact)[^"']*/gi,
+    replacement: "https://albanianeagletours.com/pages/contact-us",
+  },
+];
+
+/**
+ * Rewrites known-broken albanianeagletours.com links in an HTML string.
+ * Any AET href that doesn't match a known collection/page and results in a
+ * 404-style path is replaced with the homepage as a safe fallback.
+ */
+function rewriteAetLinks(html: string): string {
+  let result = html;
+
+  // Apply each specific pattern replacement
+  for (const { pattern, replacement } of AET_LINK_MAP) {
+    result = result.replace(pattern, replacement);
+  }
+
+  // Fallback: any remaining albanianeagletours.com/contact or bare /contact path
+  // that wasn't caught above → homepage fallback
+  result = result.replace(
+    /href="(https?:\/\/(?:www\.)?albanianeagletours\.com\/(?!collections\/albania-city-breaks|collections\/albania-tours-with-car-driver-included-popular|pages\/contact-us|collections\/guided-tours|$)[^"]*)"/gi,
+    'href="https://albanianeagletours.com/"'
+  );
+
+  return result;
 }
 
 export default function CmsPageRenderer() {
@@ -58,14 +119,17 @@ export default function CmsPageRenderer() {
       <div className="max-w-2xl mx-auto px-4 py-16 text-center space-y-4">
         <h1 className="text-xl font-bold">Page not found</h1>
         <p className="text-muted-foreground text-sm">This page doesn't exist or isn't published yet.</p>
-        <Link href="/" className="text-primary text-sm hover:underline">← Back to Home</Link>
+        <Link href="/" className="text-primary text-sm hover:underline">← Back to AlbaTour</Link>
       </div>
     );
   }
 
   const publishDate = page.publishedAt
-    ? new Date(page.publishedAt).toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric" })
-    : "";
+    ? new Date(page.publishedAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
+    : null;
+
+  // Rewrite AET links in the body HTML before rendering
+  const sanitisedBody = rewriteAetLinks(page.body || "");
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10 pb-28 space-y-6">
@@ -107,7 +171,7 @@ export default function CmsPageRenderer() {
         </div>
       </div>
 
-      {/* Body (HTML) */}
+      {/* Body (HTML) – AET links have been rewritten */}
       <div
         className="prose prose-sm max-w-none text-sm text-foreground leading-relaxed
           prose-headings:font-bold prose-headings:text-foreground
@@ -115,12 +179,12 @@ export default function CmsPageRenderer() {
           prose-a:text-primary prose-a:no-underline hover:prose-a:underline
           prose-ul:list-disc prose-ol:list-decimal
           prose-li:text-sm prose-p:text-sm"
-        dangerouslySetInnerHTML={{ __html: page.body }}
+        dangerouslySetInnerHTML={{ __html: sanitisedBody }}
       />
 
       {/* Footer */}
       <div className="border-t border-border pt-6 text-center text-xs text-muted-foreground space-y-1">
-        <p>AlbaTour — Albania Self-Guided Audio Tours</p>
+        <p>AlbaTour – Albania Self-Guided Audio Tours</p>
         <p>© {new Date().getFullYear()} All Rights Reserved</p>
       </div>
     </div>
