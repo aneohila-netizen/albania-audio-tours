@@ -85,7 +85,7 @@ function esc(s: string): string {
 }
 
 // ── Helper: strip HTML tags for plain text use ─────────────────────────────
-function stripHtml(s: string): string {
+// — Helper: rewrite broken AET links in CMS page body HTML function rewriteAetLinks(html: string): string {   return (html || "")     // City Breaks: /collections/city-breaks -> /collections/albania-city-breaks     .replace(       /https?:\/\/(?:www\.)?albanianeagletours\.com\/collections\/(?:albania-)?city-breaks(["'\s>?#])/gi,       "https://albanianeagletours.com/collections/albania-city-breaks$1"     )     // Car & Driver: /collections/car-driver -> /collections/albania-tours-with-car-driver-included-popular     .replace(       /https?:\/\/(?:www\.)?albanianeagletours\.com\/collections\/(?:albania-tours-with-)?car-(?:and-)?driver[^"'\s>]*/gi,       "https://albanianeagletours.com/collections/albania-tours-with-car-driver-included-popular"     )     // Contact: /contact or /pages/contact (not /pages/contact-us) -> /pages/contact-us     .replace(       /https?:\/\/(?:www\.)?albanianeagletours\.com\/(?:pages\/)?contact(?!\/us)(["'\s>?#])/gi,       "https://albanianeagletours.com/pages/contact-us$1"     )     // All tours: /collections/all -> /collections/guided-tours     .replace(       /https?:\/\/(?:www\.)?albanianeagletours\.com\/collections\/all(["'\s>?#])/gi,       "https://albanianeagletours.com/collections/guided-tours$1"     )     // Fallback: any remaining AET href not matching a known working path -> homepage     .replace(       /href="(https?:\/\/(?:www\.)?albanianeagletours\.com\/(?!collections\/albania-city-breaks|collections\/albania-tours-with-car-driver-included-popular|pages\/contact-us|collections\/guided-tours|products\/)[^"]*)"/gi,       'href="https://albanianeagletours.com/"'     ); }  function stripHtml(s: string): string {
   return (s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
@@ -468,7 +468,7 @@ function renderLandingPage(page: {
   <!-- Header -->
   <header class="seo-header">
     <a class="logo" href="${SITE_URL}/#/">🎧 Albania Audio Tours</a>
-    <a class="cta-header" href="${AET_URL}/collections/all" target="_blank" rel="noopener">
+    <a class="cta-header" href="${AET_URL}/collections/guided-tours" target="_blank" rel="noopener">
       Book a Guided Tour →
     </a>
   </header>
@@ -489,7 +489,7 @@ function renderLandingPage(page: {
 
     <!-- Page body (trusted HTML from CMS) -->
     <div class="body-content">
-      ${page.body || ""}
+      ${rewriteAetLinks(page.body || "")}
     </div>
 
     <!-- 3-Step Journey Block (P1-C) -->
@@ -519,14 +519,14 @@ function renderLandingPage(page: {
       <h2>${cta[0]}</h2>
       <p>${cta[1]}</p>
       <a href="${SITE_URL}/#/sites/${hasLangVariants ? slugBase : ""}" target="_self">${cta[2]}</a>
-      <a href="${AET_URL}/collections/car-driver" target="_blank" rel="noopener" class="outline">${cta[3]}</a>
+      <a href="${AET_URL}/collections/guided-tours" target="_blank" rel="noopener" class="outline">${cta[3]}</a>
     </div>
   </div>
 
   <!-- Footer -->
   <footer>
     <p>© ${new Date().getFullYear()} Albania Audio Tours · <a href="${SITE_URL}/#/">albaniaaudiotours.com</a> · Powered by <a href="${AET_URL}" target="_blank" rel="noopener">Albanian Eagle Tours</a></p>
-    <p><a href="${SITE_URL}/sitemap.xml">Sitemap</a> · <a href="${SITE_URL}/#/terms">Terms</a> · <a href="${SITE_URL}/#/contact">Contact</a></p>
+    <p><a href="${SITE_URL}/sitemap.xml">Sitemap</a> · <a href="${SITE_URL}/#/terms">Terms</a> · <a href="${AET_URL}/pages/contact-us">Contact</a></p>
   </footer>
 
 </body>
