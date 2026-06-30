@@ -35,56 +35,54 @@ interface CmsPage {
 }
 
 // ---------------------------------------------------------------------------
-// AET link rewriting map
-// Maps any broken / old albanianeagletours.com path patterns to the correct URL.
-// The fallback (last entry) catches all remaining AET links.
+// AET link rewriting
+// Exact broken URL -> correct URL mappings confirmed from live CMS data.
+// Order matters: more specific patterns must come before broader ones.
 // ---------------------------------------------------------------------------
-const AET_LINK_MAP: { pattern: RegExp; replacement: string }[] = [
-  {
-    // City Breaks collection
-    pattern: /https?:\/\/(?:www\.)?albanianeagletours\.com\/(?:collections\/)?(?:albania-city-breaks?|city-breaks?)[^"']*/gi,
-    replacement: "https://albanianeagletours.com/collections/albania-city-breaks",
-  },
-  {
-    // Car & Driver collection
-    pattern: /https?:\/\/(?:www\.)?albanianeagletours\.com\/(?:collections\/)?(?:albania-tours-with-car[^"']*|car-and-driver[^"']*|car-driver[^"']*)/gi,
-    replacement: "https://albanianeagletours.com/collections/albania-tours-with-car-driver-included-popular",
-  },
-  {
-    // Contact / Ask an Expert
-    pattern: /https?:\/\/(?:www\.)?albanianeagletours\.com\/(?:pages\/)?(?:contact[^"']*)/gi,
-    replacement: "https://albanianeagletours.com/pages/contact-us",
-  },
-  {
-    // Guided Tours collection
-    pattern: /https?:\/\/(?:www\.)?albanianeagletours\.com\/(?:collections\/)?(?:guided-tours?[^"']*)/gi,
-    replacement: "https://albanianeagletours.com/collections/guided-tours",
-  },
-  {
-    // Fallback: any remaining albanianeagletours.com link that is broken (404)
-    // We detect 404-prone paths: /contact, /collections/*, /pages/* that are not already matched
-    pattern: /https?:\/\/(?:www\.)?albanianeagletours\.com\/(?:contact|pages\/contact)[^"']*/gi,
-    replacement: "https://albanianeagletours.com/pages/contact-us",
-  },
-];
 
 /**
- * Rewrites known-broken albanianeagletours.com links in an HTML string.
- * Any AET href that doesn't match a known collection/page and results in a
- * 404-style path is replaced with the homepage as a safe fallback.
+ * Rewrites broken albanianeagletours.com button links in an HTML string.
+ *
+ * Confirmed broken URLs found in CMS pages (via API inspection):
+ *   /collections/city-breaks            -> /collections/albania-city-breaks
+ *   /collections/car-driver             -> /collections/albania-tours-with-car-driver-included-popular
+ *   /contact                            -> /pages/contact-us
+ *   /collections/all                    -> /collections/guided-tours  (Book a Guided Tour)
+ *
+ * Fallback: any remaining albanianeagletours.com link not matching a known
+ * good path is redirected to https://albanianeagletours.com/
  */
 function rewriteAetLinks(html: string): string {
   let result = html;
 
-  // Apply each specific pattern replacement
-  for (const { pattern, replacement } of AET_LINK_MAP) {
-    result = result.replace(pattern, replacement);
-  }
-
-  // Fallback: any remaining albanianeagletours.com/contact or bare /contact path
-  // that wasn't caught above → homepage fallback
+  // 1. City Breaks: /collections/city-breaks -> correct collection
   result = result.replace(
-    /href="(https?:\/\/(?:www\.)?albanianeagletours\.com\/(?!collections\/albania-city-breaks|collections\/albania-tours-with-car-driver-included-popular|pages\/contact-us|collections\/guided-tours|$)[^"]*)"/gi,
+    /https?:\/\/(?:www\.)?albanianeagletours\.com\/collections\/(?:albania-)?city-breaks(?:["'\s>])/gi,
+    (match) => "https://albanianeagletours.com/collections/albania-city-breaks" + match.slice(-1)
+  );
+
+  // 2. Car & Driver: /collections/car-driver -> correct collection
+  result = result.replace(
+    /https?:\/\/(?:www\.)?albanianeagletours\.com\/collections\/(?:albania-tours-with-)?car-(?:and-)?driver[^"'\s>]*/gi,
+    "https://albanianeagletours.com/collections/albania-tours-with-car-driver-included-popular"
+  );
+
+  // 3. Ask an Expert / Contact: /contact or /pages/contact -> /pages/contact-us
+  result = result.replace(
+    /https?:\/\/(?:www\.)?albanianeagletours\.com\/(?:pages\/)?contact(?!\/us)(?:["'\s>/?#]|$)/gi,
+    (match) => "https://albanianeagletours.com/pages/contact-us" + (match.slice(-1).match(/["'\s>]/) ? match.slice(-1) : "")
+  );
+
+  // 4. Book a Guided Tour: /collections/all -> /collections/guided-tours
+  result = result.replace(
+    /https?:\/\/(?:www\.)?albanianeagletours\.com\/collections\/all(?:["'\s>/?#]|$)/gi,
+    (match) => "https://albanianeagletours.com/collections/guided-tours" + (match.slice(-1).match(/["'\s>]/) ? match.slice(-1) : "")
+  );
+
+  // 5. Fallback: any remaining AET href that is NOT one of the 4 known-good URLs
+  //    or a /products/ link (which may be valid specific tours) gets the homepage.
+  result = result.replace(
+    /href="(https?:\/\/(?:www\.)?albanianeagletours\.com\/(?!collections\/albania-city-breaks|collections\/albania-tours-with-car-driver-included-popular|pages\/contact-us|collections\/guided-tours|products\/)[^"]*)"/gi,
     'href="https://albanianeagletours.com/"'
   );
 
@@ -171,7 +169,7 @@ export default function CmsPageRenderer() {
         </div>
       </div>
 
-      {/* Body (HTML) – AET links have been rewritten */}
+      {/* Body (HTML) – AET links have been rewritten to correct URLs */}
       <div
         className="prose prose-sm max-w-none text-sm text-foreground leading-relaxed
           prose-headings:font-bold prose-headings:text-foreground
