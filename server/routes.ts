@@ -391,7 +391,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.get("/api/sites/:slug", async (req, res) => {
-    const site = await storage.getSiteByRuug(req.params.slug);
+    const site = await storage.getSiteBySlug(req.params.slug);
     if (!site) return res.status(404).json({ error: "Not found" });
     res.json(stripImageData(stripAudioData(site, 'site'), 'site'));
   });
@@ -565,13 +565,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(attrs.map(a => stripImageData(stripAudioData(a, 'attraction'), 'attraction')));
   });
 
-  app.get("/api/attractions/:destinationRuug", async (req, res) => {
-    const attrs = await storage.getAttractionsByDestination(req.params.destinationRuug);
+  app.get("/api/attractions/:destinationSlug", async (req, res) => {
+    const attrs = await storage.getAttractionsByDestination(req.params.destinationSlug);
     res.json(attrs.map(a => stripImageData(stripAudioData(a, 'attraction'), 'attraction')));
   });
 
-  app.get("/api/attractions/:destinationRuug/:slug", async (req, res) => {
-    const attr = await storage.getAttractionByRuug(req.params.destinationRuug, req.params.slug);
+  app.get("/api/attractions/:destinationSlug/:slug", async (req, res) => {
+    const attr = await storage.getAttractionBySlug(req.params.destinationSlug, req.params.slug);
     if (!attr) return res.status(404).json({ error: "Not found" });
     res.json(stripImageData(stripAudioData(attr, 'attraction'), 'attraction'));
   });
@@ -597,8 +597,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(attrs.map(a => stripImageData(stripAudioData(a, 'attraction'), 'attraction')));
   });
 
-  app.get("/api/admin/attractions/:destinationRuug", requireAdmin, async (req, res) => {
-    const attrs = await storage.getAttractionsByDestination(req.params.destinationRuug);
+  app.get("/api/admin/attractions/:destinationSlug", requireAdmin, async (req, res) => {
+    const attrs = await storage.getAttractionsByDestination(req.params.destinationSlug);
     res.json(attrs.map(a => stripImageData(stripAudioData(a, 'attraction'), 'attraction')));
   });
 
@@ -1138,16 +1138,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(all);
   });
 
-  // Public: GET /api/itineraries/:siteRuug  — returns published itineraries for a page
-  app.get("/api/itineraries/:siteRuug", async (req, res) => {
-    const { siteRuug } = req.params;
-    const all = await storage.getItinerariesBySite(siteRuug);
+  // Public: GET /api/itineraries/:siteSlug  — returns published itineraries for a page
+  app.get("/api/itineraries/:siteSlug", async (req, res) => {
+    const { siteSlug } = req.params;
+    const all = await storage.getItinerariesBySite(siteSlug);
     res.json(all.filter(i => i.isPublished));
   });
 
   // Admin: GET all (including unpublished)
-  app.get("/api/admin/itineraries/:siteRuug", requireAdmin, async (req, res) => {
-    const items = await storage.getItinerariesBySite(req.params.siteRuug);
+  app.get("/api/admin/itineraries/:siteSlug", requireAdmin, async (req, res) => {
+    const items = await storage.getItinerariesBySite(req.params.siteSlug);
     res.json(items);
   });
 
@@ -1203,22 +1203,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ── Ratings ─────────────────────────────────────────────────
   // POST /api/ratings — save a star rating (1–5) for a site
   app.post("/api/ratings", async (req, res) => {
-    const { siteId, siteRuug, stars } = req.body as { siteId: number; siteRuug: string; stars: number };
-    if (!siteRuug || !stars || stars < 1 || stars > 5) {
-      return res.status(400).json({ error: "siteRuug and stars (1–5) are required" });
+    const { siteId, siteSlug, stars } = req.body as { siteId: number; siteSlug: string; stars: number };
+    if (!siteSlug || !stars || stars < 1 || stars > 5) {
+      return res.status(400).json({ error: "siteSlug and stars (1–5) are required" });
     }
     try {
-      const rating = await storage.saveRating(Number(siteId) || 0, siteRuug, Math.round(stars));
+      const rating = await storage.saveRating(Number(siteId) || 0, siteSlug, Math.round(stars));
       res.json({ success: true, rating });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  // GET /api/ratings/:siteRuug — returns { average, count }
-  app.get("/api/ratings/:siteRuug", async (req, res) => {
+  // GET /api/ratings/:siteSlug — returns { average, count }
+  app.get("/api/ratings/:siteSlug", async (req, res) => {
     try {
-      const stats = await storage.getRatingStats(req.params.siteRuug);
+      const stats = await storage.getRatingStats(req.params.siteSlug);
       res.json(stats);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -1241,7 +1241,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Public: get single published page by slug
   app.get("/api/cms/pages/:slug", async (req, res) => {
     try {
-      const page = await storage.getCmsPageByRuug(req.params.slug);
+      const page = await storage.getCmsPageBySlug(req.params.slug);
       if (!page) return res.status(404).json({ error: "Page not found" });
       res.json(page);
     } catch (e: any) {
@@ -1315,9 +1315,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Public: capture a lead (interest before Shopify is wired)
   app.post('/api/plans/lead', async (req, res) => {
     try {
-      const { email, planRuug, planName } = req.body;
-      if (!email || !planRuug) return res.status(400).json({ error: 'email and planRuug required' });
-      const lead = await storage.createLead({ email, planRuug, planName: planName || planRuug, source: 'pricing-page', notes: '' });
+      const { email, planSlug, planName } = req.body;
+      if (!email || !planSlug) return res.status(400).json({ error: 'email and planSlug required' });
+      const lead = await storage.createLead({ email, planSlug, planName: planName || planSlug, source: 'pricing-page', notes: '' });
       res.json({ success: true, lead });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
@@ -1774,7 +1774,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
         const sub = await storage.createSubscription({
           email,
-          planRuug: matchedPlan.slug,
+          planSlug: matchedPlan.slug,
           planName: matchedPlan.name,
           shopifyOrderId: orderId,
           priceEur: matchedPlan.priceEur,
@@ -1955,7 +1955,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         token: sub.sessionToken,
         email: sub.email,
         planName: sub.planName,
-        planRuug: sub.planRuug,
+        planSlug: sub.planSlug,
         expiresAt: sub.expiresAt,
         deviceCount: devices.length,
         deviceLimit,
@@ -1997,7 +1997,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         token: sub.sessionToken,
         email: sub.email,
         planName: sub.planName,
-        planRuug: sub.planRuug,
+        planSlug: sub.planSlug,
         expiresAt: sub.expiresAt,
         deviceCount: devices.length,
         deviceLimit,
@@ -2022,7 +2022,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.json({
         active: true,
         planName: sub.planName,
-        planRuug: sub.planRuug,
+        planSlug: sub.planSlug,
         expiresAt: sub.expiresAt,
         startsAt: sub.startsAt,
         email: sub.email,
@@ -2165,15 +2165,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ── Admin: manual test activation (no Shopify needed) ──────────────────
   app.post('/api/admin/subscriptions/test-activate', requireAdmin, async (req, res) => {
     try {
-      const { email, planRuug, daysFromNow = 7 } = req.body as { email: string; planRuug: string; daysFromNow?: number };
-      if (!email || !planRuug) return res.status(400).json({ error: 'email and planRuug required' });
-      const plan = await storage.getPlanByRuug(planRuug);
+      const { email, planSlug, daysFromNow = 7 } = req.body as { email: string; planSlug: string; daysFromNow?: number };
+      if (!email || !planSlug) return res.status(400).json({ error: 'email and planSlug required' });
+      const plan = await storage.getPlanBySlug(planSlug);
       if (!plan) return res.status(404).json({ error: 'Plan not found' });
       const now = new Date();
       const expiresAt = new Date(now);
       expiresAt.setDate(expiresAt.getDate() + daysFromNow);
       const sub = await storage.createSubscription({
-        email: email.toLowerCase(), planRuug, planName: plan.name,
+        email: email.toLowerCase(), planSlug, planName: plan.name,
         shopifyOrderId: `TEST-${cryptoRandomBytes(8).toString('hex')}`,
         priceEur: plan.priceEur, startsAt: now.toISOString(),
         expiresAt: expiresAt.toISOString(), isActive: true,
@@ -2216,7 +2216,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const sub = await storage.createSubscription({
         email: email.toLowerCase(),
-        planRuug: plan.slug, planName: plan.name,
+        planSlug: plan.slug, planName: plan.name,
         shopifyOrderId: orderId,
         priceEur: plan.priceEur,
         startsAt: startsAt.toISOString(),
