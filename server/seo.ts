@@ -50,11 +50,34 @@ function esc(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-// ── Helper: strip HTML tags for plain text use ─────────────────────────────
-// — Helper: rewrite broken AET links in CMS page body HTML function rewriteAetLinks(html: string): string {   return (html || "")     // City Breaks: /collections/albania-city-breaks -> /collections/albania-city-breaks     .replace(       /https?:\/\/(?:www\.)?albanianeagletours\.com\/collections\/(?:albania-)?city-breaks(["'\s>?#])/gi,       "https://albanianeagletours.com/collections/albania-city-breaks$1"     )     // Car & Driver: /collections/albania-tours-with-car-driver-included-popular -> /collections/albania-tours-with-car-driver-included-popular     .replace(       /https?:\/\/(?:www\.)?albanianeagletours\.com\/collections\/(?:albania-tours-with-)?car-(?:and-)?driver[^"'\s>]*/gi,       "https://albanianeagletours.com/collections/albania-tours-with-car-driver-included-popular"     )     // Contact: /contact or /pages/contact-us (not /pages/contact-us) -> /pages/contact-us     .replace(       /https?:\/\/(?:www\.)?albanianeagletours\.com\/(?:pages\/)?contact(?!\/us)(["'\s>?#])/gi,       "https://albanianeagletours.com/pages/contact-us$1"     )     // All tours: /collections/all -> /collections/guided-tours     .replace(       /https?:\/\/(?:www\.)?albanianeagletours\.com\/collections\/all(["'\s>?#])/gi,       "https://albanianeagletours.com/collections/guided-tours$1"     )     // Fallback: any remaining AET href not matching a known working path -> homepage     .replace(       /href="(https?:\/\/(?:www\.)?albanianeagletours\.com\/(?!collections\/albania-city-breaks|collections\/albania-tours-with-car-driver-included-popular|pages\/contact-us|collections\/guided-tours|products\/)[^"]*)"/gi,       'href="https://albanianeagletours.com/"'     ); }  function stripHtml(s: string): string {
+// ── Helper: strip HTML tags for plain text use ─────────────────────────────────────────
+function stripHtml(s: string): string {
   return (s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
-
+// ── Helper: rewrite broken AET links in CMS page body HTML ─────────────────────────
+function rewriteAetLinks(html: string): string {
+  return (html || "")
+    .replace(
+      /https?:\/\/(?:www\.)?albanianeagletours\.com\/collections\/(?:albania-)?city-breaks(["'\s>?#])/gi,
+      "https://albanianeagletours.com/collections/albania-city-breaks$1"
+    )
+    .replace(
+      /https?:\/\/(?:www\.)?albanianeagletours\.com\/collections\/(?:albania-tours-with-)?car-(?:and-)?driver[^"'\s>?]*/gi,
+      "https://albanianeagletours.com/collections/albania-tours-with-car-driver-included-popular"
+    )
+    .replace(
+      /https?:\/\/(?:www\.)?albanianeagletours\.com\/(?:pages\/)?contact(?!\/us)(["'\s>?#])/gi,
+      "https://albanianeagletours.com/pages/contact-us$1"
+    )
+    .replace(
+      /https?:\/\/(?:www\.)?albanianeagletours\.com\/collections\/all(["'\s>?#])/gi,
+      "https://albanianeagletours.com/collections/guided-tours$1"
+    )
+    .replace(
+      /href="(https?:\/\/(?:www\.)?albanianeagletours\.com\/(?!collections\/albania-city-breaks|collections\/albania-tours-with-car-driver-included-popular|pages\/contact-us|collections\/guided-tours|products\/)[^"]*)"/gi,
+      'href="https://albanianeagletours.com/"'
+    );
+}
 // ── Build hreflang link tags ───────────────────────────────────────────────
 function buildHreflang(slugBase: string, langs: string[]): string {
   // slugBase = "berat" → alternates are berat-en, berat-de, etc.
