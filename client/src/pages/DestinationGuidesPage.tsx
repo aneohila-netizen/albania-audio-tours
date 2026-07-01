@@ -150,23 +150,7 @@ export default function DestinationGuidesPage() {
         {filtered.length} destinations · 11 languages · {filtered.length * 11} guides total
       </p>
 
-      {/* CTA */}
-      <div className="rounded-2xl border border-border bg-muted/30 p-6 text-center space-y-3">
-        <p className="font-semibold text-sm">Want a guided experience?</p>
-        <p className="text-xs text-muted-foreground">
-          Albanian Eagle Tours offers private Car & Driver, Wine Tours, and City Breaks
-          to every destination listed here.
-        </p>
-        <a
-          href="https://albanianeagletours.com/collections/all"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-block bg-primary text-primary-foreground px-5 py-2 rounded-lg
-                     text-sm font-semibold hover:opacity-90 transition-opacity"
-        >
-          Browse All Tours →
-        </a>
-      </div>
+      {/* Plan Your Visit */}           <div className="rounded-2xl border border-border bg-muted/30 p-6 text-center space-y-4">             <p className="font-semibold text-sm">Plan Your Visit to Albania</p>             <p className="text-xs text-muted-foreground">Choose how you want to explore with Albanian Eagle Tours</p>             <div className="flex flex-wrap gap-2 justify-center">               <a                 href="https://albanianeagletours.com/collections/albania-city-breaks"                 target="_blank"                 rel="noopener noreferrer"                 className="inline-block bg-secondary text-secondary-foreground px-4 py-2 rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity"               >                 🏙️ City Breaks               </a>               <a                 href="https://albanianeagletours.com/collections/albania-tours-with-car-driver-included-popular"                 target="_blank"                 rel="noopener noreferrer"                 className="inline-block bg-secondary text-secondary-foreground px-4 py-2 rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity"               >                 🚗 Car &amp; Driver               </a>               <a                 href="https://albanianeagletours.com/pages/contact-us"                 target="_blank"                 rel="noopener noreferrer"                 className="inline-block bg-secondary text-secondary-foreground px-4 py-2 rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity"               >                 💬 Ask an Expert               </a>               <a                 href="https://albanianeagletours.com/collections/guided-tours"                 target="_blank"                 rel="noopener noreferrer"                 className="inline-block bg-primary text-primary-foreground px-4 py-2 rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity"               >                 🦅 Book a Guided Tour               </a>             </div>           </div>
 
     </div>
   );
