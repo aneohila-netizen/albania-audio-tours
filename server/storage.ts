@@ -82,7 +82,17 @@ class PgStorage implements IStorage {
   private ready: Promise<void>;
 
   constructor(databaseUrl: string) {
-    this.ready = this._init(databaseUrl);
+    // IMPORTANT: attach a .catch() here immediately. Without it, a failed DB
+    // connection (unreachable host, bad credentials, paused Postgres addon,
+    // etc.) becomes an *unhandled* promise rejection, which crashes the whole
+    // Node process. On Railway that triggers the restart policy, burns through
+    // restartPolicyMaxRetries, and the deployment gets stuck showing
+    // "Application failed to respond" indefinitely instead of just logging
+    // the real error and staying up (or failing gracefully per-request).
+    this.ready = this._init(databaseUrl).catch((err) => {
+      console.error("[storage] PgStorage failed to initialize:", err);
+      throw err; // re-throw so callers that `await this.ready` still see the failure
+    });
   }
 
   private async _init(databaseUrl: string) {
