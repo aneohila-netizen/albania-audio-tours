@@ -1,6 +1,24 @@
 import dns from "dns";
 dns.setDefaultResultOrder("ipv4first"); // force IPv4 — Railway cannot reach IPv6 SMTP endpoints
 
+// --- Process-level safety nets -------------------------------------------
+// These MUST be registered before anything else in the app. Without them,
+// a single unhandled promise rejection or uncaught exception ANYWHERE in the
+// app (a route handler, a background job, a stray DB client error, etc.)
+// takes down the entire Node process. On Railway that shows up as the app
+// "Crashed" and, once restartPolicyMaxRetries is exhausted, visitors see a
+// permanent "Application failed to respond" page until someone manually
+// redeploys. We log everything with full detail (visible in Railway's Deploy
+// Logs) instead of dying, so isolated/recoverable errors can't sink the
+// whole site.
+process.on("unhandledRejection", (reason: any) => {
+  console.error("[fatal-guard] Unhandled promise rejection (process kept alive):", reason?.stack || reason);
+});
+
+process.on("uncaughtException", (err: any) => {
+  console.error("[fatal-guard] Uncaught exception (process kept alive):", err?.stack || err);
+});
+
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { registerRoutes } from "./routes";

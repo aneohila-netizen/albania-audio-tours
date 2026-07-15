@@ -97,7 +97,27 @@ class PgStorage implements IStorage {
 
   private async _init(databaseUrl: string) {
     const { Pool } = await import("pg");
-    this.pool = new Pool({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false } });
+    this.pool = new Pool({
+      connectionString: databaseUrl,
+      ssl: { rejectUnauthorized: false },
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    });
+
+    // CRITICAL: node-postgres Pools emit an 'error' event whenever an IDLE
+    // client in the pool hits a backend/network error — e.g. Postgres
+    // restarting, a dropped TCP connection, a brief network blip between
+    // Railway and the DB. The pool itself recovers fine (it just discards
+    // that client), but if nothing is listening for this event, Node treats
+    // it as an uncaught 'error' event and CRASHES THE ENTIRE PROCESS. This is
+    // the single most common production crash cause for node-postgres apps,
+    // and it typically happens well after a clean startup (hours/days later,
+    // whenever the DB connection first hiccups) — not during the initial
+    // boot, which is why local testing never reproduces it.
+    this.pool.on("error", (err: any) => {
+      console.error("[storage] Postgres pool idle-client error (connection recovered automatically, process kept alive):", err?.stack || err);
+    });
 
     await this.pool.query(`
       CREATE TABLE IF NOT EXISTS tour_sites (
