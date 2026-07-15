@@ -1,0 +1,44 @@
+# Render Blueprint for the standby deployment of Albania Audio Tours.
+# This is a hot-standby copy of the same app running on Railway, connected to
+# the SAME Postgres database, so it serves live (not stale) data if Railway
+# ever goes down. Cloudflare Load Balancing sits in front of both origins and
+# fails over automatically based on the /health endpoint below.
+#
+# To use: in the Render dashboard, "New +" -> "Blueprint", point it at this
+# repo. Render reads this file and creates the service. You'll still need to
+# manually set the secret env vars marked "sync: false" below (copy their
+# values from the Railway project's Variables tab).
+services:
+  - type: web
+    name: albania-audio-tours-standby
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter # paid tier — required so the service never sleeps; the free
+                  # tier spins down after inactivity, which defeats the point
+                  # of an always-on standby
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # No need to set VITE_API_BASE_URL / PUBLIC_BASE_URL here — Render
+      # auto-injects RENDER_EXTERNAL_URL (this service's own public URL) at
+      # build time, and the Dockerfile bridges it into those two app-level
+      # vars automatically. See Dockerfile comments for details.
+      # ---- Secrets: copy these values from Railway's Variables tab ----
+      - key: DATABASE_URL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
+      - key: SHOPIFY_WEBHOOK_SECRET
+        sync: false
+      - key: UNLOCK_CODE
+        sync: false
+      - key: APP_URL
+        sync: false

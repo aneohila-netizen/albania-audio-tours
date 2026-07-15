@@ -98,6 +98,15 @@ app.use((req, res, next) => {
   next();
 });
 
+// Lightweight liveness endpoint — used by Railway/Render deploy healthchecks
+// and by external uptime monitors / Cloudflare Load Balancer health checks to
+// decide which origin is healthy and should receive traffic. Registered first
+// and kept dependency-free (no DB call) so it responds even if the DB pool is
+// briefly unavailable — that distinction matters for load-balancer failover.
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok", uptimeSeconds: Math.round(process.uptime()) });
+});
+
 (async () => {
   // SEO routes (/p/:slug, /sitemap.xml, /robots.txt) — registered BEFORE
   // the API routes and the catch-all static handler so real URLs are served
@@ -144,4 +153,25 @@ app.use((req, res, next) => {
       log(`serving on port ${port}`);
     },
   );
+
+  // Graceful shutdown — on redeploys/restarts (Railway, Render, or a manual
+  // restart) the platform sends SIGTERM before killing the process. Stop
+  // accepting new connections and let in-flight requests finish instead of
+  // dropping them mid-response, which visitors would otherwise see as a
+  // failed request or brief "Application failed to respond".
+  let shuttingDown = false;
+  function shutdown(signal: string) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    log(`received ${signal}, shutting down gracefully...`);
+    httpServer.close(() => {
+      log("closed remaining connections, exiting.");
+      process.exit(0);
+    });
+    // Safety net: force-exit if some connection never closes (e.g. a stuck
+    // long-poll or SSE stream).
+    setTimeout(() => process.exit(0), 10_000).unref();
+  }
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 })();

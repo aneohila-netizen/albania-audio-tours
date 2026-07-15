@@ -1,8 +1,11 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-export const RAILWAY_URL = "https://albania-audio-tours-production.up.railway.app";
-// Always use Railway URL directly — this frontend is statically hosted and always
-// calls the Railway backend regardless of where it's served from.
+// Backend base URL this build should call. Defaults to the Railway production
+// backend so existing behavior is unchanged there. A standby deployment (e.g.
+// Render) sets VITE_API_BASE_URL at build time to its OWN public URL, so each
+// deployment is fully self-contained and talks to itself — critical so a
+// failover to a second host actually serves live data instead of a dead shell.
+export const RAILWAY_URL = (import.meta as any).env?.VITE_API_BASE_URL || "https://albania-audio-tours-production.up.railway.app";
 const API_BASE = RAILWAY_URL;
 
 /** Direct Railway fetch — always goes to Railway, never through Perplexity proxy */

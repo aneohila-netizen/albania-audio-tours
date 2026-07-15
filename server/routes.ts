@@ -172,7 +172,11 @@ function incrementListenCount(siteId: number) {
 // MUST always be the Railway direct URL — never albaniaaudiotours.com.
 // GoDaddy forwarding strips URL paths, breaking all /api/images/db/... requests.
 // Do NOT use RAILWAY_PUBLIC_DOMAIN here — that domain goes through forwarding.
-const RAILWAY_BASE = "https://albania-audio-tours-production.up.railway.app";
+// Defaults to Railway's production backend (unchanged behavior there). A
+// standby deployment (e.g. Render) sets PUBLIC_BASE_URL at runtime to its own
+// public URL, so generated audio/image serve links are self-referential
+// instead of silently pointing back at Railway.
+const RAILWAY_BASE = process.env.PUBLIC_BASE_URL || "https://albania-audio-tours-production.up.railway.app";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "AlbaTour2026!";
