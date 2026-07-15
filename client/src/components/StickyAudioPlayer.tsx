@@ -77,10 +77,6 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Offline fallback state
-  const [isOfflineSpeech, setIsOfflineSpeech] = useState(false);
-  const [showOfflineBanner, setShowOfflineBanner] = useState(false);
-  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -95,6 +91,16 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Stable ref to loadTrack so attachAudio's error handler can call it without stale closure
   const loadTrackRef = useRef<((t: AudioTrack) => void) | null>(null);
+  // Guards against overlapping/stale playback requests. Every call to loadTrack()
+  // (Play, Resume, tapping a different stop, double-tapping the button, etc.)
+  // bumps this counter and captures its own id. When an in-flight TTS fetch
+  // eventually resolves or rejects, it first checks that its id is still the
+  // current one — if a newer play request has since superseded it, the old
+  // result is silently discarded instead of being allowed to start audio.
+  // This is what previously let two audio sources (e.g. a slow-arriving real
+  // track and a fallback that fired in the meantime) end up playing at once.
+  const requestIdRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Track listened time while playing
   useEffect(() => {
@@ -110,12 +116,13 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
   }, [isPlaying]);
 
   const teardown = useCallback(() => {
-    // Stop any active Web Speech synthesis
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
+    // Cancel any in-flight TTS request and invalidate its result so it can't
+    // land after this teardown and start audio unexpectedly.
+    requestIdRef.current += 1;
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
     }
-    speechRef.current = null;
-    setIsOfflineSpeech(false);
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.src = "";
@@ -186,6 +193,9 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
 
   const loadTrack = useCallback(async (newTrack: AudioTrack) => {
     teardown();
+    // requestIdRef was bumped inside teardown() — capture the id that now
+    // "owns" playback. Any earlier in-flight request is no longer current.
+    const myRequestId = requestIdRef.current;
     setTrack(newTrack);
     setCollapsed(false);
 
@@ -195,63 +205,39 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
       return;
     }
 
-    // Generate via Gemini TTS
+    // Generate via Gemini TTS (this is the ONLY audio source — there is no
+    // browser text-to-speech fallback anymore, so it's impossible for two
+    // audio sources to play at once).
     const key = cacheKey(newTrack);
     const cached = blobCache.get(key);
     if (cached) { attachAudio(cached); return; }
 
     setIsGenerating(true);
     setError(null);
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const r = await fetch(`${RAILWAY_URL}/api/tts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: newTrack.text, lang: newTrack.lang, siteId: newTrack.siteId }),
+        signal: controller.signal,
       });
       if (!r.ok) throw new Error(`TTS error ${r.status}`);
       const blob = await r.blob();
       const url = URL.createObjectURL(blob);
       blobCache.set(key, url);
+      // A newer play request may have started while this fetch was in
+      // flight — discard this result instead of hijacking playback.
+      if (requestIdRef.current !== myRequestId) return;
       setIsGenerating(false);
       attachAudio(url);
     } catch (e: any) {
-      setIsGenerating(false);
-      // Network error — try Web Speech API offline fallback (English only)
-      const isNetworkError = !navigator.onLine ||
-        e.message?.includes("Failed to fetch") ||
-        e.message?.includes("NetworkError") ||
-        e.message?.includes("fetch");
-
-      if (isNetworkError && typeof window !== "undefined" && window.speechSynthesis) {
-        // Use English text regardless of selected language — Web Speech is English-only fallback
-        const textToSpeak = newTrack.text || "";
-        if (textToSpeak.trim()) {
-          const utterance = new SpeechSynthesisUtterance(textToSpeak);
-          utterance.lang = "en-US";
-          utterance.rate = 0.92;   // slightly slower for clarity
-          utterance.pitch = 1.0;
-          utterance.volume = 1.0;
-
-          // Pick best available English voice
-          const voices = window.speechSynthesis.getVoices();
-          const enVoice = voices.find(v => v.lang.startsWith("en") && v.localService) ||
-                          voices.find(v => v.lang.startsWith("en")) || null;
-          if (enVoice) utterance.voice = enVoice;
-
-          utterance.onstart = () => setIsOfflineSpeech(true);
-          utterance.onend = () => setIsOfflineSpeech(false);
-          utterance.onerror = () => {
-            setIsOfflineSpeech(false);
-            setError("Offline speech unavailable on this device.");
-          };
-
-          speechRef.current = utterance;
-          setIsOfflineSpeech(true);
-          setShowOfflineBanner(true); // show the one-time banner
-          window.speechSynthesis.speak(utterance);
-          return; // don't set error — we're handling it
-        }
+      if (requestIdRef.current !== myRequestId || e?.name === "AbortError") {
+        // Superseded by a newer request — not a real error, nothing to show.
+        return;
       }
+      setIsGenerating(false);
       setError(e.message || "Audio generation failed. Check your connection.");
     }
   }, [teardown, attachAudio]);
@@ -270,17 +256,6 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
   }, [speed]);
 
   const togglePlay = useCallback(() => {
-    // Handle offline Web Speech playback toggle
-    if (isOfflineSpeech && !audioRef.current?.src) {
-      if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
-        window.speechSynthesis.pause();
-        setIsPlaying(false);
-      } else if (window.speechSynthesis.paused) {
-        window.speechSynthesis.resume();
-        setIsPlaying(true);
-      }
-      return;
-    }
     const audio = audioRef.current;
     if (!audio) return;
     if (isPlaying) {
@@ -324,55 +299,8 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
 
   const showSpinner = isLoading || isGenerating;
 
-  // ── One-time offline notification banner ─────────────────────────────────
-  const OfflineBanner = showOfflineBanner ? (
-    <div
-      role="alert"
-      style={{
-        position: "fixed",
-        bottom: "6rem",
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: 2100,
-        background: "hsl(var(--card))",
-        border: "1px solid hsl(var(--border))",
-        borderRadius: "14px",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
-        padding: "12px 16px",
-        maxWidth: "320px",
-        width: "calc(100vw - 2rem)",
-        animation: "popup-in 0.3s ease both",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-        <span style={{ fontSize: "1.25rem", lineHeight: 1, flexShrink: 0 }}>📵</span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontWeight: 700, fontSize: "13px", marginBottom: "3px", color: "hsl(var(--foreground))" }}>
-            Playing in Offline Mode
-          </p>
-          <p style={{ fontSize: "11px", color: "hsl(var(--muted-foreground))", lineHeight: 1.5, margin: 0 }}>
-            No internet detected. Playing in <strong>English only</strong> using your device's built-in voice.
-            Quality will sound robotic — the full audio guide requires a connection.
-          </p>
-        </div>
-        <button
-          onClick={() => setShowOfflineBanner(false)}
-          style={{
-            background: "none", border: "none", cursor: "pointer",
-            padding: "2px", color: "hsl(var(--muted-foreground))",
-            flexShrink: 0, fontSize: "14px", lineHeight: 1,
-          }}
-          aria-label="Dismiss offline notice"
-        >
-          ✕
-        </button>
-      </div>
-    </div>
-  ) : null;
-
   return (
     <AudioPlayerContext.Provider value={{ loadTrack, clearTrack, isActive: true, isPlaying, currentTrack: track, listenedSeconds }}>
-      {OfflineBanner}
       {children}
 
       {/* ── Sticky player ──
@@ -408,15 +336,6 @@ export function AudioPlayerProvider({ children, onComplete, onNavigate }: {
           <div className="flex items-center gap-2 min-w-0">
             <Volume2 size={14} className="text-primary shrink-0" aria-hidden="true" />
             <span className="text-xs font-semibold truncate">{track.siteName}</span>
-            {isOfflineSpeech && (
-              <span
-                className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                style={{ background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))", letterSpacing: "0.03em" }}
-                title="Offline mode — English only, device voice"
-              >
-                OFFLINE
-              </span>
-            )}
           {track.stopIndex && track.totalStops && (
             <span className="text-[10px] font-medium text-muted-foreground shrink-0 bg-muted px-1.5 py-0.5 rounded-full">
               {track.stopIndex}/{track.totalStops}

@@ -149,7 +149,7 @@ export default function DestinationPage() {
         shopifyUrl={(dest as any).shopifyUrl}
       >
         <AudioPlayer site={dest} />
-        <ItineraryCard siteSlug={dest.slug} centerLat={dest.lat} centerLng={dest.lng} />
+        <ItineraryCard siteSlug={dest.slug} centerLat={dest.lat} centerLng={dest.lng} thumbnailUrl={dest.imageUrl} />
       </PaywallGate>
 
       {/* Description — FREE forever as promised */}

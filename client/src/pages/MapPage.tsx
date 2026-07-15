@@ -1270,14 +1270,21 @@ export default function MapPage() {
 
               {/* Actions */}
               <div className="flex gap-2 flex-wrap">
-                <button
-                  onClick={handlePlayFromPin}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
-                  style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
-                  aria-label="Play audio guide"
-                >
-                  <Headphones size={14} /> Play Audio
-                </button>
+                {/* "Play Audio" is intentionally hidden for destinations (cities/regions like
+                    Tirana) — there is no single audio track for an entire destination, only
+                    for its individual attractions/itineraries. Showing it here also invited
+                    the TTS-generation flow before the visitor picked a real stop, which was
+                    the main trigger for the double-audio bug. Still shown for attraction pins. */}
+                {selectedPin.type === "attraction" && (
+                  <button
+                    onClick={handlePlayFromPin}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
+                    style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                    aria-label="Play audio guide"
+                  >
+                    <Headphones size={14} /> Play Audio
+                  </button>
+                )}
                 <button
                   data-testid="view-details-btn"
                   onClick={handleViewDetails}

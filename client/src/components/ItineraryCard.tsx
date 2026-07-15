@@ -192,11 +192,12 @@ function RouteMap({ waypoints, centerLat, centerLng }: {
 }
 
 // ── Single itinerary card ─────────────────────────────────────────────────────
-function SingleItinerary({ it, centerLat, centerLng, defaultOpen }: {
+function SingleItinerary({ it, centerLat, centerLng, defaultOpen, thumbnailUrl }: {
   it: Itinerary;
   centerLat: number;
   centerLng: number;
   defaultOpen?: boolean;
+  thumbnailUrl?: string | null;
 }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
   const [showStops, setShowStops] = useState(false);
@@ -223,9 +224,18 @@ function SingleItinerary({ it, centerLat, centerLng, defaultOpen }: {
         className="w-full flex items-start gap-3 p-4 text-left hover:bg-muted/40 transition-colors"
         aria-expanded={open}
       >
-        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-          <Route size={16} className="text-primary" />
-        </div>
+        {thumbnailUrl ? (
+          <img
+            src={thumbnailUrl}
+            alt={it.name}
+            className="w-9 h-9 rounded-lg object-cover shrink-0 mt-0.5"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+            <Route size={16} className="text-primary" />
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-sm">{it.name}</span>
@@ -353,9 +363,12 @@ interface Props {
   siteSlug: string;
   centerLat?: number;
   centerLng?: number;
+  /** Cover photo of the parent destination/site/attraction, shown as a thumbnail
+   *  on each itinerary card instead of a generic route icon. */
+  thumbnailUrl?: string | null;
 }
 
-export default function ItineraryCard({ siteSlug, centerLat = 41.3275, centerLng = 19.8187 }: Props) {
+export default function ItineraryCard({ siteSlug, centerLat = 41.3275, centerLng = 19.8187, thumbnailUrl }: Props) {
   const [itineraries, setItineraries] = useState<Itinerary[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -374,7 +387,7 @@ export default function ItineraryCard({ siteSlug, centerLat = 41.3275, centerLng
       <div className="flex items-center gap-2">
         <Map size={15} className="text-primary" />
         <h2 className="text-sm font-semibold">
-          {itineraries.length === 1 ? "Tour Itinerary" : "Tour Itineraries (" + itineraries.length + ")"}
+          {itineraries.length === 1 ? "View Tour Itinerary" : "View Tour Itineraries (" + itineraries.length + ")"}
         </h2>
       </div>
       {itineraries.map(function(it, idx) {
@@ -385,6 +398,7 @@ export default function ItineraryCard({ siteSlug, centerLat = 41.3275, centerLng
             centerLat={centerLat}
             centerLng={centerLng}
             defaultOpen={idx === 0 && itineraries.length === 1}
+            thumbnailUrl={thumbnailUrl}
           />
         );
       })}

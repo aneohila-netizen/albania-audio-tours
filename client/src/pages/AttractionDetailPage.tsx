@@ -201,7 +201,7 @@ export default function AttractionDetailPage() {
         shopifyUrl={(attraction as any).shopifyUrl}
       >
         <AudioPlayer site={siteCompat} text={aDesc} onComplete={() => { if (!isVisited) handleMarkVisited(); }} />
-        <ItineraryCard siteSlug={attraction.slug} centerLat={attraction.lat} centerLng={attraction.lng} />
+        <ItineraryCard siteSlug={attraction.slug} centerLat={attraction.lat} centerLng={attraction.lng} thumbnailUrl={attraction.imageUrl} />
       </PaywallGate>
 
       {/* Description + Read Free badge — the text transcript is free forever.
