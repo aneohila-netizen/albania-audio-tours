@@ -573,12 +573,13 @@ export function registerSeoRoutes(app: Express): void {
   </url>`).join("");
 
       // Static SPA routes
+      // NOTE: hash-fragment routes (e.g. /#/blog) were removed from the sitemap.
+      // Google cannot crawl or index anything after a "#" as a distinct URL —
+      // fragments are never sent to the server, so these always resolved to the
+      // homepage shell and sat stuck as "Discovered - currently not indexed"
+      // in Search Console. Only the real homepage URL is listed here now.
       const staticUrls = [
         { path: "/", priority: "1.0", freq: "weekly" },
-        { path: "/#/sites", priority: "0.9", freq: "weekly" },
-        { path: "/#/blog", priority: "0.7", freq: "weekly" },
-        { path: "/#/subscriptions", priority: "0.8", freq: "monthly" },
-        { path: "/#/contact", priority: "0.5", freq: "monthly" },
       ].map(r => `
   <url>
     <loc>${SITE_URL}${r.path}</loc>
