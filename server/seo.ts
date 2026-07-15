@@ -283,10 +283,13 @@ function renderLandingPage(page: {
   <meta name="description" content="${desc}" />
   ${keywords ? `<meta name="keywords" content="${keywords}" />` : ""}
 
-  <!-- Canonical: English version is always the canonical for each destination.
-       Non-English pages point to the English version to consolidate ranking signals.
-       hreflang tells Google which language each URL serves (handled separately). -->
-  <link rel="canonical" href="${esc(`${SITE_URL}/p/${hasLangVariants ? slugBase + '-en' : page.slug}`)}" />
+  <!-- Canonical: self-referencing, per Google's guidance for hreflang page sets.
+       Each language version declares itself as canonical; hreflang (below) tells
+       Google which URL serves which language/region. Previously this pointed to
+       the English sibling for every translation, which sends Google a conflicting
+       "don't index this version separately" signal and caused many translated
+       pages to be skipped (Search Console: "Crawled - currently not indexed"). -->
+  <link rel="canonical" href="${esc(canonical)}" />
 
   <!-- hreflang alternates -->
   ${hreflangBlock}
