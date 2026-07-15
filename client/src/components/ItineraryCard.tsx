@@ -201,9 +201,13 @@ function SingleItinerary({ it, centerLat, centerLng, defaultOpen, thumbnailUrl }
 }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
   const [showStops, setShowStops] = useState(false);
+  const [descExpanded, setDescExpanded] = useState(false);
   const waypoints: Waypoint[] = (() => {
     try { return JSON.parse(it.waypoints) || []; } catch { return []; }
   })();
+  // Heuristic: at 2-line clamp on the ~2/3-width text column, descriptions
+  // longer than this reliably overflow, so show a "Read more.." toggle.
+  const descIsLong = (it.description?.length ?? 0) > 90;
 
   const diffColor = it.difficulty === "easy"
     ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
@@ -221,22 +225,25 @@ function SingleItinerary({ it, centerLat, centerLng, defaultOpen, thumbnailUrl }
       {/* Header */}
       <button
         onClick={() => setOpen(function(o) { return !o; })}
-        className="w-full flex items-start gap-3 p-4 text-left hover:bg-muted/40 transition-colors"
+        className="w-full flex items-stretch gap-3 p-4 text-left hover:bg-muted/40 transition-colors"
         aria-expanded={open}
       >
+        {/* Image takes ~1/3 of the card width, full row height */}
         {thumbnailUrl ? (
-          <img
-            src={thumbnailUrl}
-            alt={it.name}
-            className="w-9 h-9 rounded-lg object-cover shrink-0 mt-0.5"
-            loading="lazy"
-          />
+          <div className="w-1/3 shrink-0 rounded-lg overflow-hidden bg-muted" style={{ minHeight: 88 }}>
+            <img
+              src={thumbnailUrl}
+              alt={it.name}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          </div>
         ) : (
-          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-            <Route size={16} className="text-primary" />
+          <div className="w-1/3 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center" style={{ minHeight: 88 }}>
+            <Route size={26} className="text-primary" />
           </div>
         )}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-sm">{it.name}</span>
             <span className={"text-[11px] font-medium px-1.5 py-0.5 rounded-full " + diffColor}>
@@ -249,10 +256,23 @@ function SingleItinerary({ it, centerLat, centerLng, defaultOpen, thumbnailUrl }
             <span className="flex items-center gap-1"><Flag size={11} /> {waypoints.length} stops</span>
           </div>
           {it.description && (
-            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{it.description}</p>
+            <p className={"text-xs text-muted-foreground mt-1" + (descExpanded ? "" : " line-clamp-2")}>
+              {it.description}
+              {descIsLong && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); setDescExpanded(function(v) { return !v; }); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setDescExpanded(function(v) { return !v; }); } }}
+                  className="ml-1 font-medium text-primary hover:underline cursor-pointer whitespace-nowrap"
+                >
+                  {descExpanded ? " Show less" : " Read more.."}
+                </span>
+              )}
+            </p>
           )}
         </div>
-        <div className="shrink-0 mt-1">
+        <div className="shrink-0 self-start mt-1">
           {open ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
         </div>
       </button>
