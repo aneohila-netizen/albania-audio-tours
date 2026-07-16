@@ -12,6 +12,61 @@ import type {
   UserSubscription, InsertUserSubscription,
 } from "@shared/schema";
 
+// Base URL for constructing lightweight audio serve URLs directly in bulk/list
+// queries, without ever pulling the (potentially multi-MB) base64 audio data
+// URIs out of Postgres. Mirrors RAILWAY_BASE in routes.ts.
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://albania-audio-tours-production.up.railway.app";
+const AUDIO_LANG_COLS: Array<[string, string]> = [
+  ["En", "audio_url_en"], ["Al", "audio_url_al"], ["Gr", "audio_url_gr"],
+  ["It", "audio_url_it"], ["Es", "audio_url_es"], ["De", "audio_url_de"],
+  ["Fr", "audio_url_fr"], ["Ar", "audio_url_ar"], ["Ru", "audio_url_ru"],
+  ["Pt", "audio_url_pt"], ["Cn", "audio_url_cn"],
+];
+// Comma-joined "length(col) AS len_col" clauses — computed server-side by
+// Postgres so only a small integer crosses the wire per language, instead of
+// the full multi-MB base64 audio payload. This is what prevents bulk list
+// endpoints (getAllAttractions/getAttractionsByDestination/getAllSites) from
+// pulling hundreds of MB into Node's memory and causing heap-OOM crashes.
+const AUDIO_LEN_SELECT = AUDIO_LANG_COLS.map(([, col]) => `length(${col}) AS len_${col}`).join(", ");
+
+// Explicit non-audio column lists for the two tables that carry per-language
+// audio_url_* blobs. Kept explicit (rather than "SELECT * EXCLUDE(...)", which
+// Postgres doesn't support) so it's obvious exactly what bulk/list endpoints
+// fetch. Detail/single-row getters keep using SELECT * unchanged — a single
+// row's audio payload is not large enough to be a memory risk.
+const ATTRACTION_NON_AUDIO_COLS = [
+  "id", "slug", "destination_slug",
+  "name_en", "name_al", "name_gr", "name_it", "name_es", "name_de", "name_fr", "name_ar", "name_ru", "name_pt", "name_cn",
+  "desc_en", "desc_al", "desc_gr", "desc_it", "desc_es", "desc_de", "desc_fr", "desc_ar", "desc_ru", "desc_pt", "desc_cn",
+  "fun_fact_en", "fun_fact_al", "fun_fact_gr", "fun_fact_it", "fun_fact_es", "fun_fact_de", "fun_fact_fr", "fun_fact_ar", "fun_fact_ru", "fun_fact_pt", "fun_fact_cn",
+  "category", "points", "lat", "lng", "image_url", "images", "visit_duration", "is_locked", "shopify_url",
+];
+const SITE_NON_AUDIO_COLS = [
+  "id", "slug",
+  "name_en", "name_al", "name_gr", "name_it", "name_es", "name_de", "name_fr", "name_ar", "name_ru", "name_pt", "name_cn",
+  "desc_en", "desc_al", "desc_gr", "desc_it", "desc_es", "desc_de", "desc_fr", "desc_ar", "desc_ru", "desc_pt", "desc_cn",
+  "fun_fact_en", "fun_fact_al", "fun_fact_gr", "fun_fact_it", "fun_fact_es", "fun_fact_de", "fun_fact_fr", "fun_fact_ar", "fun_fact_ru", "fun_fact_pt", "fun_fact_cn",
+  "lat", "lng", "region", "category", "difficulty", "points", "image_url", "images", "visit_duration", "is_locked", "shopify_url",
+];
+const ATTRACTION_LIGHT_SELECT = `${ATTRACTION_NON_AUDIO_COLS.join(", ")}, ${AUDIO_LEN_SELECT}`;
+const SITE_LIGHT_SELECT = `${SITE_NON_AUDIO_COLS.join(", ")}, ${AUDIO_LEN_SELECT}`;
+
+// Builds audioUrl{Lang} fields for a "light" bulk row using only the
+// precomputed lengths (no raw audio data was fetched). A non-null length
+// means audio exists, so we hand back a working serve URL; the length is
+// reused as a cache-busting version param, matching prior behavior where the
+// version was derived from the base64 payload length.
+function buildLightAudioFields(r: any, type: "attraction" | "site"): Record<string, string | null> {
+  const out: Record<string, string | null> = {};
+  for (const [lang, col] of AUDIO_LANG_COLS) {
+    const len = r[`len_${col}`];
+    out[`audioUrl${lang}`] = len != null
+      ? `${PUBLIC_BASE_URL}/api/audio/serve/${type}/${r.id}/${lang.toLowerCase()}?v=${len}`
+      : null;
+  }
+  return out;
+}
+
 // ─── Interface ────────────────────────────────────────────────────────────────
 export interface IStorage {
   // Sites (destinations / regions)
@@ -587,10 +642,65 @@ class PgStorage implements IStorage {
     } as any;
   }
 
+  // Lightweight row mappers for BULK/list queries. These never receive the
+  // raw base64 audio_url_* columns (see AUDIO_LEN_SELECT / SITE_LIGHT_SELECT /
+  // ATTRACTION_LIGHT_SELECT below) — audioUrl{Lang} fields are instead built
+  // from a Postgres-computed length(), which is enough to know whether audio
+  // exists and to construct a working serve URL, without ever transferring
+  // the multi-MB payload itself. This is what prevents bulk endpoints from
+  // loading hundreds of MB into Node's heap and crashing the process.
+  private rowToSiteLight(r: any): TourSite {
+    return {
+      id: r.id, slug: r.slug,
+      nameEn: r.name_en, nameAl: r.name_al, nameGr: r.name_gr,
+      nameIt: r.name_it||'', nameEs: r.name_es||'', nameDe: r.name_de||'',
+      nameFr: r.name_fr||'', nameAr: r.name_ar||'', nameRu: r.name_ru||'', namePt: r.name_pt||'', nameCn: r.name_cn||'',
+      descEn: r.desc_en, descAl: r.desc_al, descGr: r.desc_gr,
+      descIt: r.desc_it||'', descEs: r.desc_es||'', descDe: r.desc_de||'',
+      descFr: r.desc_fr||'', descAr: r.desc_ar||'', descRu: r.desc_ru||'',
+      descPt: r.desc_pt||'', descCn: r.desc_cn||'',
+      funFactEn: r.fun_fact_en, funFactAl: r.fun_fact_al, funFactGr: r.fun_fact_gr,
+      funFactIt: r.fun_fact_it||null, funFactEs: r.fun_fact_es||null, funFactDe: r.fun_fact_de||null,
+      funFactFr: r.fun_fact_fr||null, funFactAr: r.fun_fact_ar||null, funFactRu: r.fun_fact_ru||null,
+      funFactPt: r.fun_fact_pt||null, funFactCn: r.fun_fact_cn||null,
+      ...buildLightAudioFields(r, "site"),
+      lat: parseFloat(r.lat), lng: parseFloat(r.lng),
+      region: r.region, category: r.category, difficulty: r.difficulty,
+      points: r.points, imageUrl: r.image_url,
+      images: r.images ? JSON.parse(r.images) : [],
+      visitDuration: r.visit_duration,
+      isLocked: r.is_locked||false, shopifyUrl: r.shopify_url||null,
+    } as any;
+  }
+
+  private rowToAttractionLight(r: any): Attraction {
+    return {
+      id: r.id, slug: r.slug, destinationSlug: r.destination_slug,
+      nameEn: r.name_en, nameAl: r.name_al, nameGr: r.name_gr,
+      nameIt: r.name_it||'', nameEs: r.name_es||'', nameDe: r.name_de||'',
+      nameFr: r.name_fr||'', nameAr: r.name_ar||'', nameRu: r.name_ru||'', namePt: r.name_pt||'', nameCn: r.name_cn||'',
+      descEn: r.desc_en, descAl: r.desc_al, descGr: r.desc_gr,
+      descIt: r.desc_it||'', descEs: r.desc_es||'', descDe: r.desc_de||'',
+      descFr: r.desc_fr||'', descAr: r.desc_ar||'', descRu: r.desc_ru||'',
+      descPt: r.desc_pt||'', descCn: r.desc_cn||'',
+      funFactEn: r.fun_fact_en||'', funFactAl: r.fun_fact_al||'', funFactGr: r.fun_fact_gr||'',
+      funFactIt: r.fun_fact_it||null, funFactEs: r.fun_fact_es||null, funFactDe: r.fun_fact_de||null,
+      funFactFr: r.fun_fact_fr||null, funFactAr: r.fun_fact_ar||null, funFactRu: r.fun_fact_ru||null,
+      funFactPt: r.fun_fact_pt||null, funFactCn: r.fun_fact_cn||null,
+      ...buildLightAudioFields(r, "attraction"),
+      category: r.category, points: r.points,
+      lat: parseFloat(r.lat), lng: parseFloat(r.lng),
+      imageUrl: r.image_url,
+      images: r.images ? JSON.parse(r.images) : [],
+      visitDuration: r.visit_duration,
+      isLocked: r.is_locked ?? false, shopifyUrl: r.shopify_url || null,
+    } as any;
+  }
+
   async getAllSites(): Promise<TourSite[]> {
     await this.ready;
-    const { rows } = await this.pool.query("SELECT * FROM tour_sites ORDER BY id");
-    return rows.map(this.rowToSite);
+    const { rows } = await this.pool.query(`SELECT ${SITE_LIGHT_SELECT} FROM tour_sites ORDER BY id`);
+    return rows.map(this.rowToSiteLight.bind(this));
   }
 
   async getSiteBySlug(slug: string): Promise<TourSite | undefined> {
@@ -666,14 +776,14 @@ class PgStorage implements IStorage {
 
   async getAllAttractions(): Promise<Attraction[]> {
     await this.ready;
-    const { rows } = await this.pool.query("SELECT * FROM attractions ORDER BY id");
-    return rows.map(this.rowToAttraction.bind(this));
+    const { rows } = await this.pool.query(`SELECT ${ATTRACTION_LIGHT_SELECT} FROM attractions ORDER BY id`);
+    return rows.map(this.rowToAttractionLight.bind(this));
   }
 
   async getAttractionsByDestination(destinationSlug: string): Promise<Attraction[]> {
     await this.ready;
-    const { rows } = await this.pool.query("SELECT * FROM attractions WHERE destination_slug=$1 ORDER BY id", [destinationSlug]);
-    return rows.map(this.rowToAttraction.bind(this));
+    const { rows } = await this.pool.query(`SELECT ${ATTRACTION_LIGHT_SELECT} FROM attractions WHERE destination_slug=$1 ORDER BY id`, [destinationSlug]);
+    return rows.map(this.rowToAttractionLight.bind(this));
   }
 
   async getAttractionBySlug(destinationSlug: string, slug: string): Promise<Attraction | undefined> {

@@ -258,7 +258,7 @@ const imageUpload = multer({
   },
 });
 
-const AUDIO_LANGS = ['En','Al','Gr','It','Es','De','Fr','Ar','Ru'] as const;
+const AUDIO_LANGS = ['En','Al','Gr','It','Es','De','Fr','Ar','Ru','Pt','Cn'] as const;
 
 // Strip large data URIs and replace with lightweight serve URLs.
 // KEY RULE: gallery[0] is always the hero image shown to visitors.
