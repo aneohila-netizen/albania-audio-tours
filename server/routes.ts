@@ -434,17 +434,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const { type, id, lang } = req.params;
     const entityId = parseInt(id);
     if (isNaN(entityId)) return res.status(400).send('Invalid id');
-    const cap = lang.charAt(0).toUpperCase() + lang.slice(1);
-    const field = `audioUrl${cap}`;
+    if (type !== 'site' && type !== 'attraction') return res.status(400).send('Invalid type');
     let val: string | null | undefined;
     try {
-      if (type === 'site') {
-        const site = await storage.getSiteById(entityId);
-        val = site ? (site as any)[field] : null;
-      } else {
-        const attr = await storage.getAttractionById(entityId);
-        val = attr ? (attr as any)[field] : null;
-      }
+      // Fetches only this one language's audio column instead of the full
+      // row (which would carry all 11 languages of base64 audio) -- mirrors
+      // the same fix applied to the bulk list endpoints.
+      val = await storage.getAudioBase64(type, entityId, lang);
     } catch { val = null; }
     if (!val) return res.status(404).send('Audio not found');
     if (val.startsWith('data:')) {

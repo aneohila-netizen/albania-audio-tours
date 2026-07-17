@@ -73,6 +73,10 @@ export interface IStorage {
   getAllSites(): Promise<TourSite[]>;
   getSiteBySlug(slug: string): Promise<TourSite | undefined>;
   getSiteById(id: number): Promise<TourSite | undefined>;
+  // Fetches only the single requested language's audio column, instead of
+  // the full row (which carries 11 languages of base64 audio). Used by the
+  // /api/audio/serve/:type/:id/:lang endpoint, which only ever needs one.
+  getAudioBase64(type: "site" | "attraction", id: number, lang: string): Promise<string | null>;
   createSite(data: InsertTourSite): Promise<TourSite>;
   updateSite(id: number, data: Partial<InsertTourSite>): Promise<TourSite | undefined>;
   deleteSite(id: number): Promise<boolean>;
@@ -715,6 +719,19 @@ class PgStorage implements IStorage {
     return rows[0] ? this.rowToSite(rows[0]) : undefined;
   }
 
+  async getAudioBase64(type: "site" | "attraction", id: number, lang: string): Promise<string | null> {
+    await this.ready;
+    // Whitelist the column against AUDIO_LANG_COLS instead of interpolating
+    // the URL param directly — this is the only safe way to parameterize a
+    // column name in Postgres (column identifiers can't be bind params).
+    const match = AUDIO_LANG_COLS.find(([l]) => l.toLowerCase() === lang.toLowerCase());
+    if (!match) return null;
+    const col = match[1];
+    const table = type === "site" ? "tour_sites" : "attractions";
+    const { rows } = await this.pool.query(`SELECT ${col} AS val FROM ${table} WHERE id=$1`, [id]);
+    return rows[0]?.val ?? null;
+  }
+
   async createSite(data: InsertTourSite): Promise<TourSite> {
     await this.ready;
     const { rows } = await this.pool.query(
@@ -1353,6 +1370,14 @@ export class MemStorage implements IStorage {
   async getAllSites() { return [...this.sites]; }
   async getSiteBySlug(slug: string) { return this.sites.find(s => s.slug === slug); }
   async getSiteById(id: number) { return this.sites.find(s => s.id === id); }
+
+  async getAudioBase64(type: "site" | "attraction", id: number, lang: string): Promise<string | null> {
+    const list = type === "site" ? this.sites : this.attrs;
+    const item = list.find((x: any) => x.id === id);
+    if (!item) return null;
+    const cap = lang.charAt(0).toUpperCase() + lang.slice(1).toLowerCase();
+    return (item as any)[`audioUrl${cap}`] ?? null;
+  }
 
   async createSite(data: InsertTourSite): Promise<TourSite> {
     const site = { id: this.nextSiteId++, ...data } as TourSite;
