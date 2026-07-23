@@ -2125,6 +2125,8 @@ function EditorView({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [translatingLang, setTranslatingLang] = useState<string | null>(null);
   const [translateError, setTranslateError] = useState("");
+  const [shortDescWarnings, setShortDescWarnings] = useState<Record<string, { words: number; required: number }>>({});
+  const [saveViolations, setSaveViolations] = useState<Array<{ lang: string; words: number; required: number }> | null>(null);
 
   useEffect(() => {
     if (!isNew && siteId !== null) {
@@ -2154,22 +2156,26 @@ function EditorView({
     if (!form.nameEn && !form.descEn) return;
     setTranslatingLang(langKey);
     setTranslateError("");
+    setShortDescWarnings(prev => { const p = { ...prev }; delete p[langKey]; return p; });
     try {
       const cap = langKey.charAt(0).toUpperCase() + langKey.slice(1);
       const doTranslate = async (text: string) => {
         const r = await adminFetch("/api/admin/translate", { method: "POST", body: JSON.stringify({ text, targetLang: langKey }) });
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
-        return d.translated || "";
+        return d;
       };
-      const [nameT, descT, funT] = await Promise.all([
-        form.nameEn ? doTranslate(form.nameEn) : Promise.resolve(""),
-        form.descEn ? doTranslate(form.descEn) : Promise.resolve(""),
-        form.funFactEn ? doTranslate(form.funFactEn) : Promise.resolve(""),
+      const [nameRes, descRes, funRes] = await Promise.all([
+        form.nameEn ? doTranslate(form.nameEn) : Promise.resolve({ translated: "" }),
+        form.descEn ? doTranslate(form.descEn) : Promise.resolve({ translated: "" }),
+        form.funFactEn ? doTranslate(form.funFactEn) : Promise.resolve({ translated: "" }),
       ]);
-      if (nameT) set(`name${cap}` as keyof DestFormData, nameT);
-      if (descT) set(`desc${cap}` as keyof DestFormData, descT);
-      if (funT) set(`funFact${cap}` as keyof DestFormData, funT);
+      if (nameRes.translated) set(`name${cap}` as keyof DestFormData, nameRes.translated);
+      if (descRes.translated) set(`desc${cap}` as keyof DestFormData, descRes.translated);
+      if (funRes.translated) set(`funFact${cap}` as keyof DestFormData, funRes.translated);
+      if (descRes.translated && descRes.isShort) {
+        setShortDescWarnings(prev => ({ ...prev, [langKey]: { words: descRes.translatedWords, required: descRes.requiredWords } }));
+      }
     } catch (e: any) {
       const msg = e.message || "Translation failed";
       if (msg.includes("GEMINI_API_KEY") || msg.includes("not configured")) {
@@ -2254,9 +2260,25 @@ function EditorView({
       descRu: form.descRu || null,
     };
     try {
-      const res = isNew
-        ? await adminFetch("/api/admin/sites", { method: "POST", body: JSON.stringify(payload) })
-        : await adminFetch(`/api/admin/sites/${siteId}`, { method: "PUT", body: JSON.stringify(payload) });
+      const doSave = (confirmShort?: boolean) => isNew
+        ? adminFetch("/api/admin/sites", { method: "POST", body: JSON.stringify(payload), headers: confirmShort ? { "x-confirm-short-translation": "yes" } : undefined })
+        : adminFetch(`/api/admin/sites/${siteId}`, { method: "PUT", body: JSON.stringify(payload), headers: confirmShort ? { "x-confirm-short-translation": "yes" } : undefined });
+
+      let res = await doSave();
+
+      if (res.status === 422) {
+        const errBody = await res.json().catch(() => ({} as any));
+        const violations = errBody.violations || [];
+        setSaveViolations(violations);
+        const list = violations.map((v: any) => `${v.lang}: ${v.words}/${v.required} words`).join("\n");
+        const proceed = window.confirm(`Some translations are shorter than the required word count:\n${list}\n\nSave anyway?`);
+        if (!proceed) {
+          setSaving(false);
+          return;
+        }
+        res = await doSave(true);
+        setSaveViolations(null);
+      }
 
       if (res.ok) {
         const saved = await res.json();
@@ -2533,6 +2555,11 @@ function EditorView({
                         rows={4}
                         placeholder={form.descEn}
                       />
+                      {shortDescWarnings[lang.key] && (
+                        <p className="text-xs text-amber-600 mt-1">
+                          ⚠️ {shortDescWarnings[lang.key].words}/{shortDescWarnings[lang.key].required} words — this translation looks incomplete, try Auto-translate again
+                        </p>
+                      )}
                     </Field>
                     <Field label={`${lang.label} Fun Fact`}>
                       <Input
@@ -2688,6 +2715,8 @@ function AttrEditorView({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [translatingLang, setTranslatingLang] = useState<string | null>(null);
   const [translateError, setTranslateError] = useState("");
+  const [shortDescWarnings, setShortDescWarnings] = useState<Record<string, { words: number; required: number }>>({});
+  const [saveViolations, setSaveViolations] = useState<Array<{ lang: string; words: number; required: number }> | null>(null);
 
   useEffect(() => {
     if (!isNew && attractionId !== null) {
@@ -2723,6 +2752,7 @@ function AttrEditorView({
     if (!form.nameEn && !form.descEn) return;
     setTranslatingLang(langKey);
     setTranslateError("");
+    setShortDescWarnings(prev => { const p = { ...prev }; delete p[langKey]; return p; });
     try {
       const cap = langKey.charAt(0).toUpperCase() + langKey.slice(1);
       const [nameRes, descRes, funRes] = await Promise.all([
@@ -2743,6 +2773,9 @@ function AttrEditorView({
         if (nameRes.translated) set(`name${cap}` as keyof AttrFormData, nameRes.translated);
         if (descRes.translated) set(`desc${cap}` as keyof AttrFormData, descRes.translated);
         if (funRes.translated) set(`funFact${cap}` as keyof AttrFormData, funRes.translated);
+        if (descRes.translated && descRes.isShort) {
+          setShortDescWarnings(prev => ({ ...prev, [langKey]: { words: descRes.translatedWords, required: descRes.requiredWords } }));
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -2817,9 +2850,25 @@ function AttrEditorView({
     };
 
     try {
-      const res = isNew
-        ? await adminFetch("/api/admin/attractions", { method: "POST", body: JSON.stringify(payload) })
-        : await adminFetch(`/api/admin/attractions/${attractionId}`, { method: "PUT", body: JSON.stringify(payload) });
+      const doSave = (confirmShort?: boolean) => isNew
+        ? adminFetch("/api/admin/attractions", { method: "POST", body: JSON.stringify(payload), headers: confirmShort ? { "x-confirm-short-translation": "yes" } : undefined })
+        : adminFetch(`/api/admin/attractions/${attractionId}`, { method: "PUT", body: JSON.stringify(payload), headers: confirmShort ? { "x-confirm-short-translation": "yes" } : undefined });
+
+      let res = await doSave();
+
+      if (res.status === 422) {
+        const errBody = await res.json().catch(() => ({} as any));
+        const violations = errBody.violations || [];
+        setSaveViolations(violations);
+        const list = violations.map((v: any) => `${v.lang}: ${v.words}/${v.required} words`).join("\n");
+        const proceed = window.confirm(`Some translations are shorter than the required word count:\n${list}\n\nSave anyway?`);
+        if (!proceed) {
+          setSaving(false);
+          return;
+        }
+        res = await doSave(true);
+        setSaveViolations(null);
+      }
 
       if (res.ok) {
         setSavedOk(true);
@@ -3044,6 +3093,11 @@ function AttrEditorView({
                         rows={4}
                         placeholder={form.descEn}
                       />
+                      {shortDescWarnings[lang.key] && (
+                        <p className="text-xs text-amber-600 mt-1">
+                          ⚠️ {shortDescWarnings[lang.key].words}/{shortDescWarnings[lang.key].required} words — this translation looks incomplete, try Auto-translate again
+                        </p>
+                      )}
                     </Field>
                     <Field label={`${lang.label} Fun Fact`}>
                       <Input

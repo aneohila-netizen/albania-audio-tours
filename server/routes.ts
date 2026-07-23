@@ -92,6 +92,10 @@ function audioField(lang: SupportedLang): string {
 // ─── Gemini translation helper ────────────────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 
+function countWords(text: string): number {
+  return (text || "").trim().split(/\s+/).filter(Boolean).length;
+}
+
 async function translateWithGemini(text: string, targetLang: string): Promise<string> {
   const langNames: Record<string, string> = {
     al: "Albanian", gr: "Greek", it: "Italian", es: "Spanish",
@@ -101,13 +105,15 @@ async function translateWithGemini(text: string, targetLang: string): Promise<st
     cn: "Simplified Chinese",
   };
   const langName = langNames[targetLang] || targetLang;
+  const sourceWords = countWords(text);
 
   const prompt = `Translate the following tourism description text into ${langName}.
-Keep the tone warm, friendly, and natural — like a knowledgeable local guide speaking to a visitor.
-Do NOT use em-dashes (—), avoid ellipses (...), avoid parentheses where possible.
-Write in complete natural sentences. Do not add any explanation or commentary, only output the translated text.
+This is a COMPLETE, FULL-LENGTH translation task. Translate the ENTIRE text from start to finish, every sentence and every paragraph, with nothing skipped, shortened, condensed, or summarized. The translation must contain roughly the same amount of information and detail as the original (the source is approximately ${sourceWords} words). Do NOT produce a summary or abstract. Produce a complete, faithful, full-length translation only.
+Keep the tone warm, friendly, and natural, like a knowledgeable local guide speaking to a visitor.
+Do NOT use em dashes, avoid ellipses, avoid parentheses where possible.
+Write in complete natural sentences. Do not add any explanation or commentary, only output the translated text, no preamble and no notes.
 
-Text to translate:
+Text to translate (${sourceWords} words):
 ${text}`;
 
   // Try models in order: 2.5-flash first, then 1.5-flash as fallback
@@ -118,14 +124,25 @@ ${text}`;
 
   const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+  let bestAttempt = ""; // longest/best partial result seen across all attempts, used as a last-resort fallback
+
   for (const model of models) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+    const generationConfig: Record<string, any> = { temperature: 0.3, maxOutputTokens: 8192 };
+    // Gemini 2.5 models have "thinking" enabled by default, and thinking tokens share the
+    // same maxOutputTokens budget as the visible output. For long inputs this can burn most
+    // of the budget on internal reasoning and truncate the actual translation mid-sentence.
+    // Disabling thinking gives the full token budget to the translation itself.
+    if (model.startsWith("gemini-2.5")) {
+      generationConfig.thinkingConfig = { thinkingBudget: 0 };
+    }
     const body = {
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
+      generationConfig,
     };
 
-    // Retry up to 3 times with exponential backoff for 429/503
+    // Retry up to 3 times with backoff for 429/503, and also retry (same model) if the
+    // response looks truncated or summarized rather than a complete translation.
     for (let attempt = 1; attempt <= 3; attempt++) {
       const resp = await fetch(url, {
         method: "POST",
@@ -135,12 +152,32 @@ ${text}`;
 
       if (resp.ok) {
         const data = await resp.json() as any;
-        const translated = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        return translated.trim();
+        const candidate = data?.candidates?.[0];
+        const translated = (candidate?.content?.parts?.[0]?.text || "").trim();
+        const finishReason = candidate?.finishReason;
+
+        if (translated.length > bestAttempt.length) bestAttempt = translated;
+
+        const translatedWords = countWords(translated);
+        // Treat as incomplete if Gemini reports it stopped on the token budget, or if the
+        // result came back suspiciously short relative to the source - a hallmark of
+        // silent summarization/truncation rather than a genuine full translation.
+        const looksTruncated = finishReason === "MAX_TOKENS";
+        const looksSummarized = sourceWords > 40 && translatedWords < sourceWords * 0.5;
+
+        if (!looksTruncated && !looksSummarized) {
+          return translated;
+        }
+
+        console.warn(`[translate] ${model} attempt ${attempt} looked incomplete (finishReason=${finishReason}, ${translatedWords}/${sourceWords} words) - retrying`);
+        if (attempt < 3) {
+          await sleep(1500);
+          continue;
+        }
+        break; // exhausted retries for this model, fall through to next model
       }
 
       const status = resp.status;
-      // Retry on overload/rate-limit errors
       if ((status === 429 || status === 503 || status === 500) && attempt < 3) {
         const delay = attempt * 3000; // 3s, 6s
         console.warn(`[translate] ${model} attempt ${attempt} failed (${status}), retrying in ${delay}ms...`);
@@ -148,15 +185,98 @@ ${text}`;
         continue;
       }
 
-      // For this model, give up and try next model
       const errText = await resp.text();
       console.warn(`[translate] ${model} failed permanently (${status}): ${errText.slice(0, 120)}`);
       break;
     }
   }
 
+  // All models/attempts either failed outright or kept coming back incomplete. Return the
+  // best (longest) partial result rather than throwing, so save-time validation can still
+  // flag and block it and alert the admin instead of silently losing the whole request.
+  if (bestAttempt) {
+    console.warn(`[translate] returning best-effort partial translation for ${targetLang} (${countWords(bestAttempt)}/${sourceWords} words) - save-time validation should catch this`);
+    return bestAttempt;
+  }
+
   throw new Error("Translation failed: all models unavailable. Please try again in a few minutes.");
 }
+
+// ─── Word-count validation for translations ───────────────────────────────────
+// Minimum required words for a translated description: match the English source
+// word count, capped at 700 (very long articles don't need to exceed 700 words).
+function minRequiredWords(sourceWordCount: number): number {
+  return Math.min(700, sourceWordCount);
+}
+
+type DescViolation = { lang: string; words: number; required: number };
+
+const DESC_LANG_KEYS: Array<{ key: string; label: string }> = [
+  { key: "descAl", label: "Albanian" },
+  { key: "descGr", label: "Greek" },
+  { key: "descIt", label: "Italian" },
+  { key: "descEs", label: "Spanish" },
+  { key: "descDe", label: "German" },
+  { key: "descFr", label: "French" },
+  { key: "descAr", label: "Arabic" },
+  { key: "descRu", label: "Russian" },
+  { key: "descPt", label: "Portuguese" },
+  { key: "descCn", label: "Chinese" },
+];
+
+// Checks each non-English description field against the minimum required word count
+// (derived from the English description length). Fields left intentionally blank are
+// skipped, since the app already falls back to English display for blank fields.
+function checkDescriptionCompleteness(entity: Record<string, any>): DescViolation[] {
+  const descEn = (entity.descEn || "").toString();
+  const sourceWords = countWords(descEn);
+  if (sourceWords === 0) return [];
+  const required = minRequiredWords(sourceWords);
+  const violations: DescViolation[] = [];
+  for (const { key, label } of DESC_LANG_KEYS) {
+    const val = (entity[key] || "").toString().trim();
+    if (!val) continue; // intentionally blank, falls back to English - not a violation
+    const words = countWords(val);
+    if (words < required) {
+      violations.push({ lang: label, words, required });
+    }
+  }
+  return violations;
+}
+
+// ─── Email alert for short/incomplete translations ────────────────────────────
+async function sendShortTranslationAlert(entityType: string, entityName: string, violations: DescViolation[]): Promise<void> {
+  const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+  if (!RESEND_API_KEY) {
+    console.warn("[translate-alert] RESEND_API_KEY not set - skipping email alert, violations:", violations);
+    return;
+  }
+  const RESEND_FROM = process.env.RESEND_FROM || "onboarding@resend.dev";
+  const ALERT_EMAIL = process.env.TRANSLATION_ALERT_EMAIL || "book@albanianeagletours.com";
+
+  const rows = violations.map(v => `<li><strong>${v.lang}</strong>: ${v.words} words (needs at least ${v.required})</li>`).join("");
+  const rowsText = violations.map(v => `- ${v.lang}: ${v.words} words (needs at least ${v.required})`).join("\n");
+
+  try {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: RESEND_FROM,
+        to: ALERT_EMAIL,
+        subject: `⚠️ Short translation blocked: ${entityName}`,
+        html: `<p>An attempted save for <strong>${entityName}</strong> (${entityType}) was blocked because the following translations are shorter than the required word count:</p><ul>${rows}</ul><p>The admin must review and either regenerate the translation or explicitly confirm saving anyway.</p>`,
+        text: `An attempted save for ${entityName} (${entityType}) was blocked because the following translations are shorter than required:\n${rowsText}\n\nThe admin must review and either regenerate the translation or explicitly confirm saving anyway.`,
+      }),
+    });
+  } catch (err) {
+    console.error("[translate-alert] failed to send email:", err);
+  }
+}
+
 
 // ─── Listen counter (in-memory, resets on redeploy — future: persist to DB) ───────────
 // Key: siteId (number) | Value: total listens this deployment
@@ -203,6 +323,37 @@ function requireDeleteConfirmation(req: any, res: any, next: any) {
     });
   }
   next();
+}
+
+// 2-step protection for short/incomplete translations: before a site or attraction is
+// saved, every non-blank non-English description field must contain at least as many
+// words as minRequiredWords(englishWordCount). If any field falls short, the save is
+// blocked (422) and an email alert is sent to the admin — unless the request explicitly
+// carries x-confirm-short-translation: yes, meaning the admin reviewed and chose to save
+// anyway (mirrors the requireDeleteConfirmation pattern above).
+async function guardDescriptionCompleteness(
+  req: any,
+  res: any,
+  entityType: "site" | "attraction",
+  entityName: string,
+  mergedEntity: Record<string, any>
+): Promise<boolean> {
+  const violations = checkDescriptionCompleteness(mergedEntity);
+  if (violations.length === 0) return true;
+
+  const override = req.headers["x-confirm-short-translation"];
+  if (override === "yes") {
+    console.warn(`[translate-guard] ${entityType} "${entityName}" saved with short translations after admin override:`, violations);
+    return true;
+  }
+
+  await sendShortTranslationAlert(entityType, entityName || "(untitled)", violations);
+  res.status(422).json({
+    error: "One or more translations are shorter than the required word count. Review and regenerate, or confirm to save anyway.",
+    violations,
+    hint: "Set header x-confirm-short-translation: yes to save anyway.",
+  });
+  return false;
 }
 
 // ─── Upload dirs ─────────────────────────────────────────────────────────────
@@ -605,6 +756,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/admin/attractions", requireAdmin, async (req, res) => {
     const parsed = insertAttractionSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error });
+    const ok = await guardDescriptionCompleteness(req, res, "attraction", parsed.data.nameEn, parsed.data);
+    if (!ok) return;
     const attr = await storage.createAttraction(parsed.data);
     res.json(attr);
   });
@@ -623,6 +776,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     // Strip audioUrl and images fields — managed via dedicated endpoints only.
     // Never allow PUT to overwrite gallery images with serve-URLs.
     const { audioUrlEn, audioUrlAl, audioUrlGr, audioUrlIt, audioUrlEs, audioUrlDe, audioUrlFr, audioUrlAr, audioUrlRu, audioUrlPt, audioUrlCn, images: _imgA, ...safeBody } = req.body;
+    const existing = await storage.getAttractionById(id);
+    if (!existing) return res.status(404).json({ error: "Not found" });
+    const merged = { ...existing, ...safeBody };
+    const ok = await guardDescriptionCompleteness(req, res, "attraction", merged.nameEn, merged);
+    if (!ok) return;
     const updated = await storage.updateAttraction(id, safeBody);
     if (!updated) return res.status(404).json({ error: "Not found" });
     res.json(stripAudioData(updated, 'attraction'));
@@ -648,7 +806,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       return res.status(503).json({ error: "Translation not configured (no GEMINI_API_KEY)" });
     try {
       const translated = await translateWithGemini(text, targetLang);
-      res.json({ translated });
+      const sourceWords = countWords(text);
+      const translatedWords = countWords(translated);
+      const requiredWords = minRequiredWords(sourceWords);
+      res.json({
+        translated,
+        sourceWords,
+        translatedWords,
+        requiredWords,
+        isShort: translatedWords < requiredWords,
+      });
     } catch (e: any) {
       res.status(500).json({ error: e.message || "Translation failed" });
     }
@@ -908,6 +1075,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/admin/sites", requireAdmin, async (req, res) => {
     const parsed = insertTourSiteSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error });
+    const ok = await guardDescriptionCompleteness(req, res, "site", parsed.data.nameEn, parsed.data);
+    if (!ok) return;
     const site = await storage.createSite(parsed.data);
     res.json(site);
   });
@@ -918,6 +1087,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     // Strip audioUrl and images fields — managed via dedicated endpoints only.
     // Never allow PUT to overwrite gallery images with serve-URLs.
     const { audioUrlEn, audioUrlAl, audioUrlGr, audioUrlIt, audioUrlEs, audioUrlDe, audioUrlFr, audioUrlAr, audioUrlRu, audioUrlPt, audioUrlCn, images: _imgS, ...safeBody } = req.body;
+    const existing = await storage.getSiteById(id);
+    if (!existing) return res.status(404).json({ error: "Not found" });
+    const merged = { ...existing, ...safeBody };
+    const ok = await guardDescriptionCompleteness(req, res, "site", merged.nameEn, merged);
+    if (!ok) return;
     const updated = await storage.updateSite(id, safeBody);
     if (!updated) return res.status(404).json({ error: "Not found" });
     res.json(stripAudioData(updated, 'site'));
