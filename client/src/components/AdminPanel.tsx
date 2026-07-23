@@ -2162,7 +2162,11 @@ function EditorView({
       const doTranslate = async (text: string) => {
         const r = await adminFetch("/api/admin/translate", { method: "POST", body: JSON.stringify({ text, targetLang: langKey }) });
         const d = await r.json();
-        if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+        if (!r.ok) {
+          const err = new Error(d.error || `HTTP ${r.status}`) as any;
+          err.quotaExceeded = !!d.quotaExceeded;
+          throw err;
+        }
         return d;
       };
       const [nameRes, descRes, funRes] = await Promise.all([
@@ -2178,7 +2182,9 @@ function EditorView({
       }
     } catch (e: any) {
       const msg = e.message || "Translation failed";
-      if (msg.includes("GEMINI_API_KEY") || msg.includes("not configured")) {
+      if (e.quotaExceeded) {
+        setTranslateError(`🚦 Gemini daily/rate limit reached — pause Auto-translate for now. ${msg}`);
+      } else if (msg.includes("GEMINI_API_KEY") || msg.includes("not configured")) {
         setTranslateError("⚠️ Translation requires a GEMINI_API_KEY. Go to Railway → inspiring-exploration → albania-audio-tours → Variables → add GEMINI_API_KEY.");
       } else {
         setTranslateError(`Translation error: ${msg}`);
@@ -2761,10 +2767,12 @@ function AttrEditorView({
         form.funFactEn ? adminFetch("/api/admin/translate", { method: "POST", body: JSON.stringify({ text: form.funFactEn, targetLang: langKey }) }).then(r => r.json()) : Promise.resolve({ translated: "" }),
       ]);
       // Check if the API returned an error payload
-      const firstRes = nameRes || descRes;
+      const firstRes = [nameRes, descRes, funRes].find((r: any) => r?.error) || nameRes || descRes;
       if (firstRes?.error) {
         const msg = firstRes.error || "";
-        if (msg.includes("503") || msg.includes("GEMINI") || msg.includes("API key") || firstRes.error === "Translation service unavailable") {
+        if (firstRes.quotaExceeded) {
+          setTranslateError(`🚦 Gemini daily/rate limit reached — pause Auto-translate for now. ${msg}`);
+        } else if (msg.includes("503") || msg.includes("GEMINI") || msg.includes("API key") || firstRes.error === "Translation service unavailable") {
           setTranslateError("⚠️ Translation requires a GEMINI_API_KEY. Go to Railway → inspiring-exploration → albania-audio-tours → Variables → add GEMINI_API_KEY.");
         } else {
           setTranslateError(`Translation error: ${msg}`);

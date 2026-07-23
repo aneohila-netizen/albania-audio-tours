@@ -96,6 +96,18 @@ function countWords(text: string): number {
   return (text || "").trim().split(/\s+/).filter(Boolean).length;
 }
 
+// Thrown when every model attempt failed specifically due to Gemini API rate/quota limits
+// (HTTP 429, or 503 while the service is overloaded from quota pressure), with zero successful
+// responses at all. This is distinct from "translation came back short" - it means the API
+// itself refused to run, so the admin needs to pause/pace requests or raise the quota, not
+// review translation quality.
+class GeminiQuotaError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GeminiQuotaError";
+  }
+}
+
 async function translateWithGemini(text: string, targetLang: string): Promise<string> {
   const langNames: Record<string, string> = {
     al: "Albanian", gr: "Greek", it: "Italian", es: "Spanish",
@@ -125,6 +137,9 @@ ${text}`;
   const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
   let bestAttempt = ""; // longest/best partial result seen across all attempts, used as a last-resort fallback
+  let anySuccess = false; // true as soon as any HTTP request returns 2xx from Gemini, on any model/attempt
+  let quotaStatusSeen: number | null = null; // last 429/503 status code seen, if any
+  let quotaMessageSeen = ""; // Gemini's own error message text from a 429/503 response, if any
 
   for (const model of models) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
@@ -151,6 +166,7 @@ ${text}`;
       });
 
       if (resp.ok) {
+        anySuccess = true;
         const data = await resp.json() as any;
         const candidate = data?.candidates?.[0];
         const translated = (candidate?.content?.parts?.[0]?.text || "").trim();
@@ -178,6 +194,13 @@ ${text}`;
       }
 
       const status = resp.status;
+      if (status === 429 || status === 503) {
+        quotaStatusSeen = status;
+        try {
+          const errBody = await resp.json() as any;
+          quotaMessageSeen = errBody?.error?.message || quotaMessageSeen;
+        } catch { /* ignore parse failure, keep previous message */ }
+      }
       if ((status === 429 || status === 503 || status === 500) && attempt < 3) {
         const delay = attempt * 3000; // 3s, 6s
         console.warn(`[translate] ${model} attempt ${attempt} failed (${status}), retrying in ${delay}ms...`);
@@ -191,9 +214,23 @@ ${text}`;
     }
   }
 
-  // All models/attempts either failed outright or kept coming back incomplete. Return the
-  // best (longest) partial result rather than throwing, so save-time validation can still
-  // flag and block it and alert the admin instead of silently losing the whole request.
+  // If every single attempt across every model came back as a rate/quota error and Gemini
+  // never once returned a usable response, this is a genuine API quota problem, not a
+  // translation-quality problem. Surface it as a distinct, actionable error rather than
+  // silently returning empty/partial text that would be mistaken for a "short translation".
+  if (!anySuccess && quotaStatusSeen !== null) {
+    throw new GeminiQuotaError(
+      `Gemini API ${quotaStatusSeen === 429 ? "rate/daily quota limit" : "temporary overload"} reached ` +
+      `(HTTP ${quotaStatusSeen}${quotaMessageSeen ? `: ${quotaMessageSeen}` : ""}). ` +
+      `Free-tier daily quotas reset at midnight Pacific Time (~09:00 CEST / 08:00 CEST during DST). ` +
+      `To raise the daily limit immediately, enable billing for this project in Google AI Studio / Google Cloud Console (moves you from Free tier to Tier 1, typically 5-10x higher daily limits).`
+    );
+  }
+
+  // All models/attempts either failed outright or kept coming back incomplete, but at least
+  // one request succeeded. Return the best (longest) partial result rather than throwing, so
+  // save-time validation can still flag and block it and alert the admin instead of silently
+  // losing the whole request.
   if (bestAttempt) {
     console.warn(`[translate] returning best-effort partial translation for ${targetLang} (${countWords(bestAttempt)}/${sourceWords} words) - save-time validation should catch this`);
     return bestAttempt;
@@ -817,6 +854,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         isShort: translatedWords < requiredWords,
       });
     } catch (e: any) {
+      // Quota/rate-limit exhaustion is a distinct, actionable condition - surface it with its
+      // own status code and a `quotaExceeded` flag so the admin UI can show a clear "pause and
+      // wait / raise your limit" message instead of the generic translation-error banner.
+      if (e?.name === "GeminiQuotaError") {
+        return res.status(429).json({ error: e.message, quotaExceeded: true });
+      }
       res.status(500).json({ error: e.message || "Translation failed" });
     }
   });
