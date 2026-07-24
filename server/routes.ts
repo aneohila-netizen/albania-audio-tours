@@ -329,7 +329,7 @@ async function sendShortTranslationAlert(entityType: string, entityName: string,
     return;
   }
   const RESEND_FROM = process.env.RESEND_FROM || "onboarding@resend.dev";
-  const ALERT_EMAIL = process.env.TRANSLATION_ALERT_EMAIL || "book@albanianeagletours.com";
+  const ALERT_EMAIL = process.env.TRANSLATION_ALERT_EMAIL || "aneo.hila@gmail.com";
 
   const rows = violations.map(v => `<li><strong>${v.lang}</strong>: ${v.words} ${v.unit} (needs at least ${v.required})</li>`).join("");
   const rowsText = violations.map(v => `- ${v.lang}: ${v.words} ${v.unit} (needs at least ${v.required})`).join("\n");
