@@ -14,6 +14,7 @@ import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { useAudioPlayer } from "@/components/StickyAudioPlayer";
 import { getLangText } from "@/lib/i18n";
 import MobileDrawer from "@/components/MobileDrawer";
+import AnimatedQuickGuide from "@/components/AnimatedQuickGuide";
 
 type LeafletLib = any;
 type LeafletMap = any;
@@ -148,6 +149,32 @@ export default function MapPage() {
     const timer = setTimeout(() => setShowOnboarding(true), 3000);
     return () => clearTimeout(timer);
   }, []);
+
+  // Quietly warm the mascot images in the background so the Animated Quick Guide
+  // has zero visible load lag when it triggers at the 3s mark above. Runs at low
+  // priority (requestIdleCallback, falling back to a short timeout on Safari) and
+  // never touches the main bundle — these are static image files, not JS.
+  useEffect(() => {
+    if (alreadySeen) return;
+    const warm = () => {
+      ["/mascot/aeti-greeting.webp", "/mascot/aeti-tap.webp", "/mascot/aeti-celebrate.webp"].forEach((src) => {
+        const img = new Image();
+        img.src = src;
+      });
+    };
+    const ric = (window as any).requestIdleCallback as ((cb: () => void) => number) | undefined;
+    const handle = ric ? ric(warm) : window.setTimeout(warm, 200);
+    return () => {
+      if (ric && (window as any).cancelIdleCallback) (window as any).cancelIdleCallback(handle);
+      else window.clearTimeout(handle as number);
+    };
+  }, []);
+
+  // Motion-sensitive visitors get the original static, click-through guide instead
+  // of the animated mascot version.
+  const prefersReducedMotion = useRef(
+    typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+  ).current;
 
   // Auto-dismiss the hero strip after 8 seconds
   useEffect(() => {
@@ -1292,7 +1319,18 @@ export default function MapPage() {
 
       {/* ── Onboarding Popup ────────────────────────────────────────────────
            Centered modal, 3s delay, once per session, greeting in active language. */}
-      {showOnboarding && (() => {
+      {showOnboarding && !prefersReducedMotion && (
+        <AnimatedQuickGuide
+          t={t}
+          onClose={dismissOnboarding}
+          onShareLocation={() => { dismissOnboarding(); userPannedRef.current = false; setAutoCenter(true); }}
+          onFilterCategory={(val) => { dismissOnboarding(); setLayerMode("destinations"); setCategoryFilter(val); }}
+          onBrowseDestinations={() => { dismissOnboarding(); setLayerMode("destinations"); setShowDestPanel(true); }}
+          onStartTour={() => { dismissOnboarding(); navigate("/sites/tirana"); }}
+        />
+      )}
+
+      {showOnboarding && prefersReducedMotion && (() => {
         const STEPS = [
           {
             emoji: "📍",
