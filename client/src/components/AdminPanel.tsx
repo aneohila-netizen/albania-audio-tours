@@ -2125,7 +2125,7 @@ function EditorView({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [translatingLang, setTranslatingLang] = useState<string | null>(null);
   const [translateError, setTranslateError] = useState("");
-  const [shortDescWarnings, setShortDescWarnings] = useState<Record<string, { words: number; required: number }>>({});
+  const [shortDescWarnings, setShortDescWarnings] = useState<Record<string, { words: number; required: number; unit: string }>>({});
   const [saveViolations, setSaveViolations] = useState<Array<{ lang: string; words: number; required: number }> | null>(null);
 
   useEffect(() => {
@@ -2178,7 +2178,7 @@ function EditorView({
       if (descRes.translated) set(`desc${cap}` as keyof DestFormData, descRes.translated);
       if (funRes.translated) set(`funFact${cap}` as keyof DestFormData, funRes.translated);
       if (descRes.translated && descRes.isShort) {
-        setShortDescWarnings(prev => ({ ...prev, [langKey]: { words: descRes.translatedWords, required: descRes.requiredWords } }));
+        setShortDescWarnings(prev => ({ ...prev, [langKey]: { words: descRes.translatedWords, required: descRes.requiredWords, unit: descRes.unit || "words" } }));
       }
     } catch (e: any) {
       const msg = e.message || "Translation failed";
@@ -2563,7 +2563,7 @@ function EditorView({
                       />
                       {shortDescWarnings[lang.key] && (
                         <p className="text-xs text-amber-600 mt-1">
-                          ⚠️ {shortDescWarnings[lang.key].words}/{shortDescWarnings[lang.key].required} words — this translation looks incomplete, try Auto-translate again
+                          ⚠️ {shortDescWarnings[lang.key].words}/{shortDescWarnings[lang.key].required} {shortDescWarnings[lang.key].unit} — this translation looks incomplete, try Auto-translate again
                         </p>
                       )}
                     </Field>
@@ -2721,7 +2721,7 @@ function AttrEditorView({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [translatingLang, setTranslatingLang] = useState<string | null>(null);
   const [translateError, setTranslateError] = useState("");
-  const [shortDescWarnings, setShortDescWarnings] = useState<Record<string, { words: number; required: number }>>({});
+  const [shortDescWarnings, setShortDescWarnings] = useState<Record<string, { words: number; required: number; unit: string }>>({});
   const [saveViolations, setSaveViolations] = useState<Array<{ lang: string; words: number; required: number }> | null>(null);
 
   useEffect(() => {
@@ -2782,7 +2782,7 @@ function AttrEditorView({
         if (descRes.translated) set(`desc${cap}` as keyof AttrFormData, descRes.translated);
         if (funRes.translated) set(`funFact${cap}` as keyof AttrFormData, funRes.translated);
         if (descRes.translated && descRes.isShort) {
-          setShortDescWarnings(prev => ({ ...prev, [langKey]: { words: descRes.translatedWords, required: descRes.requiredWords } }));
+          setShortDescWarnings(prev => ({ ...prev, [langKey]: { words: descRes.translatedWords, required: descRes.requiredWords, unit: descRes.unit || "words" } }));
         }
       }
     } catch (err: unknown) {
@@ -3103,7 +3103,7 @@ function AttrEditorView({
                       />
                       {shortDescWarnings[lang.key] && (
                         <p className="text-xs text-amber-600 mt-1">
-                          ⚠️ {shortDescWarnings[lang.key].words}/{shortDescWarnings[lang.key].required} words — this translation looks incomplete, try Auto-translate again
+                          ⚠️ {shortDescWarnings[lang.key].words}/{shortDescWarnings[lang.key].required} {shortDescWarnings[lang.key].unit} — this translation looks incomplete, try Auto-translate again
                         </p>
                       )}
                     </Field>

@@ -96,6 +96,38 @@ function countWords(text: string): number {
   return (text || "").trim().split(/\s+/).filter(Boolean).length;
 }
 
+// Simplified/Traditional Chinese (and other CJK ideographs) are written without spaces
+// between words, so a whitespace split massively undercounts length - a full, complete
+// article of ~2500 characters can come back as a "word count" of under 10, which made the
+// validation guard falsely flag genuine, full-length Chinese translations as incomplete.
+// Count actual CJK ideographs instead for any Chinese content.
+const CJK_CHAR_REGEX = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/g;
+function countCJKChars(text: string): number {
+  return ((text || "").match(CJK_CHAR_REGEX) || []).length;
+}
+
+// Returns the correct length measurement for a piece of translated text, in the unit that
+// makes sense for its language: CJK characters for Chinese, whitespace-delimited words for
+// every other supported language (all of which use spaces between words).
+function effectiveLength(text: string, langKey: string): { count: number; unit: "words" | "characters" } {
+  if (langKey === "cn") {
+    return { count: countCJKChars(text), unit: "characters" };
+  }
+  return { count: countWords(text), unit: "words" };
+}
+
+// Converts an English-source word requirement into the equivalent minimum length for the
+// target language's unit. Chinese text is naturally more compact per unit of meaning than
+// English - translators commonly use a ratio of roughly 1.5-1.8 Chinese characters per
+// English word - so comparing raw word-counts 1:1 against Chinese character-counts would
+// unfairly demand far more content than the English source actually contains. Using 1.5x
+// keeps the check honest (still catches genuine truncation/summarization) without
+// penalizing Chinese for being a more compact script.
+function effectiveRequired(sourceWords: number, langKey: string): number {
+  const base = minRequiredWords(sourceWords);
+  return langKey === "cn" ? Math.round(base * 1.5) : base;
+}
+
 // Thrown when every model attempt failed specifically due to Gemini API rate/quota limits
 // (HTTP 429, or 503 while the service is overloaded from quota pressure), with zero successful
 // responses at all. This is distinct from "translation came back short" - it means the API
@@ -174,18 +206,23 @@ ${text}`;
 
         if (translated.length > bestAttempt.length) bestAttempt = translated;
 
-        const translatedWords = countWords(translated);
+        // Measure the translation in the unit appropriate for its script (CJK characters
+        // for Chinese, words for everything else) - whitespace word-splitting silently
+        // undercounts Chinese to near-zero, which used to make every real, full-length
+        // Chinese translation look "summarized" and trigger pointless retries/fallbacks.
+        const { count: translatedLen, unit: lenUnit } = effectiveLength(translated, targetLang);
+        const sourceEquivalent = targetLang === "cn" ? Math.round(sourceWords * 1.5) : sourceWords;
         // Treat as incomplete if Gemini reports it stopped on the token budget, or if the
         // result came back suspiciously short relative to the source - a hallmark of
         // silent summarization/truncation rather than a genuine full translation.
         const looksTruncated = finishReason === "MAX_TOKENS";
-        const looksSummarized = sourceWords > 40 && translatedWords < sourceWords * 0.5;
+        const looksSummarized = sourceWords > 40 && translatedLen < sourceEquivalent * 0.5;
 
         if (!looksTruncated && !looksSummarized) {
           return translated;
         }
 
-        console.warn(`[translate] ${model} attempt ${attempt} looked incomplete (finishReason=${finishReason}, ${translatedWords}/${sourceWords} words) - retrying`);
+        console.warn(`[translate] ${model} attempt ${attempt} looked incomplete (finishReason=${finishReason}, ${translatedLen}/${sourceEquivalent} ${lenUnit}) - retrying`);
         if (attempt < 3) {
           await sleep(1500);
           continue;
@@ -232,7 +269,8 @@ ${text}`;
   // save-time validation can still flag and block it and alert the admin instead of silently
   // losing the whole request.
   if (bestAttempt) {
-    console.warn(`[translate] returning best-effort partial translation for ${targetLang} (${countWords(bestAttempt)}/${sourceWords} words) - save-time validation should catch this`);
+    const { count: bestLen, unit: bestUnit } = effectiveLength(bestAttempt, targetLang);
+    console.warn(`[translate] returning best-effort partial translation for ${targetLang} (${bestLen} ${bestUnit}) - save-time validation should catch this`);
     return bestAttempt;
   }
 
@@ -246,36 +284,38 @@ function minRequiredWords(sourceWordCount: number): number {
   return Math.min(700, sourceWordCount);
 }
 
-type DescViolation = { lang: string; words: number; required: number };
+type DescViolation = { lang: string; words: number; required: number; unit: "words" | "characters" };
 
-const DESC_LANG_KEYS: Array<{ key: string; label: string }> = [
-  { key: "descAl", label: "Albanian" },
-  { key: "descGr", label: "Greek" },
-  { key: "descIt", label: "Italian" },
-  { key: "descEs", label: "Spanish" },
-  { key: "descDe", label: "German" },
-  { key: "descFr", label: "French" },
-  { key: "descAr", label: "Arabic" },
-  { key: "descRu", label: "Russian" },
-  { key: "descPt", label: "Portuguese" },
-  { key: "descCn", label: "Chinese" },
+const DESC_LANG_KEYS: Array<{ key: string; label: string; langKey: string }> = [
+  { key: "descAl", label: "Albanian", langKey: "al" },
+  { key: "descGr", label: "Greek", langKey: "gr" },
+  { key: "descIt", label: "Italian", langKey: "it" },
+  { key: "descEs", label: "Spanish", langKey: "es" },
+  { key: "descDe", label: "German", langKey: "de" },
+  { key: "descFr", label: "French", langKey: "fr" },
+  { key: "descAr", label: "Arabic", langKey: "ar" },
+  { key: "descRu", label: "Russian", langKey: "ru" },
+  { key: "descPt", label: "Portuguese", langKey: "pt" },
+  { key: "descCn", label: "Chinese", langKey: "cn" },
 ];
 
-// Checks each non-English description field against the minimum required word count
-// (derived from the English description length). Fields left intentionally blank are
-// skipped, since the app already falls back to English display for blank fields.
+// Checks each non-English description field against the minimum required length
+// (derived from the English description word count, converted into the appropriate unit
+// for each target script - see effectiveLength/effectiveRequired). Fields left
+// intentionally blank are skipped, since the app already falls back to English display
+// for blank fields.
 function checkDescriptionCompleteness(entity: Record<string, any>): DescViolation[] {
   const descEn = (entity.descEn || "").toString();
   const sourceWords = countWords(descEn);
   if (sourceWords === 0) return [];
-  const required = minRequiredWords(sourceWords);
   const violations: DescViolation[] = [];
-  for (const { key, label } of DESC_LANG_KEYS) {
+  for (const { key, label, langKey } of DESC_LANG_KEYS) {
     const val = (entity[key] || "").toString().trim();
     if (!val) continue; // intentionally blank, falls back to English - not a violation
-    const words = countWords(val);
-    if (words < required) {
-      violations.push({ lang: label, words, required });
+    const { count, unit } = effectiveLength(val, langKey);
+    const required = effectiveRequired(sourceWords, langKey);
+    if (count < required) {
+      violations.push({ lang: label, words: count, required, unit });
     }
   }
   return violations;
@@ -291,8 +331,8 @@ async function sendShortTranslationAlert(entityType: string, entityName: string,
   const RESEND_FROM = process.env.RESEND_FROM || "onboarding@resend.dev";
   const ALERT_EMAIL = process.env.TRANSLATION_ALERT_EMAIL || "book@albanianeagletours.com";
 
-  const rows = violations.map(v => `<li><strong>${v.lang}</strong>: ${v.words} words (needs at least ${v.required})</li>`).join("");
-  const rowsText = violations.map(v => `- ${v.lang}: ${v.words} words (needs at least ${v.required})`).join("\n");
+  const rows = violations.map(v => `<li><strong>${v.lang}</strong>: ${v.words} ${v.unit} (needs at least ${v.required})</li>`).join("");
+  const rowsText = violations.map(v => `- ${v.lang}: ${v.words} ${v.unit} (needs at least ${v.required})`).join("\n");
 
   try {
     await fetch("https://api.resend.com/emails", {
@@ -844,13 +884,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const translated = await translateWithGemini(text, targetLang);
       const sourceWords = countWords(text);
-      const translatedWords = countWords(translated);
-      const requiredWords = minRequiredWords(sourceWords);
+      // Chinese is measured in characters (no spaces between words), every other
+      // supported language is measured in whitespace-delimited words.
+      const { count: translatedWords, unit } = effectiveLength(translated, targetLang);
+      const requiredWords = effectiveRequired(sourceWords, targetLang);
       res.json({
         translated,
         sourceWords,
         translatedWords,
         requiredWords,
+        unit,
         isShort: translatedWords < requiredWords,
       });
     } catch (e: any) {
