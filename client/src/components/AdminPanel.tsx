@@ -41,6 +41,7 @@ import AdminCmsManager from "@/components/AdminCmsManager";
 import AdminSubscriptions from "@/components/AdminSubscriptions";
 import { queryClient } from "@/lib/queryClient";
 import { fieldLabel, saveErrorMessage } from "@/lib/apiError";
+import { parseGoogleMapsCoords, isShortenedMapsLink } from "@/lib/googleMapsLink";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 const ADMIN_PASSWORD = "AlbaTour2026!";
@@ -1393,6 +1394,95 @@ function MapPicker({
   );
 }
 
+// ─── GOOGLE MAPS LINK → COORDINATES ───────────────────────────────────────────
+const MAPS_LINK_ERROR =
+  "Could not read coordinates from this link. Try pasting the link from the address bar after opening the location in Google Maps, or enter coordinates manually below.";
+
+function GoogleMapsLinkField({ onCoords }: { onCoords: (lat: number, lng: number) => void }) {
+  const [url, setUrl] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+
+  useEffect(() => {
+    if (status !== "success") return;
+    const t = setTimeout(() => setStatus("idle"), 2500);
+    return () => clearTimeout(t);
+  }, [status]);
+
+  async function apply(raw: string) {
+    const value = raw.trim();
+    if (!value) return;
+
+    let target = value;
+    if (isShortenedMapsLink(value)) {
+      setStatus("loading");
+      try {
+        const res = await adminFetch("/api/admin/resolve-maps-link", {
+          method: "POST",
+          body: JSON.stringify({ url: value }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok || !body.resolvedUrl) throw new Error(body.error || "resolve failed");
+        target = body.resolvedUrl;
+      } catch {
+        setStatus("error");
+        return;
+      }
+    }
+
+    const coords = parseGoogleMapsCoords(target);
+    if (!coords) {
+      setStatus("error");
+      return;
+    }
+    onCoords(coords.lat, coords.lng);
+    setStatus("success");
+  }
+
+  return (
+    <div>
+      <label className="text-xs font-medium text-foreground block mb-1.5">Paste Google Maps link</label>
+      <div className="flex gap-2">
+        <Input
+          value={url}
+          onChange={e => { setUrl(e.target.value); setStatus("idle"); }}
+          onPaste={e => {
+            const text = e.clipboardData.getData("text");
+            if (!text) return;
+            e.preventDefault();
+            setUrl(text);
+            void apply(text);
+          }}
+          placeholder="e.g. https://maps.google.com/... or https://maps.app.goo.gl/..."
+          disabled={status === "loading"}
+          data-testid="input-maps-link"
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => void apply(url)}
+          disabled={!url.trim() || status === "loading"}
+          className="shrink-0 gap-1.5"
+          data-testid="button-apply-maps-link"
+        >
+          {status === "loading" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          Apply
+        </Button>
+      </div>
+      {status === "success" ? (
+        <p className="text-xs text-green-600 mt-1 flex items-center gap-1" data-testid="text-maps-link-success">
+          <CheckCircle2 className="w-3.5 h-3.5" /> Location updated from link
+        </p>
+      ) : status === "error" ? (
+        <p className="text-xs text-destructive mt-1" data-testid="text-maps-link-error">{MAPS_LINK_ERROR}</p>
+      ) : (
+        <p className="text-xs text-muted-foreground mt-1">
+          Coordinates are read from the link and fill the fields below. Short links are expanded automatically.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── AUDIO CARD ────────────────────────────────────────────────────────────────
 function AudioCard({
   siteId, lang, label, flag, currentUrl, onUpdate, entityType = "sites", descText, onTtsGenerated,
@@ -2576,6 +2666,7 @@ function EditorView({
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <GoogleMapsLinkField onCoords={(la, lo) => { set("lat", String(la)); set("lng", String(lo)); }} />
                 <div className="grid grid-cols-2 gap-4">
                   <Field label="Latitude" error={errors.lat} required>
                     <Input value={form.lat} onChange={e => set("lat", e.target.value)} placeholder="40.7058" data-testid="input-lat" />
@@ -3140,6 +3231,7 @@ function AttrEditorView({
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <GoogleMapsLinkField onCoords={(la, lo) => { set("lat", String(la)); set("lng", String(lo)); }} />
                 <div className="grid grid-cols-2 gap-4">
                   <Field label="Latitude" error={errors.lat} required>
                     <Input value={form.lat} onChange={e => set("lat", e.target.value)} placeholder="40.7069" />
