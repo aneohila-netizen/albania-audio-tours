@@ -19,6 +19,7 @@ import {
   Upload, Play, Pause, Loader2, X, Link, CheckCircle2,
   LayoutList, Star, Route, FileText, Settings, Megaphone, Power, PowerOff,
   Phone, Mail, ExternalLink, ChevronLeft, ChevronRight, ArrowLeftRight, RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,7 @@ import ItineraryManager from "@/components/ItineraryManager";
 import AdminCmsManager from "@/components/AdminCmsManager";
 import AdminSubscriptions from "@/components/AdminSubscriptions";
 import { queryClient } from "@/lib/queryClient";
+import { fieldLabel, saveErrorMessage } from "@/lib/apiError";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 const ADMIN_PASSWORD = "AlbaTour2026!";
@@ -2055,6 +2057,46 @@ function Field({ label, required, error, children }: { label: string; required?:
   );
 }
 
+// ─── SHARED SAVE FEEDBACK ─────────────────────────────────────────────────────
+// Required fields are spread across the Details and Location tabs, so a
+// validation failure on a tab the admin isn't looking at used to make Save
+// appear completely dead. Callers use this map to jump to the offending tab.
+const FIELD_TAB: Record<string, string> = {
+  slug: "details", nameEn: "details", descEn: "details",
+  region: "details", category: "details",
+  lat: "location", lng: "location",
+};
+
+function firstErrorTab(errors: Record<string, string>, fallback: string): string {
+  const field = Object.keys(errors).find(f => FIELD_TAB[f]);
+  return field ? FIELD_TAB[field] : fallback;
+}
+
+function SaveErrorBanner({
+  title, message, fields, onDismiss,
+}: { title: string; message?: string; fields?: string[]; onDismiss: () => void }) {
+  return (
+    <div
+      className="mb-6 rounded-lg border border-destructive/40 bg-destructive/5 p-4 flex items-start gap-3"
+      data-testid="banner-save-error"
+    >
+      <AlertTriangle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
+      <div className="flex-1 space-y-2">
+        <p className="text-sm font-medium text-destructive">{title}</p>
+        {message && <p className="text-xs text-muted-foreground whitespace-pre-line">{message}</p>}
+        {fields && fields.length > 0 && (
+          <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5">
+            {fields.map(f => <li key={f}><span className="font-medium text-foreground">{fieldLabel(f)}</span></li>)}
+          </ul>
+        )}
+        <Button size="sm" variant="ghost" onClick={onDismiss} className="text-xs h-7" data-testid="button-dismiss-save-error">
+          Dismiss
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ─── DESTINATION EDITOR ───────────────────────────────────────────────────────
 type DestFormData = {
   slug: string;
@@ -2127,6 +2169,9 @@ function EditorView({
   const [translateError, setTranslateError] = useState("");
   const [shortDescWarnings, setShortDescWarnings] = useState<Record<string, { words: number; required: number; unit: string }>>({});
   const [saveViolations, setSaveViolations] = useState<Array<{ lang: string; words: number; required: number }> | null>(null);
+  const [activeTab, setActiveTab] = useState("details");
+  const [showInvalidBanner, setShowInvalidBanner] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isNew && siteId !== null) {
@@ -2203,10 +2248,18 @@ function EditorView({
     if (!form.region) e.region = "Region is required";
     if (!form.category) e.category = "Category is required";
     setErrors(e);
-    return Object.keys(e).length === 0;
+    if (Object.keys(e).length > 0) {
+      setShowInvalidBanner(true);
+      setActiveTab(firstErrorTab(e, activeTab));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return false;
+    }
+    setShowInvalidBanner(false);
+    return true;
   }
 
   async function handleSave() {
+    setSaveError(null);
     if (!validate()) return;
     setSaving(true);
 
@@ -2299,6 +2352,15 @@ function EditorView({
         setSavedOk(true);
         setTimeout(() => setSavedOk(false), 2500);
       } else {
+        // A JSON `error` body means the API really rejected the payload (e.g. a
+        // schema failure) — surfacing it beats silently faking a local save.
+        const body = await res.json().catch(() => null);
+        if (body?.error) {
+          setSaveError(saveErrorMessage(body, res.status));
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          setSaving(false);
+          return;
+        }
         // Static mode — persist to localStorage
         const all = loadPersistedSites();
         const fakeId = isNew ? Date.now() : siteId!;
@@ -2354,7 +2416,18 @@ function EditorView({
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <Tabs defaultValue="details">
+        {showInvalidBanner && Object.keys(errors).length > 0 && (
+          <SaveErrorBanner
+            title="Please fix the highlighted fields before saving"
+            fields={Object.keys(errors)}
+            onDismiss={() => setShowInvalidBanner(false)}
+          />
+        )}
+        {saveError && (
+          <SaveErrorBanner title="Save failed" message={saveError} onDismiss={() => setSaveError(null)} />
+        )}
+
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6">
             <TabsTrigger value="details" className="gap-1.5 text-xs"><Info className="w-3.5 h-3.5" /> Details</TabsTrigger>
             <TabsTrigger value="location" className="gap-1.5 text-xs"><MapPin className="w-3.5 h-3.5" /> Location</TabsTrigger>
@@ -2723,6 +2796,9 @@ function AttrEditorView({
   const [translateError, setTranslateError] = useState("");
   const [shortDescWarnings, setShortDescWarnings] = useState<Record<string, { words: number; required: number; unit: string }>>({});
   const [saveViolations, setSaveViolations] = useState<Array<{ lang: string; words: number; required: number }> | null>(null);
+  const [activeTab, setActiveTab] = useState("details");
+  const [showInvalidBanner, setShowInvalidBanner] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isNew && attractionId !== null) {
@@ -2805,21 +2881,29 @@ function AttrEditorView({
     if (!form.lng || isNaN(parseFloat(form.lng))) e.lng = "Valid longitude required";
     if (!form.category) e.category = "Category is required";
     setErrors(e);
-    return Object.keys(e).length === 0;
+    if (Object.keys(e).length > 0) {
+      setShowInvalidBanner(true);
+      setActiveTab(firstErrorTab(e, activeTab));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return false;
+    }
+    setShowInvalidBanner(false);
+    return true;
   }
 
   async function handleSave() {
+    setSaveError(null);
     if (!validate()) return;
     setSaving(true);
 
     // If imageUrl is a data URI, upload it via dedicated endpoint first
     let resolvedAttrImageUrl = form.imageUrl || null;
-    if (resolvedAttrImageUrl && resolvedAttrImageUrl.startsWith("data:") && !isNew && attrId) {
+    if (resolvedAttrImageUrl && resolvedAttrImageUrl.startsWith("data:") && !isNew && attractionId) {
       try {
         const blob = await (await fetch(resolvedAttrImageUrl)).blob();
         const fd = new FormData();
         fd.append("image", blob, "hero.jpg");
-        const imgRes = await adminUpload(`/api/admin/attractions/${attrId}/image`, fd);
+        const imgRes = await adminUpload(`/api/admin/attractions/${attractionId}/image`, fd);
         if (imgRes.ok) {
           const { url } = await imgRes.json();
           resolvedAttrImageUrl = url;
@@ -2888,11 +2972,13 @@ function AttrEditorView({
           setTimeout(() => setSavedOk(false), 2500);
         }
       } else {
-        const err = await res.json().catch(() => ({}));
-        alert(`Save failed: ${err.error || res.status}`);
+        const body = await res.json().catch(() => null);
+        setSaveError(saveErrorMessage(body, res.status));
+        window.scrollTo({ top: 0, behavior: "smooth" });
       }
-    } catch (e) {
-      alert("Save failed: network error");
+    } catch {
+      setSaveError("Network error while saving. Check your connection and try again.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
     setSaving(false);
   }
@@ -2921,7 +3007,18 @@ function AttrEditorView({
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <Tabs defaultValue="details">
+        {showInvalidBanner && Object.keys(errors).length > 0 && (
+          <SaveErrorBanner
+            title="Please fix the highlighted fields before saving"
+            fields={Object.keys(errors)}
+            onDismiss={() => setShowInvalidBanner(false)}
+          />
+        )}
+        {saveError && (
+          <SaveErrorBanner title="Save failed" message={saveError} onDismiss={() => setSaveError(null)} />
+        )}
+
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6">
             <TabsTrigger value="details" className="gap-1.5 text-xs"><Info className="w-3.5 h-3.5" /> Details</TabsTrigger>
             <TabsTrigger value="location" className="gap-1.5 text-xs"><MapPin className="w-3.5 h-3.5" /> Location</TabsTrigger>
