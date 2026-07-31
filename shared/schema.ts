@@ -66,7 +66,7 @@ export const tourSites = pgTable("tour_sites", {
 export const attractions = pgTable("attractions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   slug: text("slug").notNull(),
-  destinationRuug: text("destination_ruug").notNull(),
+  destinationSlug: text("destination_slug").notNull(),
   nameEn: text("name_en").notNull(),
   nameAl: text("name_al").notNull().default(""),
   nameGr: text("name_gr").notNull().default(""),
@@ -122,11 +122,11 @@ export const attractions = pgTable("attractions", {
 
 // ── Tour Itineraries ──────────────────────────────────────────────────────────
 // Each itinerary belongs to a site (destination, tour site, or attraction page)
-// via siteRuug. Multiple itineraries per page are supported.
+// via siteSlug. Multiple itineraries per page are supported.
 // Waypoints are stored as JSON array: [{lat, lng, title, description, order}]
 export const itineraries = pgTable("itineraries", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  siteRuug: text("site_ruug").notNull(),     // matches tourSites.slug or attractions.slug
+  siteSlug: text("site_slug").notNull(),     // matches tourSites.slug or attractions.slug
   entityType: text("entity_type").notNull().default("site"), // "site" | "attraction"
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
@@ -147,7 +147,7 @@ export type InsertItinerary = z.infer<typeof insertItinerarySchema>;
 export const ratings = pgTable("ratings", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   siteId: integer("site_id").notNull(),
-  siteRuug: text("site_ruug").notNull(),
+  siteSlug: text("site_slug").notNull(),
   stars: integer("stars").notNull(),        // 1–5
   createdAt: text("created_at").notNull(),
 });
@@ -221,7 +221,7 @@ export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema
 export const subscriptionLeads = pgTable("subscription_leads", {
   id:        integer("id").primaryKey().generatedAlwaysAsIdentity(),
   email:     text("email").notNull(),
-  planRuug:  text("plan_ruug").notNull(),
+  planSlug:  text("plan_slug").notNull(),
   planName:  text("plan_name").notNull(),
   source:    text("source").default("pricing-page"),
   createdAt: text("created_at").notNull(),
@@ -236,7 +236,7 @@ export type InsertLead = z.infer<typeof insertLeadSchema>;
 export const userSubscriptions = pgTable("user_subscriptions", {
   id:           integer("id").primaryKey().generatedAlwaysAsIdentity(),
   email:        text("email").notNull(),
-  planRuug:     text("plan_ruug").notNull(),
+  planSlug:     text("plan_slug").notNull(),
   planName:     text("plan_name").notNull(),
   shopifyOrderId: text("shopify_order_id").notNull().unique(),
   priceEur:     real("price_eur").notNull().default(0),
