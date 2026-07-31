@@ -192,12 +192,12 @@ function RouteMap({ waypoints, centerLat, centerLng }: {
 }
 
 // ── Single itinerary card ─────────────────────────────────────────────────────
-function SingleItinerary({ it, centerLat, centerLng, defaultOpen, thumbnailUrl }: {
+function SingleItinerary({ it, centerLat, centerLng, defaultOpen, heroImageUrl }: {
   it: Itinerary;
   centerLat: number;
   centerLng: number;
   defaultOpen?: boolean;
-  thumbnailUrl?: string | null;
+  heroImageUrl?: string | null;
 }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
   const [showStops, setShowStops] = useState(false);
@@ -229,10 +229,10 @@ function SingleItinerary({ it, centerLat, centerLng, defaultOpen, thumbnailUrl }
         aria-expanded={open}
       >
         {/* Image takes ~1/3 of the card width, full row height */}
-        {thumbnailUrl ? (
+        {heroImageUrl ? (
           <div className="w-1/3 shrink-0 rounded-lg overflow-hidden bg-muted" style={{ minHeight: 88 }}>
             <img
-              src={thumbnailUrl}
+              src={heroImageUrl}
               alt={it.name}
               className="w-full h-full object-cover"
               loading="lazy"
@@ -383,14 +383,13 @@ interface Props {
   siteSlug: string;
   centerLat?: number;
   centerLng?: number;
-  /** Cover photo of the parent destination/site/attraction, shown as a thumbnail
-   *  on each itinerary card instead of a generic route icon. */
-  thumbnailUrl?: string | null;
 }
 
-export default function ItineraryCard({ siteSlug, centerLat = 41.3275, centerLng = 19.8187, thumbnailUrl }: Props) {
+export default function ItineraryCard({ siteSlug, centerLat = 41.3275, centerLng = 19.8187 }: Props) {
   const [itineraries, setItineraries] = useState<Itinerary[]>([]);
   const [loaded, setLoaded] = useState(false);
+  // One site-wide image, set by the admin, shared by every itinerary card.
+  const [heroImageUrl, setHeroImageUrl] = useState<string | null>(null);
 
   useEffect(function() {
     if (!siteSlug) return;
@@ -399,6 +398,13 @@ export default function ItineraryCard({ siteSlug, centerLat = 41.3275, centerLng
       .then(function(data) { setItineraries(data || []); setLoaded(true); })
       .catch(function() { setLoaded(true); });
   }, [siteSlug]);
+
+  useEffect(function() {
+    fetch(RAILWAY_URL + "/api/settings/itinerary_hero_image")
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) { setHeroImageUrl(data?.value || null); })
+      .catch(function() {});
+  }, []);
 
   if (!loaded || itineraries.length === 0) return null;
 
@@ -418,7 +424,7 @@ export default function ItineraryCard({ siteSlug, centerLat = 41.3275, centerLng
             centerLat={centerLat}
             centerLng={centerLng}
             defaultOpen={idx === 0 && itineraries.length === 1}
-            thumbnailUrl={thumbnailUrl}
+            heroImageUrl={heroImageUrl}
           />
         );
       })}

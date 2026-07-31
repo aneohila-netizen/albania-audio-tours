@@ -1748,6 +1748,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // ── App Settings ────────────────────────────────────────────────────────────
 
+  const ITINERARY_HERO_IMAGE_KEY = 'itinerary_hero_image';
+
   // Public: read a single setting value (no auth — used by the banner)
   app.get('/api/settings/:key', async (req, res) => {
     try {
@@ -1771,6 +1773,29 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.json(setting);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
+
+  // Admin: upload the one site-wide hero image shown on every itinerary card.
+  // Uploading replaces the previous one — the old R2 object is deleted after the
+  // new value is committed so a failed upload never leaves the setting empty.
+  // Visitors read it back through the public GET /api/settings/itinerary_hero_image.
+  app.post(
+    '/api/admin/settings/itinerary-hero-image',
+    requireAdmin,
+    imageUpload.single('image'),
+    async (req: any, res) => {
+      try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+        const { buf, mime } = await compressImage(req.file.buffer, req.file.mimetype || 'image/jpeg');
+        const previous = await storage.getSetting(ITINERARY_HERO_IMAGE_KEY);
+        const value = isR2Configured()
+          ? await uploadToR2(buf, mime, 'settings')
+          : `data:${mime};base64,${buf.toString('base64')}`;
+        const setting = await storage.setSetting(ITINERARY_HERO_IMAGE_KEY, value);
+        if (previous && isR2Url(previous)) await deleteFromR2(previous);
+        res.json(setting);
+      } catch (e: any) { res.status(500).json({ error: e.message }); }
+    }
+  );
 
   // ── Admin Two-Factor OTP ───────────────────────────────────────────────────────
   //
