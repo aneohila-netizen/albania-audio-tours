@@ -165,7 +165,7 @@ export default function SiteDetailPage() {
         shopifyUrl={(site as any).shopifyUrl}
       >
         <AudioPlayer site={site} text={desc} onComplete={handleAudioComplete} />
-        <ItineraryCard siteSlug={site.slug} centerLat={site.lat} centerLng={site.lng} thumbnailUrl={site.imageUrl} />
+        <ItineraryCard siteSlug={site.slug} centerLat={site.lat} centerLng={site.lng} />
       </PaywallGate>
 
       {/* Description — FREE forever as promised — collapsed by default */}

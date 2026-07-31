@@ -837,11 +837,114 @@ function AdminSettings() {
         </CardContent>
       </Card>
 
+      <ItineraryHeroImageCard />
+
       {/* Placeholder for future settings */}
       <div className="text-xs text-muted-foreground border border-dashed border-border rounded-xl p-4 text-center">
         More settings will appear here as the platform grows — maintenance mode, subscription pricing visibility, and more.
       </div>
     </div>
+  );
+}
+
+// ─── ITINERARY HERO IMAGE ────────────────────────────────────────────────────
+// One image shared by every "Tour Itinerary" card across the whole site.
+// Uploading replaces the current one immediately — no separate Save step.
+function ItineraryHeroImageCard() {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [savedAt, setSavedAt] = useState("");
+  const [error, setError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch(`${RAILWAY_API}/api/settings/itinerary_hero_image`)
+      .then(r => r.json())
+      .then(d => setImageUrl(d.value || null))
+      .catch(() => {});
+  }, []);
+
+  async function upload(file: File) {
+    setError(""); setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await adminUpload("/api/admin/settings/itinerary-hero-image", fd);
+      if (!res.ok) throw new Error(await res.text());
+      setImageUrl((await res.json()).value);
+      setSavedAt(new Date().toLocaleTimeString());
+    } catch (e: any) {
+      setError(e.message || "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Route className="w-4 h-4 text-primary" /> Itinerary Hero Image
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="px-5 pb-5 space-y-3">
+        <p className="text-xs text-muted-foreground">
+          A single image used as the thumbnail on every "Tour Itinerary" card, on every
+          destination and attraction page. Uploading a new one replaces it site-wide.
+        </p>
+
+        {imageUrl ? (
+          <div className="rounded-xl overflow-hidden border border-border/60 bg-muted" style={{ aspectRatio: "16/9" }}>
+            <img src={imageUrl} alt="Itinerary hero" className="w-full h-full object-cover" />
+          </div>
+        ) : (
+          <div className="rounded-xl border-2 border-dashed border-border/60 bg-muted/30 flex items-center justify-center text-muted-foreground text-xs" style={{ aspectRatio: "16/9" }}>
+            No image set — itinerary cards show a route icon
+          </div>
+        )}
+
+        <div
+          className="border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all border-border/60 hover:border-primary/40 hover:bg-primary/5"
+          onClick={() => fileRef.current?.click()}
+          onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add("border-primary", "bg-primary/5"); }}
+          onDragLeave={e => { e.currentTarget.classList.remove("border-primary", "bg-primary/5"); }}
+          onDrop={e => {
+            e.preventDefault();
+            e.currentTarget.classList.remove("border-primary", "bg-primary/5");
+            const f = e.dataTransfer.files[0];
+            if (f?.type.startsWith("image/")) upload(f);
+          }}
+        >
+          {uploading ? (
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              <p className="text-xs text-muted-foreground">Uploading…</p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <div className="flex items-center justify-center gap-2">
+                <Upload className="w-4 h-4 text-primary/60" />
+                <p className="text-xs font-medium">{imageUrl ? "Replace image" : "Upload image"}</p>
+              </div>
+              <p className="text-xs text-muted-foreground/70">Select a file or drag &amp; drop — saved immediately</p>
+            </div>
+          )}
+          <input ref={fileRef} type="file" accept="image/*" className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
+        </div>
+
+        {savedAt && (
+          <p className="text-xs text-green-600 flex items-center gap-1">
+            <CheckCircle2 size={11} /> Saved at {savedAt}
+          </p>
+        )}
+        {error && (
+          <p className="text-xs text-destructive bg-destructive/10 rounded-md px-3 py-2 flex items-center gap-1.5">
+            <X className="w-3.5 h-3.5 shrink-0" /> {error}
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
