@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, useParams } from "wouter";
 import {
   ArrowLeft, Save, Upload, Trash2, Play, Pause, Loader2,
-  MapPin, Globe, Music, Image, Info, Route
+  MapPin, Globe, Music, Image, Info, Route, AlertTriangle, Mic
 } from "lucide-react";
 import ItineraryManager from "@/components/ItineraryManager";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,8 @@ import { getAdminToken } from "@/lib/adminAuth";
 const CATEGORIES = ["archaeology", "castle", "beach", "historic-town", "nature"];
 const DIFFICULTIES = ["easy", "moderate", "hard"];
 const REGIONS = ["Sarandë", "Gjirokastër", "Fier", "Berat", "Shkodër", "Tirana", "Durrës", "Vlorë", "Korçë", "Other"];
-const LANGS: { key: "en" | "al" | "gr" | "it" | "es" | "de" | "fr" | "ar" | "sl" | "pt" | "cn"; label: string; flag: string }[] = [
+type LangKey = "en" | "al" | "gr" | "it" | "es" | "de" | "fr" | "ar" | "sl" | "pt" | "cn";
+const LANGS: { key: LangKey; label: string; flag: string }[] = [
   { key: "en", label: "English", flag: "🇬🇧" },
   { key: "al", label: "Albanian", flag: "🇦🇱" },
   { key: "gr", label: "Greek", flag: "🇬🇷" },
@@ -43,6 +44,31 @@ function adminFetch(url: string, options?: RequestInit) {
   });
 }
 
+// Short-translation guard payload returned by the API with HTTP 422.
+type DescViolation = { lang: string; words: number; required: number; unit: "words" | "characters" };
+
+type SaveError = { message: string; violations?: DescViolation[] };
+
+// The API returns `error` as a plain string for most failures, but schema validation
+// (zod `safeParse`) responds with the serialized ZodError object — concatenating that
+// straight into a message renders "[object Object]".
+function readableError(err: unknown): string {
+  if (typeof err === "string") return err;
+  if (!err || typeof err !== "object") return "";
+  const issues = (err as any).issues ?? (err as any).errors;
+  if (Array.isArray(issues) && issues.length > 0) {
+    return issues
+      .map((i: any) => {
+        const path = Array.isArray(i?.path) ? i.path.join(".") : "";
+        const message = i?.message || "Invalid value";
+        return path ? `${path}: ${message}` : message;
+      })
+      .join("\n");
+  }
+  if (typeof (err as any).message === "string") return (err as any).message;
+  return "";
+}
+
 // ─── Audio upload card for one language ──────────────────────────────────────
 function AudioCard({
   siteId,
@@ -50,20 +76,45 @@ function AudioCard({
   label,
   flag,
   currentUrl,
+  descText,
   onUpdate,
 }: {
   siteId: number;
-  lang: "en" | "al" | "gr";
+  lang: LangKey;
   label: string;
   flag: string;
   currentUrl: string | null;
+  descText?: string;
   onUpdate: (url: string | null) => void;
 }) {
   const [uploading, setUploading] = useState(false);
+  const [generatingTts, setGeneratingTts] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  async function handleGenerateTts() {
+    if (!descText) return;
+    setGeneratingTts(true);
+    setError("");
+    try {
+      const res = await adminFetch("/api/admin/generate-tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: descText, lang, entityType: "sites", entityId: siteId }),
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (res.ok && data.url) {
+        onUpdate(data.url);
+      } else {
+        setError(readableError(data?.error) || "TTS generation failed");
+      }
+    } catch {
+      setError("Network error during TTS generation");
+    }
+    setGeneratingTts(false);
+  }
 
   async function handleUpload(file: File) {
     if (!file) return;
@@ -131,7 +182,7 @@ function AudioCard({
               {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
             </Button>
             <span className="text-xs text-muted-foreground truncate flex-1">
-              {currentUrl.split("/").pop()}
+              {currentUrl.includes("/api/audio/serve/") ? "Generated audio ready" : currentUrl.split("/").pop()}
             </span>
             <Button
               variant="ghost"
@@ -153,25 +204,40 @@ function AudioCard({
           </Button>
         </div>
       ) : (
-        <div
-          className="border-2 border-dashed border-border/60 rounded-lg p-4 text-center cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-colors"
-          onClick={() => fileRef.current?.click()}
-          onDragOver={e => { e.preventDefault(); }}
-          onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleUpload(f); }}
-        >
-          {uploading ? (
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Uploading…</span>
-            </div>
-          ) : (
-            <>
-              <Music className="w-6 h-6 mx-auto mb-1.5 text-muted-foreground/50" />
-              <p className="text-xs text-muted-foreground">
-                Drop MP3 here or <span className="text-primary font-medium">click to browse</span>
-              </p>
-              <p className="text-xs text-muted-foreground/60 mt-0.5">MP3, WAV, M4A · Max 100 MB</p>
-            </>
+        <div className="space-y-2">
+          <div
+            className="border-2 border-dashed border-border/60 rounded-lg p-4 text-center cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-colors"
+            onClick={() => fileRef.current?.click()}
+            onDragOver={e => { e.preventDefault(); }}
+            onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleUpload(f); }}
+          >
+            {uploading ? (
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Uploading…</span>
+              </div>
+            ) : (
+              <>
+                <Music className="w-6 h-6 mx-auto mb-1.5 text-muted-foreground/50" />
+                <p className="text-xs text-muted-foreground">
+                  Drop MP3 here or <span className="text-primary font-medium">click to browse</span>
+                </p>
+                <p className="text-xs text-muted-foreground/60 mt-0.5">MP3, WAV, M4A · Max 100 MB</p>
+              </>
+            )}
+          </div>
+          {descText && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateTts}
+              disabled={generatingTts || uploading}
+              className="w-full text-xs gap-1.5 h-8 border-primary/30 text-primary hover:bg-primary/5"
+              data-testid={`button-generate-tts-${lang}`}
+            >
+              {generatingTts ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mic className="w-3 h-3" />}
+              {generatingTts ? "Generating audio…" : "Generate audio from description"}
+            </Button>
           )}
         </div>
       )}
@@ -235,6 +301,7 @@ export default function AdminSiteEditorPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saveError, setSaveError] = useState<SaveError | null>(null);
 
   useEffect(() => {
     if (!getAdminToken()) {
@@ -271,9 +338,10 @@ export default function AdminSiteEditorPage() {
     return Object.keys(e).length === 0;
   }
 
-  async function handleSave() {
+  async function handleSave(confirmShortTranslation = false) {
     if (!validate()) return;
     setSaving(true);
+    setSaveError(null);
     const payload = {
       ...form,
       lat: parseFloat(form.lat),
@@ -290,9 +358,19 @@ export default function AdminSiteEditorPage() {
       descGr: form.descGr || form.descEn,
     };
     try {
-      const res = isNew
-        ? await adminFetch("/api/admin/sites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
-        : await adminFetch(`/api/admin/sites/${siteId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const res = await adminFetch(
+        isNew ? "/api/admin/sites" : `/api/admin/sites/${siteId}`,
+        {
+          method: isNew ? "POST" : "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            // Mirrors the x-confirm-delete 2-step pattern: the server blocks short
+            // translations with 422 until the admin explicitly confirms.
+            ...(confirmShortTranslation ? { "x-confirm-short-translation": "yes" } : {}),
+          },
+          body: JSON.stringify(payload),
+        },
+      );
 
       if (res.ok) {
         const saved = await res.json();
@@ -300,11 +378,18 @@ export default function AdminSiteEditorPage() {
         setTimeout(() => setSaved(false), 2500);
         if (isNew) setLocation(`/admin/sites/${saved.id}`);
       } else {
-        const d = await res.json();
-        alert("Save failed: " + (d.error || JSON.stringify(d)));
+        const d = await res.json().catch(() => ({} as any));
+        const violations: DescViolation[] | undefined =
+          Array.isArray(d?.violations) && d.violations.length > 0 ? d.violations : undefined;
+        setSaveError({
+          message:
+            readableError(d?.error) ||
+            (violations ? "Some translations are shorter than the required length." : `Save failed (HTTP ${res.status})`),
+          violations,
+        });
       }
     } catch {
-      alert("Network error while saving");
+      setSaveError({ message: "Network error while saving." });
     }
     setSaving(false);
   }
@@ -338,7 +423,7 @@ export default function AdminSiteEditorPage() {
           </div>
           <Button
             size="sm"
-            onClick={handleSave}
+            onClick={() => handleSave()}
             disabled={saving}
             className="gap-1.5"
             data-testid="button-save"
@@ -350,6 +435,53 @@ export default function AdminSiteEditorPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
+        {saveError && (
+          <div
+            className="mb-6 rounded-lg border border-destructive/40 bg-destructive/5 p-4 flex items-start gap-3"
+            data-testid="banner-save-error"
+          >
+            <AlertTriangle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
+            <div className="flex-1 space-y-2">
+              <p className="text-sm font-medium text-destructive">Save failed</p>
+              <p className="text-xs text-muted-foreground whitespace-pre-line">{saveError.message}</p>
+              {saveError.violations && (
+                <ul className="text-xs text-muted-foreground space-y-0.5 list-disc pl-4">
+                  {saveError.violations.map(v => (
+                    <li key={v.lang}>
+                      <span className="font-medium text-foreground">{v.lang}</span>: {v.words} {v.unit} — needs at least{" "}
+                      {v.required} {v.unit}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex items-center gap-2 pt-1">
+                {saveError.violations && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleSave(true)}
+                    disabled={saving}
+                    className="gap-1.5 text-xs h-7"
+                    data-testid="button-save-anyway"
+                  >
+                    {saving && <Loader2 className="w-3 h-3 animate-spin" />}
+                    Save anyway
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSaveError(null)}
+                  className="text-xs h-7"
+                  data-testid="button-dismiss-save-error"
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <Tabs defaultValue="details">
           <TabsList className="mb-6">
             <TabsTrigger value="details" className="gap-1.5 text-xs">
@@ -542,7 +674,8 @@ export default function AdminSiteEditorPage() {
           {/* ── Audio tab ───────────────────────────────────────────── */}
           <TabsContent value="audio" className="space-y-5">
             <p className="text-sm text-muted-foreground">
-              Upload an MP3 narration for each language. Visitors will hear this when they tap "Play Audio Tour" on the site detail page.
+              Upload an MP3 narration for each language, or generate one automatically from that language's
+              description. Visitors will hear this when they tap "Play Audio Tour" on the site detail page.
             </p>
             {!isNew && siteId && (
               <div className="grid gap-4">
@@ -554,6 +687,7 @@ export default function AdminSiteEditorPage() {
                     label={lang.label}
                     flag={lang.flag}
                     currentUrl={form[`audioUrl${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof FormData] as string | null}
+                    descText={(form[`desc${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof FormData] as string | null) || undefined}
                     onUpdate={url => set(`audioUrl${lang.key.charAt(0).toUpperCase() + lang.key.slice(1)}` as keyof FormData, url)}
                   />
                 ))}
@@ -609,7 +743,7 @@ export default function AdminSiteEditorPage() {
         {/* Save button at bottom */}
         <div className="pt-6 flex justify-end">
           <Button
-            onClick={handleSave}
+            onClick={() => handleSave()}
             disabled={saving}
             className="gap-1.5 min-w-32"
             data-testid="button-save-bottom"
