@@ -362,6 +362,17 @@ function incrementListenCount(siteId: number) {
   listenCounts.set(siteId, (listenCounts.get(siteId) || 0) + 1);
 }
 
+// ─── Google Maps short-link resolution ────────────────────────────────────────
+const MAX_MAPS_REDIRECT_HOPS = 4;
+
+// Allowlist guards against the resolve endpoint being used as an open proxy.
+function isResolvableMapsUrl(url: URL): boolean {
+  if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+  const host = url.hostname.toLowerCase();
+  if (host === "maps.app.goo.gl" || host === "goo.gl") return true;
+  return /^(?:[a-z0-9-]+\.)*google(?:\.[a-z]{2,3}){1,2}$/.test(host);
+}
+
 // ─── Config ───────────────────────────────────────────────────────────────────
 // Absolute base URL used to form persistent media URLs stored in the DB.
 // On Railway this resolves to the public domain; locally it falls back to localhost.
@@ -904,6 +915,47 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(429).json({ error: e.message, quotaExceeded: true });
       }
       res.status(500).json({ error: e.message || "Translation failed" });
+    }
+  });
+
+  // ── Admin: Resolve a shortened Google Maps link ─────────────────────────────
+  // maps.app.goo.gl / goo.gl links only expose their coordinates after a redirect,
+  // which the browser cannot follow itself (CORS). The host allowlist is enforced on
+  // every hop so this cannot be used to probe arbitrary internal or external hosts.
+  app.post("/api/admin/resolve-maps-link", requireAdmin, async (req, res) => {
+    const { url } = req.body as { url?: string };
+    if (!url || typeof url !== "string") return res.status(400).json({ error: "url required" });
+
+    let current: URL;
+    try {
+      current = new URL(url.trim());
+    } catch {
+      return res.status(400).json({ error: "Invalid URL" });
+    }
+    if (!isResolvableMapsUrl(current)) {
+      return res.status(400).json({ error: "Only Google Maps links can be resolved" });
+    }
+
+    try {
+      for (let hop = 0; hop < MAX_MAPS_REDIRECT_HOPS; hop++) {
+        const response = await fetch(current.toString(), {
+          method: "GET",
+          redirect: "manual",
+          signal: AbortSignal.timeout(8000),
+          headers: { "user-agent": "Mozilla/5.0 (compatible; AlbaTourAdmin/1.0)" },
+        });
+        const location = response.headers.get("location");
+        if (!location) break;
+
+        const next = new URL(location, current);
+        if (!isResolvableMapsUrl(next)) {
+          return res.status(400).json({ error: "Link redirected outside Google Maps" });
+        }
+        current = next;
+      }
+      res.json({ resolvedUrl: current.toString() });
+    } catch (e: any) {
+      res.status(502).json({ error: e?.message || "Could not resolve link" });
     }
   });
 
