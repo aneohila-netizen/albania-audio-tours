@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import type { TourSite } from "@shared/schema";
 import { getAdminToken } from "@/lib/adminAuth";
+import { fieldLabel, readableError } from "@/lib/apiError";
 
 const CATEGORIES = ["archaeology", "castle", "beach", "historic-town", "nature"];
 const DIFFICULTIES = ["easy", "moderate", "hard"];
@@ -47,27 +48,7 @@ function adminFetch(url: string, options?: RequestInit) {
 // Short-translation guard payload returned by the API with HTTP 422.
 type DescViolation = { lang: string; words: number; required: number; unit: "words" | "characters" };
 
-type SaveError = { message: string; violations?: DescViolation[] };
-
-// The API returns `error` as a plain string for most failures, but schema validation
-// (zod `safeParse`) responds with the serialized ZodError object — concatenating that
-// straight into a message renders "[object Object]".
-function readableError(err: unknown): string {
-  if (typeof err === "string") return err;
-  if (!err || typeof err !== "object") return "";
-  const issues = (err as any).issues ?? (err as any).errors;
-  if (Array.isArray(issues) && issues.length > 0) {
-    return issues
-      .map((i: any) => {
-        const path = Array.isArray(i?.path) ? i.path.join(".") : "";
-        const message = i?.message || "Invalid value";
-        return path ? `${path}: ${message}` : message;
-      })
-      .join("\n");
-  }
-  if (typeof (err as any).message === "string") return (err as any).message;
-  return "";
-}
+type SaveError = { message: string; violations?: DescViolation[]; fields?: string[] };
 
 // ─── Audio upload card for one language ──────────────────────────────────────
 function AudioCard({
@@ -302,6 +283,7 @@ export default function AdminSiteEditorPage() {
   const [saved, setSaved] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saveError, setSaveError] = useState<SaveError | null>(null);
+  const [activeTab, setActiveTab] = useState("details");
 
   useEffect(() => {
     if (!getAdminToken()) {
@@ -335,13 +317,25 @@ export default function AdminSiteEditorPage() {
     if (!form.region) e.region = "Region is required";
     if (!form.category) e.category = "Category is required";
     setErrors(e);
-    return Object.keys(e).length === 0;
+    const failed = Object.keys(e);
+    if (failed.length > 0) {
+      // Every validated field lives on the Details tab; without this the admin can
+      // sit on another tab and see nothing at all when Save is pressed.
+      setActiveTab("details");
+      setSaveError({
+        message: `Please fix the highlighted fields: ${failed.map(fieldLabel).join(", ")}.`,
+        fields: failed,
+      });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return false;
+    }
+    return true;
   }
 
   async function handleSave(confirmShortTranslation = false) {
+    setSaveError(null);
     if (!validate()) return;
     setSaving(true);
-    setSaveError(null);
     const payload = {
       ...form,
       lat: parseFloat(form.lat),
@@ -442,7 +436,9 @@ export default function AdminSiteEditorPage() {
           >
             <AlertTriangle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
             <div className="flex-1 space-y-2">
-              <p className="text-sm font-medium text-destructive">Save failed</p>
+              <p className="text-sm font-medium text-destructive">
+                {saveError.fields ? "Missing required information" : "Save failed"}
+              </p>
               <p className="text-xs text-muted-foreground whitespace-pre-line">{saveError.message}</p>
               {saveError.violations && (
                 <ul className="text-xs text-muted-foreground space-y-0.5 list-disc pl-4">
@@ -482,7 +478,7 @@ export default function AdminSiteEditorPage() {
           </div>
         )}
 
-        <Tabs defaultValue="details">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6">
             <TabsTrigger value="details" className="gap-1.5 text-xs">
               <Info className="w-3.5 h-3.5" /> Details
