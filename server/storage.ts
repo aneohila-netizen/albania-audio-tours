@@ -554,6 +554,31 @@ class PgStorage implements IStorage {
       );
     `);
 
+        // Categories table (admin-managed tour category tags)
+        await this.pool.query(`
+          CREATE TABLE IF NOT EXISTS categories (
+            id SERIAL PRIMARY KEY,
+            slug TEXT NOT NULL UNIQUE,
+            label TEXT NOT NULL,
+            icon TEXT NOT NULL DEFAULT 'pin',
+            color TEXT NOT NULL DEFAULT '#e11d48',
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT 'now'
+          );
+        `);
+        // Seed default categories
+        await this.pool.query(`
+          INSERT INTO categories (slug, label, icon, sort_order) VALUES
+            ('city', 'City', '🏙️', 1),
+            ('nature', 'Nature', '🌿', 2),
+            ('beach', 'Beach', '🏖️', 3),
+            ('historic-town', 'Historic Town', '🏛️', 4),
+            ('castle', 'Castle', '🏰', 5),
+            ('archaeology', 'Archaeology', '⛏️', 6),
+            ('cultural', 'Cultural', '🎭', 7)
+          ON CONFLICT (slug) DO NOTHING;
+        `);
+
     // Seed tour_sites if empty
     const { rows: siteRows } = await this.pool.query("SELECT COUNT(*) as c FROM tour_sites");
     if (parseInt(siteRows[0].c) === 0) {
