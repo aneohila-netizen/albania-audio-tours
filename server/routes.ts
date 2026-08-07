@@ -26,7 +26,7 @@ import multer from "multer";
 import sharp from "sharp";
 import { storage } from "./storage";
 import { uploadToR2, deleteFromR2, isR2Configured } from "./r2";
-import { insertUserProgressSchema, insertTourSiteSchema, insertAttractionSchema } from "@shared/schema";
+import { insertUserProgressSchema, insertTourSiteSchema, insertAttractionSchema, categories, insertCategorySchema } from "@shared/schema";
 
 // ── Image compression helper ─────────────────────────────────────────────────
 // Resizes to max 1200px wide/tall and compresses to WebP (quality 82).
@@ -2653,6 +2653,90 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.json({ success: true, sub, accessCode, emailSent });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
+  // — Categories CRUD (admin-managed tour categories) —
+  app.get('/api/categories', async (_req, res) => {
+    try {
+      const db = await import('../server/storage').then(m => m.storage);
+      const result = await (db as any).db.select().from(categories).orderBy(categories.sortOrder);
+      res.json(result);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post('/api/admin/categories', requireAdmin, async (req, res) => {
+    try {
+      const { db } = await import('../server/storage').then(m => m.storage as any);
+      const parsed = insertCategorySchema.parse(req.body);
+      const [created] = await db.insert(categories).values(parsed).returning();
+      res.json(created);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put('/api/admin/categories/:id', requireAdmin, async (req, res) => {
+    try {
+      const { db } = await import('../server/storage').then(m => m.storage as any);
+      const { eq } = await import('drizzle-orm');
+      const id = parseInt(req.params.id);
+      const [updated] = await db.update(categories).set(req.body).where(eq(categories.id, id)).returning();
+      res.json(updated);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete('/api/admin/categories/:id', requireAdmin, async (req, res) => {
+    try {
+      const { db } = await import('../server/storage').then(m => m.storage as any);
+      const { eq } = await import('drizzle-orm');
+      const id = parseInt(req.params.id);
+      await db.delete(categories).where(eq(categories.id, id));
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });  // — Categories CRUD (admin-managed) —
+  app.get('/api/categories', async (_req, res) => {
+    try {
+      await (storage as any).ready;
+      const pool = (storage as any).pool;
+      const result = await pool.query('SELECT * FROM categories ORDER BY sort_order ASC');
+      res.json(result.rows);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post('/api/admin/categories', requireAdmin, async (req, res) => {
+    try {
+      await (storage as any).ready;
+      const pool = (storage as any).pool;
+      const { slug, label, icon = 'pin', color = '#e11d48', sort_order = 0 } = req.body;
+      if (!slug || !label) return res.status(400).json({ error: 'slug and label required' });
+      const result = await pool.query(
+        'INSERT INTO categories (slug, label, icon, color, sort_order) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+        [slug, label, icon, color, sort_order]
+      );
+      res.json(result.rows[0]);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.put('/api/admin/categories/:id', requireAdmin, async (req, res) => {
+    try {
+      await (storage as any).ready;
+      const pool = (storage as any).pool;
+      const id = parseInt(req.params.id);
+      const { label, icon, color, sort_order } = req.body;
+      const result = await pool.query(
+        'UPDATE categories SET label=$1, icon=$2, color=$3, sort_order=$4 WHERE id=$5 RETURNING *',
+        [label, icon, color, sort_order, id]
+      );
+      res.json(result.rows[0]);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete('/api/admin/categories/:id', requireAdmin, async (req, res) => {
+    try {
+      await (storage as any).ready;
+      const pool = (storage as any).pool;
+      const id = parseInt(req.params.id);
+      await pool.query('DELETE FROM categories WHERE id=$1', [id]);
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
 
   return httpServer;
 }
