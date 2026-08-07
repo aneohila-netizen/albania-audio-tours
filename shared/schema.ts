@@ -274,3 +274,19 @@ export type InsertTourSite = z.infer<typeof insertTourSiteSchema>;
 export type InsertAttraction = z.infer<typeof insertAttractionSchema>;
 export type UserProgress = typeof userProgress.$inferSelect;
 export type InsertUserProgress = z.infer<typeof insertUserProgressSchema>;
+
+
+// — Tour Categories (admin-managed) —
+export const categories = pgTable("categories", {
+  id:        integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  slug:      text("slug").notNull().unique(),
+  label:     text("label").notNull(),
+  icon:      text("icon").notNull().default("pin"),
+  color:     text("color").notNull().default("#e11d48"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: text("created_at").notNull().default("now"),
+});
+
+export const insertCategorySchema = createInsertSchema(categories).omit({ id: true });
+export type Category = typeof categories.$inferSelect;
+export type InsertCategory = z.infer<typeof insertCategorySchema>;
