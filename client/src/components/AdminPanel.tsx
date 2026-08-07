@@ -839,12 +839,110 @@ function AdminSettings() {
       </Card>
 
       <ItineraryHeroImageCard />
+          <CategoriesManager />
 
       {/* Placeholder for future settings */}
       <div className="text-xs text-muted-foreground border border-dashed border-border rounded-xl p-4 text-center">
         More settings will appear here as the platform grows — maintenance mode, subscription pricing visibility, and more.
       </div>
     </div>
+  );
+}
+
+// — CATEGORIES MANAGER —
+function CategoriesManager() {
+  const [categories, setCategories] = useState<{id:number,slug:string,label:string,icon:string,color:string,sort_order:number}[]>([]);
+  const [newLabel, setNewLabel] = useState("");
+  const [newIcon, setNewIcon] = useState("📍");
+  const [saving, setSaving] = useState(false);
+  const [editId, setEditId] = useState<number|null>(null);
+  const [editLabel, setEditLabel] = useState("");
+
+  useEffect(() => {
+    adminFetch("/api/categories")
+      .then(r => r.json())
+      .then(setCategories)
+      .catch(() => {});
+  }, []);
+
+  async function addCategory() {
+    if (!newLabel.trim()) return;
+    setSaving(true);
+    const slug = newLabel.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    try {
+      const res = await adminFetch("/api/admin/categories", {
+        method: "POST",
+        body: JSON.stringify({ slug, label: newLabel.trim(), icon: newIcon, color: "#e11d48", sort_order: categories.length }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const created = await res.json();
+      setCategories([...categories, created]);
+      setNewLabel("");
+      setNewIcon("📍");
+    } catch (e: any) { alert("Error: " + e.message); }
+    setSaving(false);
+  }
+
+  async function deleteCategory(id: number) {
+    if (!confirm("Delete this category? Destinations tagged with it will keep the tag but it won't appear in the list.")) return;
+    try {
+      await adminFetch(`/api/admin/categories/${id}`, { method: "DELETE" });
+      setCategories(categories.filter(c => c.id !== id));
+    } catch (e: any) { alert("Error: " + e.message); }
+  }
+
+  async function saveEdit(id: number) {
+    const cat = categories.find(c => c.id === id);
+    if (!cat) return;
+    try {
+      const res = await adminFetch(`/api/admin/categories/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ ...cat, label: editLabel }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const updated = await res.json();
+      setCategories(categories.map(c => c.id === id ? updated : c));
+      setEditId(null);
+    } catch (e: any) { alert("Error: " + e.message); }
+  }
+
+  return (
+    <Card className="mt-4">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <LayoutList className="w-4 h-4" /> Tour Categories
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">Add, rename or remove the category tags used on destinations and the map filter bar.</p>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <div className="flex gap-2">
+          <Input value={newIcon} onChange={e => setNewIcon(e.target.value)} placeholder="📍" className="w-14 text-center" maxLength={4} />
+          <Input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="New category name..." className="flex-1" onKeyDown={e => e.key === "Enter" && addCategory()} />
+          <Button size="sm" onClick={addCategory} disabled={saving || !newLabel.trim()}>
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Add
+          </Button>
+        </div>
+        {categories.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">No categories yet.</p>}
+        {categories.map(cat => (
+          <div key={cat.id} className="flex items-center gap-2 border rounded-lg px-3 py-2">
+            <span className="text-lg">{cat.icon}</span>
+            {editId === cat.id ? (
+              <>
+                <Input value={editLabel} onChange={e => setEditLabel(e.target.value)} className="flex-1 h-7 text-sm" autoFocus />
+                <Button size="sm" variant="ghost" onClick={() => saveEdit(cat.id)} className="h-7 px-2"><Save className="w-3 h-3" /></Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditId(null)} className="h-7 px-2"><X className="w-3 h-3" /></Button>
+              </>
+            ) : (
+              <>
+                <span className="flex-1 text-sm">{cat.label} <span className="text-muted-foreground text-xs">({cat.slug})</span></span>
+                <Button size="sm" variant="ghost" onClick={() => { setEditId(cat.id); setEditLabel(cat.label); }} className="h-7 px-2"><Pencil className="w-3 h-3" /></Button>
+                <Button size="sm" variant="ghost" onClick={() => deleteCategory(cat.id)} className="h-7 px-2 text-destructive"><Trash2 className="w-3 h-3" /></Button>
+              </>
+            )}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 
