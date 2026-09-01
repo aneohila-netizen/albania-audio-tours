@@ -271,8 +271,8 @@ function ForgotPasswordModal({ onClose }: { onClose: () => void }) {
             </p>
             <div className="space-y-2">
               {[
-                { value: "primary",   label: "Primary email",   desc: "book@albanianeagletours.com" },
-                { value: "secondary", label: "Secondary email",  desc: "aneo.hila@gmail.com" },
+                { value: "primary",   label: "Primary email",   desc: "b***@albanianeagletours.com" },
+                { value: "secondary", label: "Secondary email",  desc: "a***@gmail.com" },
               ].map(opt => (
                 <button
                   key={opt.value}
@@ -329,14 +329,14 @@ function ForgotPasswordModal({ onClose }: { onClose: () => void }) {
                   type="tel"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
-                  placeholder="0682060901"
+                  placeholder="Your phone number"
                   className="w-full pl-9 pr-3 py-2.5 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/40"
                   autoFocus
                   required
                 />
               </div>
               <p className="text-[11px] text-muted-foreground mt-1.5">
-                Enter digits only — e.g. 0682060901 or +355682060901
+                Enter digits only — e.g. 0681234567 or +3556xxxxxxx
               </p>
             </div>
             {error && (
