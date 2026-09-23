@@ -107,6 +107,14 @@ app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok", uptimeSeconds: Math.round(process.uptime()) });
 });
 
+// CARTO's website-restricted basemap key is public to map viewers. Serve it at
+// runtime so Railway can update it without relying on a cached frontend build.
+// This path is outside /api to keep the key out of API response logs.
+app.get("/map-config.json", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ cartoBasemapKey: process.env.VITE_CARTO_BASEMAP_KEY || null });
+});
+
 (async () => {
   // SEO routes (/p/:slug, /sitemap.xml, /robots.txt) — registered BEFORE
   // the API routes and the catch-all static handler so real URLs are served

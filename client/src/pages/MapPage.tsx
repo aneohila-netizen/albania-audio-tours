@@ -485,6 +485,25 @@ export default function MapPage() {
       // Build markers immediately after map is ready
       buildMarkers();
 
+      // Fetch the website-restricted public key at runtime: Railway may reuse
+      // an older frontend image when only an environment variable changes.
+      let key: string = import.meta.env.VITE_CARTO_BASEMAP_KEY || "";
+      try {
+        const response = await fetch("/map-config.json", {
+          cache: "no-store",
+          signal: AbortSignal.timeout(5000),
+        });
+        if (response.ok) {
+          const config = await response.json();
+          if (typeof config.cartoBasemapKey === "string") {
+            key = config.cartoBasemapKey;
+          }
+        }
+      } catch {
+        // An unavailable config endpoint must not remove the map or its pins.
+      }
+      if (!mounted) return;
+
       // Replace only the background. Leaflet still owns the map,
       // markers, clusters, popups and all pin coordinates.
       let fallbackActive = false;
@@ -493,8 +512,6 @@ export default function MapPage() {
         if (!mounted || fallbackActive) return;
         fallbackActive = true;
         activeVectorLayer?.remove();
-        // Railway injects this public, domain-restricted CARTO key at build time.
-        const key = import.meta.env.VITE_CARTO_BASEMAP_KEY;
         // Never return to unkeyed CARTO raster tiles: they carry a watermark.
         L.tileLayer(
           key
@@ -517,7 +534,6 @@ export default function MapPage() {
         ]);
         if (!mounted) return;
         setWorkerUrl(workerUrl);
-        const key = import.meta.env.VITE_CARTO_BASEMAP_KEY;
         const style = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
         const vectorLayer = maplibreGL({
           style: key ? `${style}?key=${encodeURIComponent(key)}` : style,
