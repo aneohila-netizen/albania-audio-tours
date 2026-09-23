@@ -400,6 +400,7 @@ class PgStorage implements IStorage {
     for (const sql of newLangCols) {
       await this.pool.query(sql).catch(() => {}); // ignore if already exists
     }
+    await this.pool.query('ALTER TABLE itineraries ADD COLUMN IF NOT EXISTS cover_image_url TEXT');
 
     // DATA REPAIR: Clear any images arrays that contain serve URLs instead of data URIs.
     // This happened when handleSave incorrectly sent serve URLs back via PUT.
@@ -942,6 +943,7 @@ class PgStorage implements IStorage {
       distanceKm: r.distance_km ? parseFloat(r.distance_km) : 0,
       difficulty: r.difficulty || 'easy',
       waypoints: r.waypoints || '[]',
+      coverImageUrl: r.cover_image_url || null,
       isPublished: r.is_published ?? true,
       createdAt: r.created_at || 'now',
     };
@@ -1001,6 +1003,7 @@ class PgStorage implements IStorage {
     if (data.difficulty !== undefined) { fields.push(`difficulty=$${i++}`); vals.push(data.difficulty); }
     if (data.waypoints !== undefined) { fields.push(`waypoints=$${i++}`); vals.push(data.waypoints); }
     if (data.isPublished !== undefined) { fields.push(`is_published=$${i++}`); vals.push(data.isPublished); }
+    if (data.coverImageUrl !== undefined) { fields.push('cover_image_url=$' + i++); vals.push(data.coverImageUrl); }
     if (!fields.length) return this.getItineraryById(id);
     vals.push(id);
     const { rows } = await this.pool.query(
@@ -1470,7 +1473,7 @@ export class MemStorage implements IStorage {
   async getItinerariesBySite(siteSlug: string) { return this.itineraries.filter(i => i.siteSlug === siteSlug); }
   async getItineraryById(id: number) { return this.itineraries.find(i => i.id === id); }
   async createItinerary(data: InsertItinerary): Promise<Itinerary> {
-    const item: Itinerary = { id: Date.now(), siteSlug: data.siteSlug, entityType: data.entityType || 'site', name: data.name, description: data.description || '', instructions: data.instructions || '', durationMinutes: data.durationMinutes || 60, distanceKm: data.distanceKm ?? 0, difficulty: data.difficulty || 'easy', waypoints: data.waypoints || '[]', isPublished: data.isPublished ?? true, createdAt: new Date().toISOString() };
+    const item: Itinerary = { id: Date.now(), siteSlug: data.siteSlug, entityType: data.entityType || 'site', name: data.name, description: data.description || '', instructions: data.instructions || '', durationMinutes: data.durationMinutes || 60, distanceKm: data.distanceKm ?? 0, difficulty: data.difficulty || 'easy', waypoints: data.waypoints || '[]', coverImageUrl: data.coverImageUrl ?? null, isPublished: data.isPublished ?? true, createdAt: new Date().toISOString() };
     this.itineraries.push(item);
     return item;
   }

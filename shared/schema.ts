@@ -135,6 +135,7 @@ export const itineraries = pgTable("itineraries", {
   distanceKm: real("distance_km").default(0),
   difficulty: text("difficulty").notNull().default("easy"),  // easy | moderate | hard
   waypoints: text("waypoints").notNull().default("[]"), // JSON: [{lat,lng,title,description,order}]
+  coverImageUrl: text("cover_image_url"),
   isPublished: boolean("is_published").notNull().default(true),
   createdAt: text("created_at").notNull().default("now"),
 });

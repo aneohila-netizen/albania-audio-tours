@@ -1491,6 +1491,40 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json({ success: true });
   });
 
+  // Admin: Upload cover image for an itinerary
+  app.post("/api/admin/itineraries/:id/image", requireAdmin, imageUpload.single("image"), async (req: any, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const it = await storage.getItineraryById(id);
+    if (!it) return res.status(404).json({ error: "Itinerary not found" });
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const rawBuf = req.file.buffer ?? fs.readFileSync(req.file.path);
+    if (req.file.path) try { fs.unlinkSync(req.file.path); } catch (_) {}
+    const { buf, mime } = await compressImage(rawBuf, req.file.mimetype || "image/jpeg");
+    let url: string;
+    if (isR2Configured()) {
+      url = await uploadToR2(buf, mime, "itineraries");
+    } else {
+      url = `data:${mime};base64,${buf.toString("base64")}`;
+    }
+    await storage.updateItinerary(id, { coverImageUrl: url });
+    const oldUrl = it.coverImageUrl;
+    if (oldUrl) await deleteFromR2(oldUrl);
+    res.json({ url });
+  });
+
+  // Admin: Delete cover image from an itinerary
+  app.delete("/api/admin/itineraries/:id/image", requireAdmin, requireDeleteConfirmation, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const it = await storage.getItineraryById(id);
+    if (!it) return res.status(404).json({ error: "Itinerary not found" });
+    const oldUrl = it.coverImageUrl;
+    await storage.updateItinerary(id, { coverImageUrl: null });
+    if (oldUrl) await deleteFromR2(oldUrl);
+    res.json({ success: true });
+  });
+
   // ── Public listen counts endpoint ─────────────────────────────────
   // GET /api/listen-counts — returns { siteId: count, ... }
   app.get("/api/listen-counts", (_req, res) => {

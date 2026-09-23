@@ -7,7 +7,7 @@ import "leaflet/dist/leaflet.css";
 import { useState, useEffect, useRef } from "react";
 import {
   Plus, Trash2, Edit2, Save, X, MapPin,
-  ChevronDown, ChevronUp, Eye, EyeOff, GripVertical, Clock, Route,
+  ChevronDown, ChevronUp, Eye, EyeOff, GripVertical, Clock, Route, Image, Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -304,6 +304,10 @@ export default function ItineraryManager({ siteSlug, entityType = "site", center
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const coverFileRef = useRef<HTMLInputElement>(null);
 
   const headers = { "Content-Type": "application/json", "x-admin-token": ADMIN_TOKEN };
 
@@ -317,17 +321,59 @@ export default function ItineraryManager({ siteSlug, entityType = "site", center
 
   useEffect(() => { fetchItineraries(); }, [siteSlug]);
 
-  const startNew = () => { setForm({ ...EMPTY_FORM }); setWaypoints([]); setEditing("new"); setError(null); };
+  const startNew = () => { setForm({ ...EMPTY_FORM }); setWaypoints([]); setCoverImageUrl(null); setImageError(null); setEditing("new"); setError(null); };
 
   const startEdit = (it: Itinerary) => {
     setForm({ name: it.name, description: it.description, instructions: it.instructions,
       durationMinutes: it.durationMinutes, distanceKm: it.distanceKm || 0,
       difficulty: it.difficulty, isPublished: it.isPublished });
     try { setWaypoints(JSON.parse(it.waypoints) || []); } catch { setWaypoints([]); }
+    setCoverImageUrl((it as any).coverImageUrl || null);
+    setImageError(null);
     setEditing(it.id); setError(null);
   };
 
   const cancelEdit = () => { setEditing(null); setError(null); };
+
+  const handleImageUpload = async (file: File) => {
+    if (editing === null || editing === "new" || imageUploading) return;
+    setImageUploading(true);
+    setImageError(null);
+    const fd = new FormData();
+    fd.append("image", file);
+    try {
+      const r = await fetch(`${RAILWAY_URL}/api/admin/itineraries/${editing}/image`, {
+        method: "POST",
+        headers: { "x-admin-token": ADMIN_TOKEN },
+        body: fd,
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Upload failed");
+      setCoverImageUrl(d.url);
+      await fetchItineraries();
+    } catch (e: any) { setImageError(e.message); }
+    finally { setImageUploading(false); }
+  };
+
+  const handleImageDelete = async () => {
+    if (editing === null || editing === "new" || imageUploading) return;
+    if (!confirm("Remove cover image?")) return;
+    setImageUploading(true);
+    setImageError(null);
+    try {
+      const r = await fetch(`${RAILWAY_URL}/api/admin/itineraries/${editing}/image`, {
+        method: "DELETE",
+        headers: { "x-admin-token": ADMIN_TOKEN, "x-confirm-delete": "yes" },
+      });
+      if (!r.ok) {
+        const d = await r.json();
+        throw new Error(d.error || "Delete failed");
+      }
+      setCoverImageUrl(null);
+      await fetchItineraries();
+    } catch (e: any) { setImageError(e.message); }
+    finally { setImageUploading(false); }
+  };
 
   const handleSave = async () => {
     if (!form.name.trim()) { setError("Name is required."); return; }
@@ -411,6 +457,46 @@ export default function ItineraryManager({ siteSlug, entityType = "site", center
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Visitor Instructions</label>
                 <Textarea value={form.instructions} onChange={e => setForm(f => ({ ...f, instructions: e.target.value }))}
                   rows={2} placeholder="e.g. Start at Skanderbeg Square. Allow 2 hours. Wear comfortable shoes." className="text-sm resize-none" />
+              </div>
+              {/* ── Cover Image ── */}
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-muted-foreground mb-2 block">Cover Image</label>
+                {editing === "new" ? (
+                  <p className="text-xs text-muted-foreground italic">Save the itinerary first to upload a cover image.</p>
+                ) : coverImageUrl ? (
+                  <div className="space-y-2">
+                    <div className="relative w-full rounded-lg overflow-hidden border border-border" style={{ height: 160 }}>
+                      <img src={coverImageUrl} alt="Cover" className="w-full h-full object-cover" />
+                      <button type="button" onClick={handleImageDelete} disabled={imageUploading}
+                        className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-destructive text-white transition-colors"
+                        aria-label="Remove cover image">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                    <button type="button" onClick={() => coverFileRef.current?.click()} disabled={imageUploading}
+                      className="text-xs text-primary hover:underline flex items-center gap-1">
+                      <Upload size={11} /> {imageUploading ? "Uploading…" : "Replace image"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-border/60 rounded-lg p-5 text-center cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-colors"
+                    onClick={() => coverFileRef.current?.click()}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImageUpload(f); }}>
+                    {imageUploading ? (
+                      <p className="text-xs text-muted-foreground">Uploading…</p>
+                    ) : (
+                      <>
+                        <Image size={20} className="mx-auto mb-1.5 text-muted-foreground/50" />
+                        <p className="text-xs text-muted-foreground">Drop image here or <span className="text-primary font-medium">click to browse</span></p>
+                        <p className="text-xs text-muted-foreground/60 mt-0.5">JPG, PNG, WebP · Max 20 MB</p>
+                      </>
+                    )}
+                  </div>
+                )}
+                {imageError && <p className="text-xs text-destructive mt-1">{imageError}</p>}
+                <input ref={coverFileRef} type="file" accept="image/*" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); e.target.value = ""; }} />
               </div>
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Duration (minutes)</label>
@@ -499,6 +585,11 @@ export default function ItineraryManager({ siteSlug, entityType = "site", center
                       <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                         <Route size={13} className="text-primary" />
                       </div>
+                      {(it as any).coverImageUrl && (
+                        <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 border border-border/40">
+                          <img src={(it as any).coverImageUrl} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <p className="text-sm font-semibold truncate">{it.name}</p>
                         <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
