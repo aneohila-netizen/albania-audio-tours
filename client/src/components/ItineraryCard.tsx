@@ -27,6 +27,7 @@ interface Itinerary {
   distanceKm: number;
   difficulty: string;
   waypoints: string;
+  coverImageUrl?: string | null;
 }
 
 // ── Route map with permanent labels + per-pin directions popup ────────────────
@@ -424,7 +425,7 @@ export default function ItineraryCard({ siteSlug, centerLat = 41.3275, centerLng
             centerLat={centerLat}
             centerLng={centerLng}
             defaultOpen={idx === 0 && itineraries.length === 1}
-            heroImageUrl={heroImageUrl}
+            heroImageUrl={it.coverImageUrl || heroImageUrl}
           />
         );
       })}
