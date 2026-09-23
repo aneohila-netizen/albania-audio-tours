@@ -4,19 +4,7 @@
  * Includes a Map / Satellite toggle button overlaid top-right.
  */
 import { useEffect, useRef, useState } from "react";
-
-const TILES = {
-  street: {
-    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-    attribution: "© CartoDB © OpenStreetMap contributors",
-    maxZoom: 19,
-  },
-  satellite: {
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    attribution: "Tiles © Esri — Esri, USGS, NOAA",
-    maxZoom: 19,
-  },
-} as const;
+import { getStreetTiles, loadCartoBasemapKey, SATELLITE_TILES } from "@/lib/cartoBasemap";
 
 interface MiniMapProps {
   lat: number;
@@ -28,7 +16,21 @@ export default function MiniMap({ lat, lng, label }: MiniMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<any>(null);
   const tileRef      = useRef<any>(null);
+  const leafletRef   = useRef<any>(null);
   const [isSat, setIsSat] = useState(false);
+  const [cartoKey, setCartoKey] = useState("");
+  const cartoKeyRef = useRef("");
+
+  useEffect(() => {
+    let active = true;
+    loadCartoBasemapKey().then(key => {
+      if (active) {
+        cartoKeyRef.current = key;
+        setCartoKey(key);
+      }
+    });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -36,6 +38,7 @@ export default function MiniMap({ lat, lng, label }: MiniMapProps) {
 
     import("leaflet").then(L => {
       if (!mounted || !containerRef.current) return;
+      leafletRef.current = L;
 
       delete (L.Icon.Default.prototype as any)._getIconUrl;
       L.Icon.Default.mergeOptions({
@@ -50,9 +53,10 @@ export default function MiniMap({ lat, lng, label }: MiniMapProps) {
         dragging: true,
       }).setView([lat, lng], 15);
 
-      const tile = L.tileLayer(TILES.street.url, {
-        attribution: TILES.street.attribution,
-        maxZoom: TILES.street.maxZoom,
+      const streetTiles = getStreetTiles(cartoKeyRef.current);
+      const tile = L.tileLayer(streetTiles.url, {
+        attribution: streetTiles.attribution,
+        maxZoom: streetTiles.maxZoom,
       }).addTo(map);
       tileRef.current = tile;
 
@@ -88,19 +92,19 @@ export default function MiniMap({ lat, lng, label }: MiniMapProps) {
 
     return () => {
       mounted = false;
-      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; tileRef.current = null; }
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; tileRef.current = null; leafletRef.current = null; }
     };
   }, [lat, lng]);
 
   // Swap tile layer when toggle changes
   useEffect(() => {
     const map = mapRef.current;
-    const L = (window as any).L;
+    const L = leafletRef.current;
     if (!map || !L || !tileRef.current) return;
     tileRef.current.remove();
-    const t = isSat ? TILES.satellite : TILES.street;
+    const t = isSat ? SATELLITE_TILES : getStreetTiles(cartoKey);
     tileRef.current = L.tileLayer(t.url, { attribution: t.attribution, maxZoom: t.maxZoom }).addTo(map);
-  }, [isSat]);
+  }, [isSat, cartoKey]);
 
   return (
     <div style={{ position: "relative", width: "100%", height: "200px" }}>

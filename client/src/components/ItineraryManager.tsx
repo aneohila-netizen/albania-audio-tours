@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RAILWAY_URL } from "@/lib/queryClient";
+import { getStreetTiles, loadCartoBasemapKey, SATELLITE_TILES } from "@/lib/cartoBasemap";
 
 const ADMIN_TOKEN = "albatour-admin-secret-token";
 
@@ -80,6 +81,8 @@ function LeafletMap({ mapId, centerLat, centerLng, waypoints, onWaypointsChange 
   const mapRef = useRef<any>(null);
   const tileRef = useRef<any>(null);
   const [isSat, setIsSat] = useState(false);
+  const [cartoKey, setCartoKey] = useState("");
+  const cartoKeyRef = useRef("");
   const markersRef = useRef<any[]>([]);
   const polylineRef = useRef<any>(null);
   const waypointsRef = useRef(waypoints);
@@ -88,6 +91,16 @@ function LeafletMap({ mapId, centerLat, centerLng, waypoints, onWaypointsChange 
   // Keep refs current
   useEffect(() => { waypointsRef.current = waypoints; }, [waypoints]);
   useEffect(() => { onChangeRef.current = onWaypointsChange; }, [onWaypointsChange]);
+  useEffect(() => {
+    let active = true;
+    loadCartoBasemapKey().then(key => {
+      if (active) {
+        cartoKeyRef.current = key;
+        setCartoKey(key);
+      }
+    });
+    return () => { active = false; };
+  }, []);
 
   // Init Leaflet once using the stable DOM id
   // Swap tile layer when satellite toggle changes
@@ -96,12 +109,10 @@ function LeafletMap({ mapId, centerLat, centerLng, waypoints, onWaypointsChange 
     const L = (window as any).L;
     if (!map || !L || !tileRef.current) return;
     tileRef.current.remove();
-    const url = isSat
-      ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-      : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
-    const attr = isSat ? "Tiles © Esri" : "© CartoDB";
-    tileRef.current = L.tileLayer(url, { attribution: attr, maxZoom: 19 }).addTo(map);
-  }, [isSat]);
+    const streetTiles = getStreetTiles(cartoKey);
+    const t = isSat ? SATELLITE_TILES : streetTiles;
+    tileRef.current = L.tileLayer(t.url, { attribution: t.attribution, maxZoom: t.maxZoom }).addTo(map);
+  }, [isSat, cartoKey]);
 
   useEffect(() => {
     let mounted = true;
@@ -126,8 +137,9 @@ function LeafletMap({ mapId, centerLat, centerLng, waypoints, onWaypointsChange 
       });
 
       mapRef.current = L.map(div, { zoomControl: true }).setView([centerLat, centerLng], 15);
-      tileRef.current = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-        attribution: "© CartoDB", maxZoom: 19,
+      const streetTiles = getStreetTiles(cartoKeyRef.current);
+      tileRef.current = L.tileLayer(streetTiles.url, {
+        attribution: streetTiles.attribution, maxZoom: streetTiles.maxZoom,
       }).addTo(mapRef.current);
 
       mapRef.current.on("click", (e: any) => {

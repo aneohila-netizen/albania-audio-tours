@@ -16,6 +16,7 @@ import { useAudioPlayer } from "@/components/StickyAudioPlayer";
 import { getLangText } from "@/lib/i18n";
 import MobileDrawer from "@/components/MobileDrawer";
 import AnimatedQuickGuide from "@/components/AnimatedQuickGuide";
+import { getStreetTiles, loadCartoBasemapKey } from "@/lib/cartoBasemap";
 
 type LeafletLib = any;
 type LeafletMap = any;
@@ -487,21 +488,7 @@ export default function MapPage() {
 
       // Fetch the website-restricted public key at runtime: Railway may reuse
       // an older frontend image when only an environment variable changes.
-      let key: string = import.meta.env.VITE_CARTO_BASEMAP_KEY || "";
-      try {
-        const response = await fetch("/map-config.json", {
-          cache: "no-store",
-          signal: AbortSignal.timeout(5000),
-        });
-        if (response.ok) {
-          const config = await response.json();
-          if (typeof config.cartoBasemapKey === "string") {
-            key = config.cartoBasemapKey;
-          }
-        }
-      } catch {
-        // An unavailable config endpoint must not remove the map or its pins.
-      }
+      const key = await loadCartoBasemapKey();
       if (!mounted) return;
 
       // Replace only the background. Leaflet still owns the map,
@@ -513,19 +500,17 @@ export default function MapPage() {
         fallbackActive = true;
         activeVectorLayer?.remove();
         // Never return to unkeyed CARTO raster tiles: they carry a watermark.
-        L.tileLayer(
-          key
-            ? `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(key)}`
-            : "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-          {
-            attribution: key
-              ? '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>'
-              : '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        const streetTiles = getStreetTiles(key);
+        L.tileLayer(streetTiles.url, {
+            attribution: streetTiles.attribution,
             ...(key ? { subdomains: "abcd" } : { maxNativeZoom: 19 }),
             maxZoom: 20,
-          }
-        ).addTo(map);
+          }).addTo(map);
       };
+      if (!key) {
+        addFallbackBasemap();
+        return;
+      }
       try {
         const [{ maplibreGL }, { setWorkerUrl }, { default: workerUrl }] = await Promise.all([
           import("@maplibre/maplibre-gl-leaflet"),

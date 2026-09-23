@@ -42,6 +42,7 @@ import AdminSubscriptions from "@/components/AdminSubscriptions";
 import { queryClient } from "@/lib/queryClient";
 import { fieldLabel, saveErrorMessage } from "@/lib/apiError";
 import { parseGoogleMapsCoords, isShortenedMapsLink } from "@/lib/googleMapsLink";
+import { getStreetTiles, loadCartoBasemapKey, SATELLITE_TILES } from "@/lib/cartoBasemap";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 const ADMIN_PASSWORD = "AlbaTour2026!";
@@ -1439,20 +1440,6 @@ function AttractionsView({
   );
 }
 
-// Tile layer definitions — shared by all map pickers
-const TILES = {
-  street: {
-    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-    attribution: "\u00a9 CartoDB \u00a9 OpenStreetMap contributors",
-    maxZoom: 19,
-  },
-  satellite: {
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    attribution: "Tiles &copy; Esri &mdash; Esri, USGS, NOAA",
-    maxZoom: 19,
-  },
-} as const;
-
 // ─── MAP PICKER (interactive Leaflet) ─────────────────────────────────────────
 function MapPicker({
   lat,
@@ -1467,17 +1454,31 @@ function MapPicker({
   const mapRef      = useRef<any>(null);
   const markerRef   = useRef<any>(null);
   const tileRef     = useRef<any>(null);
+  const leafletRef  = useRef<any>(null);
   const [isSat, setIsSat] = useState(false);
+  const [cartoKey, setCartoKey] = useState("");
+  const cartoKeyRef = useRef("");
+
+  useEffect(() => {
+    let active = true;
+    loadCartoBasemapKey().then(key => {
+      if (active) {
+        cartoKeyRef.current = key;
+        setCartoKey(key);
+      }
+    });
+    return () => { active = false; };
+  }, []);
 
   // Swap tile layer when satellite toggle changes
   useEffect(() => {
     const map = mapRef.current;
-    const L = (window as any).L;
+    const L = leafletRef.current;
     if (!map || !L || !tileRef.current) return;
     tileRef.current.remove();
-    const t = isSat ? TILES.satellite : TILES.street;
+    const t = isSat ? SATELLITE_TILES : getStreetTiles(cartoKey);
     tileRef.current = L.tileLayer(t.url, { attribution: t.attribution, maxZoom: t.maxZoom }).addTo(map);
-  }, [isSat]);
+  }, [isSat, cartoKey]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -1485,6 +1486,7 @@ function MapPicker({
 
     const initLeaflet = (L: any) => {
       if (!mounted || !containerRef.current) return;
+      leafletRef.current = L;
 
       // Fix default icon paths
       delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -1498,7 +1500,8 @@ function MapPicker({
       const initLng = lng && !isNaN(lng) ? lng : 20.1683;
 
       const map = L.map(containerRef.current!, { zoomControl: true }).setView([initLat, initLng], 13);
-      const tile = L.tileLayer(TILES.street.url, { attribution: TILES.street.attribution, maxZoom: TILES.street.maxZoom }).addTo(map);
+      const streetTiles = getStreetTiles(cartoKeyRef.current);
+      const tile = L.tileLayer(streetTiles.url, { attribution: streetTiles.attribution, maxZoom: streetTiles.maxZoom }).addTo(map);
       tileRef.current = tile;
 
       const marker = L.marker([initLat, initLng], { draggable: true }).addTo(map);
@@ -1541,6 +1544,7 @@ function MapPicker({
         mapRef.current = null;
         markerRef.current = null;
         tileRef.current = null;
+        leafletRef.current = null;
       }
     };
   }, []);
