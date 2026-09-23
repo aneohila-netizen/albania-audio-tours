@@ -493,6 +493,7 @@ export default function MapPage() {
         if (!mounted || fallbackActive) return;
         fallbackActive = true;
         activeVectorLayer?.remove();
+        // Railway injects this public, domain-restricted CARTO key at build time.
         const key = import.meta.env.VITE_CARTO_BASEMAP_KEY;
         // Never return to unkeyed CARTO raster tiles: they carry a watermark.
         L.tileLayer(
