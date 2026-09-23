@@ -11,6 +11,7 @@ import { MapPin, X, Layers, Locate, LocateFixed, Headphones, ChevronRight, Arrow
 // Leaflet marker cluster — groups overlapping pins into numbered bubbles
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { useAudioPlayer } from "@/components/StickyAudioPlayer";
 import { getLangText } from "@/lib/i18n";
 import MobileDrawer from "@/components/MobileDrawer";
@@ -477,22 +478,45 @@ export default function MapPage() {
         userPannedRef.current = true;
       });
 
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-        {
-          attribution:
-            '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/">CARTO</a>',
-          subdomains: "abcd",
-          maxZoom: 20,
-        }
-      ).addTo(map);
-
       LeafletRef.current = L;
       mapInstanceRef.current = map;
       mapReadyRef.current = true;
 
       // Build markers immediately after map is ready
       buildMarkers();
+
+      // Staging: replace only the background. Leaflet still owns the map,
+      // markers, clusters, popups and all pin coordinates.
+      try {
+        const [{ maplibreGL }, { setWorkerUrl }, { default: workerUrl }] = await Promise.all([
+          import("@maplibre/maplibre-gl-leaflet"),
+          import("maplibre-gl"),
+          import("maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"),
+        ]);
+        if (!mounted) return;
+        setWorkerUrl(workerUrl);
+        const key = import.meta.env.VITE_CARTO_BASEMAP_KEY;
+        const style = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
+        const vectorLayer = maplibreGL({
+          style: key ? `${style}?key=${encodeURIComponent(key)}` : style,
+          attributionControl: {
+            customAttribution:
+              '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+          },
+        }).addTo(map);
+        const vectorMap = vectorLayer.getMaplibreMap();
+        vectorMap.on("error", (event: any) => console.error("Vector basemap error", event.error));
+      } catch (error) {
+        console.error("Vector basemap unavailable; retaining the original Leaflet map", error);
+        if (mounted) {
+          L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+            attribution:
+              '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: "abcd",
+            maxZoom: 20,
+          }).addTo(map);
+        }
+      }
     })();
 
     return () => {
