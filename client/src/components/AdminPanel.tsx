@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import * as Leaflet from "leaflet";
 import GallerySlideshow from "@/components/GallerySlideshow";
 import {
   Lock, Eye, EyeOff, Plus, Pencil, Trash2, LogOut,
@@ -1457,6 +1458,7 @@ function MapPicker({
   const leafletRef  = useRef<any>(null);
   const [isSat, setIsSat] = useState(false);
   const [cartoKey, setCartoKey] = useState("");
+  const [mapError, setMapError] = useState(false);
   const cartoKeyRef = useRef("");
 
   useEffect(() => {
@@ -1533,9 +1535,15 @@ function MapPicker({
       // Also fix on first render if already visible
       setTimeout(() => map.invalidateSize(), 50);
       setTimeout(() => map.invalidateSize(), 300);
+      setMapError(false);
     };
 
-    import("leaflet").then(initLeaflet);
+    try {
+      initLeaflet(Leaflet);
+    } catch (error) {
+      console.error("Location editor map could not initialize", error);
+      setMapError(true);
+    }
 
     return () => {
       mounted = false;
@@ -1592,6 +1600,11 @@ function MapPicker({
           })}
         </div>
       </div>
+      {mapError && (
+        <p role="alert" className="text-xs text-destructive mt-2">
+          Map could not load. Your saved coordinates are unchanged. Copy any unsaved edits before refreshing this page.
+        </p>
+      )}
       <p className="text-xs text-muted-foreground mt-1.5">
         Click the map or drag the pin to set the exact location. Albania addresses are imprecise — manual pinning is the most reliable method.
       </p>

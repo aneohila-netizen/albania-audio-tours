@@ -4,6 +4,7 @@
  * script injection pattern so Leaflet never fights with React rendering.
  */
 import "leaflet/dist/leaflet.css";
+import * as Leaflet from "leaflet";
 import { useState, useEffect, useRef } from "react";
 import {
   Plus, Trash2, Edit2, Save, X, MapPin,
@@ -82,6 +83,8 @@ function LeafletMap({ mapId, centerLat, centerLng, waypoints, onWaypointsChange 
   const tileRef = useRef<any>(null);
   const [isSat, setIsSat] = useState(false);
   const [cartoKey, setCartoKey] = useState("");
+  const [mapError, setMapError] = useState(false);
+  const [mapReadyVersion, setMapReadyVersion] = useState(0);
   const cartoKeyRef = useRef("");
   const markersRef = useRef<any[]>([]);
   const polylineRef = useRef<any>(null);
@@ -106,7 +109,7 @@ function LeafletMap({ mapId, centerLat, centerLng, waypoints, onWaypointsChange 
   // Swap tile layer when satellite toggle changes
   useEffect(() => {
     const map = mapRef.current;
-    const L = (window as any).L;
+    const L = Leaflet;
     if (!map || !L || !tileRef.current) return;
     tileRef.current.remove();
     const streetTiles = getStreetTiles(cartoKey);
@@ -119,8 +122,6 @@ function LeafletMap({ mapId, centerLat, centerLng, waypoints, onWaypointsChange 
 
     const initMap = (leaflet: any) => {
       const L = leaflet.default ?? leaflet;
-      // Store on window so the satellite toggle useEffect can access it
-      (window as any).L = L;
 
       if (!mounted) return;
       if (mapRef.current) { try { mapRef.current.remove(); } catch {} mapRef.current = null; }
@@ -158,20 +159,27 @@ function LeafletMap({ mapId, centerLat, centerLng, waypoints, onWaypointsChange 
       // Invalidate after tab CSS transition finishes
       setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 100);
       setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 400);
+      setMapError(false);
+      setMapReadyVersion(version => version + 1);
     };
 
-    import("leaflet").then(initMap).catch(console.error);
+    try {
+      initMap(Leaflet);
+    } catch (error) {
+      console.error("Itinerary editor map could not initialize", error);
+      setMapError(true);
+    }
 
     return () => {
       mounted = false;
-      if (mapRef.current) { try { mapRef.current.remove(); } catch {} mapRef.current = null; }
+      if (mapRef.current) { try { mapRef.current.remove(); } catch {} mapRef.current = null; tileRef.current = null; }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapId]);
 
   // Redraw markers + polyline whenever waypoints change
   useEffect(() => {
-    const L = (window as any).L;
+    const L = Leaflet;
     if (!L || !mapRef.current) return;
 
     markersRef.current.forEach(m => { try { m.remove(); } catch {} });
@@ -218,7 +226,7 @@ function LeafletMap({ mapId, centerLat, centerLng, waypoints, onWaypointsChange 
     else if (total === 2) mapRef.current.fitBounds(
       L.latLngBounds(waypoints.map(w => [w.lat, w.lng])), { padding: [50, 50], maxZoom: 16 }
     );
-  }, [waypoints]);
+  }, [waypoints, mapReadyVersion]);
 
   const count = waypoints.length;
 
@@ -298,6 +306,11 @@ function LeafletMap({ mapId, centerLat, centerLng, waypoints, onWaypointsChange 
         id={mapId}
         style={{ height: 400, borderRadius: 8, border: "1px solid hsl(var(--border))", zIndex: 0 }}
       />
+      {mapError && (
+        <p role="alert" className="text-xs text-destructive">
+          Map could not load. Your saved route stops are unchanged. Copy any unsaved edits before refreshing this page.
+        </p>
+      )}
     </div>
   );
 }
