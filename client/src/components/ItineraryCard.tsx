@@ -30,6 +30,21 @@ interface Itinerary {
   coverImageUrl?: string | null;
 }
 
+const OSM_ATTRIBUTION = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+const CARTO_ATTRIBUTION = OSM_ATTRIBUTION + ' © <a href="https://carto.com/attributions">CARTO</a>';
+
+function getMapTiles(cartoKey: string) {
+  return cartoKey
+    ? {
+        url: `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(cartoKey)}`,
+        attribution: CARTO_ATTRIBUTION,
+      }
+    : {
+        url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        attribution: OSM_ATTRIBUTION,
+      };
+}
+
 // ── Route map with permanent labels + per-pin directions popup ────────────────
 function RouteMap({ waypoints, centerLat, centerLng }: {
   waypoints: Waypoint[];
@@ -40,19 +55,38 @@ function RouteMap({ waypoints, centerLat, centerLng }: {
   const mapRef  = useRef<any>(null);
   const tileRef  = useRef<any>(null);
   const [isSat, setIsSat] = useState(false);
+  const [cartoKey, setCartoKey] = useState(import.meta.env.VITE_CARTO_BASEMAP_KEY || "");
+
+  useEffect(() => {
+    let active = true;
+    fetch("/map-config.json", {
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(config => {
+        if (active && typeof config?.cartoBasemapKey === "string") {
+          setCartoKey(config.cartoBasemapKey);
+        }
+      })
+      .catch(() => {
+        // Keep the watermark-free OpenStreetMap fallback if config is unavailable.
+      });
+    return () => { active = false; };
+  }, []);
 
   // Swap tile layer on satellite toggle
   useEffect(() => {
     const L = (window as any).L;
     if (!mapRef.current || !L || !tileRef.current) return;
     tileRef.current.remove();
-    const url = isSat
+    const mapTiles = getMapTiles(cartoKey);
+    tileRef.current = L.tileLayer(isSat
       ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-      : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
-    tileRef.current = L.tileLayer(url, {
-      attribution: isSat ? "Tiles © Esri" : "© CartoDB", maxZoom: 19,
+      : mapTiles.url, {
+      attribution: isSat ? "Tiles © Esri" : mapTiles.attribution, maxZoom: 19,
     }).addTo(mapRef.current);
-  }, [isSat]);
+  }, [isSat, cartoKey]);
 
   useEffect(() => {
     if (!divRef.current) return;
@@ -71,8 +105,9 @@ function RouteMap({ waypoints, centerLat, centerLng }: {
       scrollWheelZoom: false,
     }).setView(center, 15);
 
-    tileRef.current = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-      attribution: "© CartoDB",
+    const mapTiles = getMapTiles(cartoKey);
+    tileRef.current = L.tileLayer(mapTiles.url, {
+      attribution: mapTiles.attribution,
       maxZoom: 19,
     }).addTo(mapRef.current);
 
