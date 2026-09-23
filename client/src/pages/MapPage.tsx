@@ -485,8 +485,29 @@ export default function MapPage() {
       // Build markers immediately after map is ready
       buildMarkers();
 
-      // Staging: replace only the background. Leaflet still owns the map,
+      // Replace only the background. Leaflet still owns the map,
       // markers, clusters, popups and all pin coordinates.
+      let fallbackActive = false;
+      let activeVectorLayer: { remove: () => void } | null = null;
+      const addFallbackBasemap = () => {
+        if (!mounted || fallbackActive) return;
+        fallbackActive = true;
+        activeVectorLayer?.remove();
+        const key = import.meta.env.VITE_CARTO_BASEMAP_KEY;
+        // Never return to unkeyed CARTO raster tiles: they carry a watermark.
+        L.tileLayer(
+          key
+            ? `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(key)}`
+            : "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+          {
+            attribution: key
+              ? '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>'
+              : '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            ...(key ? { subdomains: "abcd" } : { maxNativeZoom: 19 }),
+            maxZoom: 20,
+          }
+        ).addTo(map);
+      };
       try {
         const [{ maplibreGL }, { setWorkerUrl }, { default: workerUrl }] = await Promise.all([
           import("@maplibre/maplibre-gl-leaflet"),
@@ -499,23 +520,38 @@ export default function MapPage() {
         const style = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
         const vectorLayer = maplibreGL({
           style: key ? `${style}?key=${encodeURIComponent(key)}` : style,
+          transformRequest: key
+            ? (url: string) => {
+                if (!url.startsWith("https://")) return { url };
+                const requestUrl = new URL(url);
+                if (
+                  requestUrl.hostname === "basemaps.cartocdn.com" ||
+                  requestUrl.hostname.endsWith(".basemaps.cartocdn.com")
+                ) {
+                  requestUrl.searchParams.set("key", key);
+                }
+                return { url: requestUrl.toString() };
+              }
+            : undefined,
           attributionControl: {
             customAttribution:
               '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
           },
         }).addTo(map);
+        activeVectorLayer = vectorLayer;
         const vectorMap = vectorLayer.getMaplibreMap();
-        vectorMap.on("error", (event: any) => console.error("Vector basemap error", event.error));
+        let errorCount = 0;
+        vectorMap.on("error", (event: any) => {
+          console.error("Vector basemap error", event.error);
+          if (++errorCount >= 2) addFallbackBasemap();
+        });
+        const loadTimer = setTimeout(() => {
+          if (!vectorMap.isStyleLoaded()) addFallbackBasemap();
+        }, 12000);
+        vectorMap.on("load", () => clearTimeout(loadTimer));
       } catch (error) {
-        console.error("Vector basemap unavailable; retaining the original Leaflet map", error);
-        if (mounted) {
-          L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-            attribution:
-              '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: "abcd",
-            maxZoom: 20,
-          }).addTo(map);
-        }
+        console.error("Vector basemap unavailable; using backup tiles", error);
+        addFallbackBasemap();
       }
     })();
 
