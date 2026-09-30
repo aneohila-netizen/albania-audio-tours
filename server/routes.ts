@@ -2832,4 +2832,4 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   return httpServer;
 }
-// deploy trigger Sun May  3 18:33:36 UTC 2026
+// deploy trigger Wed Sep 30 19:30:00 UTC 2026 — Explore Nearby routes added
