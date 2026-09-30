@@ -1523,6 +1523,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     await storage.updateItinerary(id, { coverImageUrl: null });
     if (oldUrl) await deleteFromR2(oldUrl);
     res.json({ success: true });
+  });
+
   // ── Nearby Places proxy (Google Places API) ───────────────────────
   // POST /api/nearby — proxies Google Places Nearby Search, keeping the API key server-side.
   // Body: { lat: number, lng: number, type: string, radius?: number }
