@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useApp } from "@/App";
 import { useQuery } from "@tanstack/react-query";
@@ -18,6 +18,7 @@ import BackToTop from "@/components/BackToTop";
 import NearbyExplorer from "@/components/NearbyExplorer";
 import { useSubscription } from "@/lib/subscriptionContext";
 import { Link } from "wouter";
+import { getGlobalPaywallActive } from "@/components/PaywallGate";
 
 const CATEGORY_COLORS: Record<string, string> = {
   city: "#C0392B", archaeology: "#8B4513", castle: "#4A4A6A",
@@ -44,6 +45,12 @@ export default function DestinationPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const { lang, visitedSiteIds } = useApp();
   const { sub } = useSubscription();
+  const [globalLocked, setGlobalLocked] = useState<boolean | null>(null);
+
+  // Mirror the same paywall state used by the audio tour PaywallGate
+  useEffect(() => {
+    getGlobalPaywallActive().then(setGlobalLocked);
+  }, []);
 
   // Fetch destination directly from Railway (bypasses Perplexity proxy)
   const { data: dest, isLoading: destLoading } = useQuery<TourSite>({
@@ -179,9 +186,10 @@ export default function DestinationPage() {
         </a>
       </div>
 
-      {/* ── Explore Nearby (subscriber-only) ── */}
-      {sub.checking ? null : sub.active ? (
-        /* Subscriber — full live feature */
+      {/* ── Explore Nearby — gated by the same admin paywall switch as the audio tour ── */}
+      {/* effectiveLocked mirrors PaywallGate: locked when globalLocked=true AND not subscribed */}
+      {(sub.checking || globalLocked === null) ? null : (!(globalLocked) || sub.active) ? (
+        /* Paywall OFF or subscriber — show live feature */
         <NearbyExplorer destLat={dest.lat} destLng={dest.lng} destName={name} />
       ) : (
         /* Non-subscriber — teaser card with locked overlay */
