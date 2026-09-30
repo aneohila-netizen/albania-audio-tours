@@ -1523,6 +1523,64 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     await storage.updateItinerary(id, { coverImageUrl: null });
     if (oldUrl) await deleteFromR2(oldUrl);
     res.json({ success: true });
+  // ── Nearby Places proxy (Google Places API) ───────────────────────
+  // POST /api/nearby — proxies Google Places Nearby Search, keeping the API key server-side.
+  // Body: { lat: number, lng: number, type: string, radius?: number }
+  // Returns: { results: PlaceResult[], configured: boolean }
+  app.post("/api/nearby", async (req, res) => {
+    const GPLACES_KEY = process.env.GOOGLE_PLACES_API_KEY || "";
+    if (!GPLACES_KEY) {
+      return res.json({ results: [], configured: false });
+    }
+    const { lat, lng, type, radius = 3000 } = req.body as { lat: number; lng: number; type: string; radius?: number };
+    if (!lat || !lng || !type) {
+      return res.status(400).json({ error: "lat, lng, and type are required" });
+    }
+    try {
+      const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${encodeURIComponent(type)}&key=${GPLACES_KEY}`;
+      const r = await fetch(url);
+      const data = await r.json() as any;
+      if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+        console.error("[nearby] Google Places error:", data.status, data.error_message);
+        return res.status(502).json({ error: data.error_message || data.status, results: [], configured: true });
+      }
+      const results = (data.results || []).map((p: any) => ({
+        placeId:    p.place_id,
+        name:       p.name,
+        vicinity:   p.vicinity,
+        rating:     p.rating ?? null,
+        userRatingsTotal: p.user_ratings_total ?? 0,
+        priceLevel: p.price_level ?? null,
+        lat:        p.geometry?.location?.lat ?? null,
+        lng:        p.geometry?.location?.lng ?? null,
+        photoRef:   p.photos?.[0]?.photo_reference ?? null,
+        types:      p.types ?? [],
+        openNow:    p.opening_hours?.open_now ?? null,
+      }));
+      res.json({ results, configured: true });
+    } catch (e: any) {
+      console.error("[nearby] fetch error:", e.message);
+      res.status(502).json({ error: "Failed to reach Google Places API", results: [], configured: true });
+    }
+  });
+
+  // GET /api/nearby/photo/:ref — proxies a Google Places photo, keeping API key server-side
+  app.get("/api/nearby/photo/:ref", async (req, res) => {
+    const GPLACES_KEY = process.env.GOOGLE_PLACES_API_KEY || "";
+    if (!GPLACES_KEY) return res.status(503).send("Not configured");
+    const { ref } = req.params;
+    const maxwidth = Math.min(Number(req.query.maxwidth) || 400, 800);
+    try {
+      const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxwidth}&photo_reference=${encodeURIComponent(ref)}&key=${GPLACES_KEY}`;
+      const r = await fetch(url);
+      if (!r.ok) return res.status(502).send("Photo fetch failed");
+      res.setHeader("Content-Type", r.headers.get("content-type") || "image/jpeg");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      const buf = Buffer.from(await r.arrayBuffer());
+      res.send(buf);
+    } catch {
+      res.status(502).send("Error");
+    }
   });
 
   // ── Public listen counts endpoint ─────────────────────────────────

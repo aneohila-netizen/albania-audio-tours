@@ -10,11 +10,14 @@ import PaywallGate from "@/components/PaywallGate";
 import BookWithGuide from "@/components/BookWithGuide";
 import StarRatingDisplay from "@/components/StarRatingDisplay";
 import ItineraryCard from "@/components/ItineraryCard";
-import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb, Navigation, LayoutGrid, List } from "lucide-react";
+import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb, Navigation, LayoutGrid, List, Navigation2, Lock } from "lucide-react";
 import GallerySlideshow from "@/components/GallerySlideshow";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLangText } from "@/lib/i18n";
 import BackToTop from "@/components/BackToTop";
+import NearbyExplorer from "@/components/NearbyExplorer";
+import { useSubscription } from "@/lib/subscriptionContext";
+import { Link } from "wouter";
 
 const CATEGORY_COLORS: Record<string, string> = {
   city: "#C0392B", archaeology: "#8B4513", castle: "#4A4A6A",
@@ -40,6 +43,7 @@ export default function DestinationPage() {
   const [attrFilter, setAttrFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const { lang, visitedSiteIds } = useApp();
+  const { sub } = useSubscription();
 
   // Fetch destination directly from Railway (bypasses Perplexity proxy)
   const { data: dest, isLoading: destLoading } = useQuery<TourSite>({
@@ -174,6 +178,64 @@ export default function DestinationPage() {
           {`Get Directions to ${name}`}
         </a>
       </div>
+
+      {/* ── Explore Nearby (subscriber-only) ── */}
+      {sub.checking ? null : sub.active ? (
+        /* Subscriber — full live feature */
+        <NearbyExplorer destLat={dest.lat} destLng={dest.lng} destName={name} />
+      ) : (
+        /* Non-subscriber — teaser card with locked overlay */
+        <div className="relative rounded-2xl border border-border overflow-hidden">
+          {/* Blurred preview of what the section looks like */}
+          <div className="p-4 bg-card select-none" style={{ filter: "blur(3px)", pointerEvents: "none" }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Navigation2 size={18} className="text-primary" />
+              </div>
+              <div>
+                <p className="font-bold text-sm">Explore Nearby</p>
+                <p className="text-xs text-muted-foreground">Hotels · Restaurants · Things to do</p>
+              </div>
+            </div>
+            <div className="flex gap-1.5 mb-3">
+              {["Hotels","Restaurants","Things to Do","Emergency"].map(l => (
+                <span key={l} className="px-2.5 py-1 rounded-full text-xs font-semibold bg-muted text-foreground border border-border">{l}</span>
+              ))}
+            </div>
+            <div className="space-y-2">
+              {[1,2,3].map(i => (
+                <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card">
+                  <div className="w-16 h-16 rounded-lg bg-muted shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3 bg-muted rounded w-2/3" />
+                    <div className="h-2.5 bg-muted rounded w-1/2" />
+                    <div className="h-2.5 bg-muted rounded w-1/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Lock overlay */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/70 backdrop-blur-[2px] px-6">
+            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+              <Lock size={20} className="text-primary" />
+            </div>
+            <p className="font-bold text-sm text-center mb-1">Subscriber Benefit</p>
+            <p className="text-xs text-muted-foreground text-center mb-4 leading-relaxed">
+              Discover hotels, restaurants, things to do, and emergency services near {name} — included with your audio tour subscription.
+            </p>
+            <Link href="/subscriptions">
+              <a className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
+                Unlock — from €7.99
+              </a>
+            </Link>
+            <p className="text-xs text-muted-foreground mt-2">
+              Already subscribed?{" "}
+              <Link href="/activate"><a className="text-primary underline">Activate here</a></Link>
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Book with a guide */}
       <BookWithGuide shopifyUrl={(dest as any).shopifyUrl || ""} siteName={name} />
