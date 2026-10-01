@@ -3,7 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { useApp } from "@/App";
 import { useQuery } from "@tanstack/react-query";
 import type { TourSite, Attraction } from "@shared/schema";
-import { railwayFetch } from "@/lib/queryClient";
+import { railwayFetch, RAILWAY_URL } from "@/lib/queryClient";
 import MiniMap from "@/components/MiniMap";
 import AudioPlayer from "@/components/AudioPlayer";
 import PaywallGate from "@/components/PaywallGate";
@@ -65,6 +65,7 @@ export default function DestinationPage() {
     }
   }, [nearbyParam]);
 
+  // ── Audio prefetch (Change 4) ───────────────────────────────────────────────────
   // Fetch destination directly from Railway (bypasses Perplexity proxy)
   const { data: dest, isLoading: destLoading } = useQuery<TourSite>({
     queryKey: ["railway", "sites", params?.dest],
@@ -78,6 +79,25 @@ export default function DestinationPage() {
     queryFn: () => railwayFetch<Attraction[]>(`/api/attractions/${params?.dest}`),
     enabled: !!params?.dest,
   });
+
+  // ── Audio prefetch (Change 4) ───────────────────────────────────────────────────
+  // Once dest.id is known, prefetch English audio via <link rel="prefetch">.
+  // Browser handles this off-main-thread at low priority so it never blocks UI.
+  // Only prefetches when content is accessible (subscriber or paywall off).
+  const audioPrefetchedRef = useRef(false);
+  useEffect(() => {
+    if (!dest?.id || audioPrefetchedRef.current) return;
+    if (globalLocked === true && !sub.active) return; // don't prefetch locked content
+    audioPrefetchedRef.current = true;
+    const audioUrl = `${RAILWAY_URL}/api/audio/serve/site/${dest.id}/en`;
+    const link = document.createElement("link");
+    link.rel = "prefetch";
+    link.as = "fetch";
+    link.href = audioUrl;
+    link.crossOrigin = "anonymous";
+    document.head.appendChild(link);
+    return () => { try { document.head.removeChild(link); } catch {} };
+  }, [dest?.id, globalLocked, sub.active]);
 
   if (destLoading || attrsLoading) {
     return (
