@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useApp } from "@/App";
 import type { TourSite } from "@shared/schema";
-import { useDestinations, useAttractions } from "@/lib/useApiData";
+import { useDestinations, useAttractions, useDestinationsLoading } from "@/lib/useApiData";
 import type { Destination, Attraction } from "@/lib/staticData";
 import VisitModal from "@/components/VisitModal";
 import { apiRequest, RAILWAY_URL } from "@/lib/queryClient";
@@ -16,6 +16,7 @@ import { useAudioPlayer } from "@/components/StickyAudioPlayer";
 import { getLangText } from "@/lib/i18n";
 import MobileDrawer from "@/components/MobileDrawer";
 import AnimatedQuickGuide from "@/components/AnimatedQuickGuide";
+import AppLoadingScreen from "@/components/AppLoadingScreen";
 import { getStreetTiles, loadCartoBasemapKey } from "@/lib/cartoBasemap";
 
 type LeafletLib = any;
@@ -140,17 +141,23 @@ export default function MapPage() {
   const [showExplorePopup, setShowExplorePopup] = useState(false);
   const [popupDismissed, setPopupDismissed] = useState(false);
 
+  // ── Loading screen ─────────────────────────────────────────────────────────
+  // Shown on first visit until destinations data arrives from Railway.
+  // Returning users have cached data — destLoading=false immediately, screen never shows.
+  const destLoading = useDestinationsLoading();
+  const [showLoadingScreen, setShowLoadingScreen] = useState(destLoading);
+
   // ── Onboarding tooltip tour ─────────────────────────────────────────────────
-  // Centered modal, shown 3 s after first visit (once per session).
+  // Centered modal — triggered only after loading screen finishes.
   const alreadySeen = (() => { try { return !!sessionStorage.getItem("alb_onboarded"); } catch { return false; } })();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardStep, setOnboardStep] = useState(0);
 
   useEffect(() => {
-    if (alreadySeen) return;
-    const timer = setTimeout(() => setShowOnboarding(true), 3000);
+    if (alreadySeen || showLoadingScreen) return;
+    const timer = setTimeout(() => setShowOnboarding(true), 600);
     return () => clearTimeout(timer);
-  }, []);
+  }, [showLoadingScreen]);
 
   // Quietly warm the mascot images in the background so the Animated Quick Guide
   // has zero visible load lag when it triggers at the 3s mark above. Runs at low
@@ -955,6 +962,11 @@ export default function MapPage() {
   return (
     <div ref={mapWrapperRef} className="relative flex-1 min-h-0"
       style={{ height: mapHeight > 0 ? `${mapHeight}px` : 'calc(100svh - 114px)' }}>
+
+      {/* ── Loading screen — first-visit only, dismissed when destinations ready ── */}
+      {showLoadingScreen && (
+        <AppLoadingScreen onDone={() => setShowLoadingScreen(false)} />
+      )}
 
       {/* P2-B: Hero value-prop strip — removed per request (2026-07-24): it overlapped
            the header/menu on both desktop and mobile. heroDismissed/alreadySeen state and
