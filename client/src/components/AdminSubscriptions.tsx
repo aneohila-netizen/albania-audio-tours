@@ -296,7 +296,7 @@ export default function AdminSubscriptions() {
               <Mail size={13} className="mr-1" /> Leads {leads.length > 0 && `(${leads.length})`}
             </Button>
             <Button variant="outline" size="sm" onClick={() => setView("test")}>
-              🧪 Test
+              📧 Manual Grant
             </Button>
             <Button size="sm" onClick={() => { setEditPlan(blankPlan()); setView("new"); setError(""); }}>
               <Plus size={13} className="mr-1" /> New Plan
@@ -844,7 +844,7 @@ export default function AdminSubscriptions() {
         {subscribers.length === 0 ? (
           <div className="text-center py-10 text-muted-foreground text-sm">
             <Users size={28} className="mx-auto mb-2 opacity-30" />
-            No subscribers yet. Use the 🧪 Test button to create a test subscription.
+            No subscribers yet. Use the 📧 Manual Grant button to create a manual subscription.
           </div>
         ) : (
           <div className="space-y-2">
@@ -890,76 +890,110 @@ export default function AdminSubscriptions() {
   }
 
   // ════════════════════════════════════════════════════════════════
-  // TEST ACTIVATION
+  // MANUAL / TEST ACTIVATION
   // ════════════════════════════════════════════════════════════════
   if (view === "test") {
+    const activationUrl = testResult?.success
+      ? `/#/activate?order_id=${testResult.sub?.shopifyOrderId}&email=${encodeURIComponent(testResult.sub?.email || "")}`
+      : null;
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <button onClick={() => setView("plans")} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft size={14} /> Back
           </button>
-          <h2 className="font-bold text-sm flex-1 text-center">🧪 Test Subscription Activation</h2>
+          <h2 className="font-bold text-sm flex-1 text-center">📧 Manual Subscription</h2>
           <div className="w-16" />
         </div>
 
-        <div className="p-3 rounded-xl bg-yellow-50 border border-yellow-200 text-xs text-yellow-800">
-          <p className="font-semibold">How this test works:</p>
-          <ol className="list-decimal list-inside mt-1 space-y-0.5">
-            <li>Enter any email and select a plan below</li>
-            <li>Click "Create Test Subscription" — creates a real DB record with TEST flag</li>
-            <li>Copy the session token, go to <code>/#/activate</code>, paste to verify unlock works</li>
-            <li>The test subscription auto-expires after the days you set</li>
-            <li>You can also revoke it immediately from the Subscribers list</li>
-          </ol>
+        <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-800">
+          <p className="font-semibold mb-1">Grant access without online payment</p>
+          <p>Creates a full subscription with an access code. A confirmation email with QR code, activation link, and access code is sent automatically to the user. Behaves identically to a paid subscription — device limits, expiry, and revoke all work the same way.</p>
         </div>
 
         <Card>
           <CardContent className="px-4 py-4 space-y-3">
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Test Email</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">User Email *</label>
               <Input value={testEmail} onChange={e => setTestEmail(e.target.value)}
-                placeholder="test@example.com" className="h-8 text-sm" />
+                placeholder="user@example.com" className="h-8 text-sm" />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Plan</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Plan *</label>
               <Select value={testPlan} onValueChange={setTestPlan}>
                 <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select a plan" /></SelectTrigger>
                 <SelectContent>
-                  {plans.map(p => <SelectItem key={p.slug} value={p.slug}>{p.name}</SelectItem>)}
+                  {plans.map(p => <SelectItem key={p.slug} value={p.slug}>{p.name} — {p.billingPeriod}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Expires in (days)</label>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Duration override (days)</label>
               <Input type="number" value={testDays} onChange={e => setTestDays(parseInt(e.target.value)||1)}
-                min={1} max={365} className="h-8 text-sm" />
+                min={1} max={365} className="h-8 text-sm"
+                placeholder="Leave at plan default" />
+              <p className="text-[10px] text-muted-foreground mt-1">Leave at 1 to use the plan’s natural period (7-day, monthly, yearly).</p>
             </div>
             <Button className="w-full" onClick={runTestActivate} disabled={testLoading || !testEmail || !testPlan}>
-              {testLoading ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Running…</> : "🧪 Create Test Subscription"}
+              {testLoading
+                ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Creating…</>
+                : "📧 Grant Access & Send Email"}
             </Button>
           </CardContent>
         </Card>
 
         {testResult && (
-          <div className={`p-4 rounded-xl border text-xs font-mono space-y-2 ${
+          <div className={`p-4 rounded-xl border text-xs space-y-3 ${
             testResult.success ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"
           }`}>
-            <p className={testResult.success ? "text-green-700 font-bold" : "text-red-700 font-bold"}>
-              {testResult.success ? "✓ Test subscription created" : "✗ Error"}
-            </p>
-            {testResult.success && (
+            {testResult.success ? (
               <>
-                <p className="text-green-700">Session token: <span className="break-all">{testResult.sub?.sessionToken}</span></p>
-                <p className="text-green-700">Expires: {testResult.sub?.expiresAt}</p>
-                <p className="text-muted-foreground mt-2">To test the unlock flow:</p>
-                <p className="text-muted-foreground">1. Open <a className="text-primary underline" href={`/#/activate?order_id=${testResult.sub?.shopifyOrderId}&email=${testResult.sub?.email}`} target="_blank">this activation link</a></p>
-                <p className="text-muted-foreground">2. The page should show "You're all set" and activate your session</p>
-                <p className="text-muted-foreground">3. Navigate to any destination — audio should be unlocked</p>
-                <p className="text-muted-foreground">4. To test lock: go to Subscribers and Revoke this subscription, then refresh</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-green-700 font-bold text-sm">✓ Subscription granted</span>
+                  {testResult.emailSent
+                    ? <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold">📧 Email sent</span>
+                    : <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold">⚠️ Email not sent (check RESEND_API_KEY)</span>}
+                </div>
+
+                {/* Access code — prominent */}
+                {testResult.accessCode && (
+                  <div className="rounded-lg border-2 border-dashed border-amber-300 bg-amber-50 p-3 text-center">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 mb-1">Access Code</p>
+                    <p className="text-2xl font-black font-mono tracking-[0.2em] text-amber-900">{testResult.accessCode}</p>
+                    <p className="text-[10px] text-amber-700 mt-1">User can enter this at albaniaaudiotours.com/#/activate</p>
+                  </div>
+                )}
+
+                {/* Activation link */}
+                {activationUrl && (
+                  <div className="space-y-1">
+                    <p className="font-semibold text-green-800">Activation link:</p>
+                    <a
+                      href={activationUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block break-all text-primary underline"
+                    >
+                      {`albaniaaudiotours.com${activationUrl}`}
+                    </a>
+                    <p className="text-muted-foreground">Send this link to the user or share the access code above. Either method unlocks their subscription.</p>
+                  </div>
+                )}
+
+                {/* Details */}
+                <div className="border-t border-green-200 pt-2 space-y-0.5 text-muted-foreground font-mono">
+                  <p>Plan: <span className="text-foreground">{testResult.sub?.planName}</span></p>
+                  <p>Expires: <span className="text-foreground">{testResult.sub?.expiresAt ? new Date(testResult.sub.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : ""}</span></p>
+                  <p>Email: <span className="text-foreground">{testResult.sub?.email}</span></p>
+                </div>
+
+                <p className="text-muted-foreground border-t border-green-200 pt-2">
+                  To revoke: go to <strong>Subscribers</strong> tab and revoke this subscription.
+                </p>
               </>
+            ) : (
+              <p className="text-red-700 font-semibold">✗ Error: {testResult.error}</p>
             )}
-            {!testResult.success && <p className="text-red-700">{testResult.error}</p>}
           </div>
         )}
       </div>
