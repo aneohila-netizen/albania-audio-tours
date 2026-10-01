@@ -140,6 +140,7 @@ export default function MapPage() {
   // 10-second idle popup — shown once per session, dismissed permanently on close
   const [showExplorePopup, setShowExplorePopup] = useState(false);
   const [popupDismissed, setPopupDismissed] = useState(false);
+  const [showBridgeLoading, setShowBridgeLoading] = useState(false); // "Loading..." between guide and Explore popup
 
   // ── Loading screen ─────────────────────────────────────────────────────────
   // Shown on first visit until destinations data arrives from Railway.
@@ -195,6 +196,14 @@ export default function MapPage() {
   function dismissOnboarding() {
     try { sessionStorage.setItem("alb_onboarded", "1"); } catch {}
     setShowOnboarding(false);
+    // Chain: guide closes → brief "Loading page..." bridge → Explore Nearby popup
+    if (!popupDismissed && !autoCenter) {
+      setShowBridgeLoading(true);
+      setTimeout(() => {
+        setShowBridgeLoading(false);
+        setShowExplorePopup(true);
+      }, 900); // 900ms bridge — long enough to feel like something is happening
+    }
   }
 
   // ── Destinations list panel ───────────────────────────────────────────────
@@ -1137,6 +1146,22 @@ export default function MapPage() {
       {/* ── 10-second explore popup ────────────────────────────────────────────
            Shown after idle: prompts visitor to share location and discover nearby sites.
            Clean, minimal, mobile-first. X to dismiss forever in session. */}
+      {/* ── Bridge loading toast — shown for 900ms between guide and Explore Nearby popup ── */}
+      {showBridgeLoading && (
+        <div className="absolute bottom-6 left-0 right-0 z-[1060] flex justify-center pointer-events-none">
+          <div
+            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-card border border-border shadow-xl text-sm font-medium text-foreground"
+            style={{ animation: "popup-in 0.25s ease both" }}
+          >
+            <svg className="animate-spin shrink-0" width="14" height="14" viewBox="0 0 24 24"
+              fill="none" stroke="hsl(var(--primary))" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+            <span>Loading page…</span>
+          </div>
+        </div>
+      )}
+
       {showExplorePopup && !popupDismissed && !autoCenter && (
         <div
           className="absolute inset-0 z-[1050] flex items-center justify-center pointer-events-none"
