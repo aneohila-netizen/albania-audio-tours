@@ -715,9 +715,48 @@ export default function MapPage() {
   }, [autoCenter]);
 
   const toggleAutoCenter = () => {
-    // Reset the panned flag so tapping the button re-locks to GPS position
-    userPannedRef.current = false;
-    setAutoCenter(v => !v);
+    // If already active — turn off
+    if (autoCenter) {
+      userPannedRef.current = false;
+      setAutoCenter(false);
+      return;
+    }
+
+    // Not yet active — check permission first with getCurrentPosition.
+    // This forces the browser to show the permission prompt if it hasn't been
+    // granted yet, and gives immediate feedback instead of a silent watchPosition.
+    if (!navigator.geolocation) {
+      setGpsError("GPS is not available on this device or browser.");
+      return;
+    }
+
+    setGpsError(null);
+
+    // Use a short-timeout getCurrentPosition to probe permission immediately.
+    // On success: activate watchPosition via setAutoCenter.
+    // On error: show a clear message with browser-settings instructions and a
+    //           Google Maps fallback so the user is never left stuck.
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        // Permission granted — hand off to the watchPosition useEffect
+        userPannedRef.current = false;
+        setAutoCenter(true);
+      },
+      (err) => {
+        if (err.code === 1) {
+          // PERMISSION_DENIED — user has blocked location
+          setGpsError("permission_denied");
+        } else if (err.code === 2) {
+          // POSITION_UNAVAILABLE — GPS signal issue
+          setGpsError("position_unavailable");
+        } else {
+          // TIMEOUT or unknown
+          setGpsError("timeout");
+        }
+        setAutoCenter(false);
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
   };
 
   // ── Handle mark visited ───────────────────────────────────────────────────
@@ -918,17 +957,51 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* GPS error toast — with recovery guidance for permission-denied */}
+      {/* GPS error toast — structured messages with fallback options */}
       {gpsError && (
-        <div className="absolute top-3 left-3 z-[1001] max-w-xs bg-destructive text-destructive-foreground text-xs rounded-xl px-3 py-2.5 shadow-lg">
+        <div className="absolute top-3 left-3 z-[1001] max-w-[280px] bg-destructive text-destructive-foreground text-xs rounded-xl px-3 py-2.5 shadow-lg space-y-1.5">
           <div className="flex items-start gap-2">
-            <span className="flex-1 leading-relaxed">{gpsError}</span>
-            <button onClick={() => setGpsError(null)} aria-label="Dismiss" className="font-bold shrink-0 mt-0.5 opacity-80 hover:opacity-100">✕</button>
+            <span className="flex-1 font-semibold">
+              {gpsError === "permission_denied" && "🚫 Location blocked"}
+              {gpsError === "position_unavailable" && "📶 GPS signal unavailable"}
+              {gpsError === "timeout" && "⏱ Location timed out"}
+              {gpsError !== "permission_denied" && gpsError !== "position_unavailable" && gpsError !== "timeout" && gpsError}
+            </span>
+            <button onClick={() => setGpsError(null)} aria-label="Dismiss" className="font-bold shrink-0 opacity-80 hover:opacity-100">✕</button>
           </div>
-          {gpsError.toLowerCase().includes("permission") && (
-            <p className="mt-1.5 opacity-90 leading-relaxed">
-              To fix: open your browser settings, find <strong>Site Permissions → Location</strong>, and allow this site. Then tap <strong>Share Location</strong> again.
+
+          {gpsError === "permission_denied" && (
+            <>
+              <p className="opacity-90 leading-relaxed">
+                Open your browser settings → <strong>Site permissions → Location</strong> → set to <strong>Allow</strong> for this site, then tap Share Location again.
+              </p>
+              <a
+                href="https://www.google.com/maps/search/tourist+attractions+in+Albania"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 underline opacity-90 hover:opacity-100 font-medium mt-0.5"
+              >
+                🗺️ Use Google Maps instead
+              </a>
+            </>
+          )}
+          {gpsError === "position_unavailable" && (
+            <p className="opacity-90 leading-relaxed">
+              Your device can’t get a GPS fix right now. Try moving to an open outdoor area and tap Share Location again.
             </p>
+          )}
+          {gpsError === "timeout" && (
+            <>
+              <p className="opacity-90 leading-relaxed">
+                GPS took too long to respond. Check that Location is enabled on your device, then try again.
+              </p>
+              <button
+                onClick={() => { setGpsError(null); setTimeout(toggleAutoCenter, 100); }}
+                className="underline font-medium opacity-90 hover:opacity-100"
+              >
+                Try again
+              </button>
+            </>
           )}
         </div>
       )}
@@ -1601,10 +1674,9 @@ export default function MapPage() {
                 <button
                   key={dest.slug}
                   onClick={() => {
-                    const map = mapInstanceRef.current;
-                    if (map) map.flyTo([dest.lat, dest.lng], 13, { duration: 1 });
                     setShowDestPanel(false);
                     setDestSearch("");
+                    navigate(`/sites/${dest.slug}`);
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/60 transition-colors text-left group"
                 >
