@@ -109,3 +109,31 @@ export function useAttractions(destinationSlug?: string): Attraction[] {
   // Still loading or failed → return empty (no Unsplash placeholders)
   return [];
 }
+
+// ─── Prefetch helpers ─────────────────────────────────────────────────────────
+// Call these when the user shows intent to visit a destination (hover, tap)
+// so the data is in TanStack cache by the time the page renders.
+import { queryClient } from "./queryClient";
+import type { TourSite as TourSiteType } from "@shared/schema";
+
+/**
+ * prefetchDestination — warms the TanStack cache for a destination page.
+ * Fires /api/sites/:slug and /api/attractions/:slug in parallel.
+ * Silent: never throws, never blocks the UI thread.
+ * Safe to call repeatedly — TanStack deduplicates in-flight requests.
+ */
+export function prefetchDestination(slug: string): void {
+  if (!slug) return;
+  // Destination detail (full row with all language fields)
+  queryClient.prefetchQuery({
+    queryKey: ["railway", "sites", slug],
+    queryFn: () => railwayFetch<TourSiteType>(`/api/sites/${slug}`),
+    staleTime: 5 * 60_000,
+  }).catch(() => {});
+  // Attractions for this destination
+  queryClient.prefetchQuery({
+    queryKey: ["railway", "attractions", slug],
+    queryFn: () => railwayFetch<ApiAttraction[]>(`/api/attractions/${slug}`),
+    staleTime: 60_000,
+  }).catch(() => {});
+}

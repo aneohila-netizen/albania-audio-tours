@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useApp } from "@/App";
-import { useDestinations, useAttractions, useDestinationsLoading } from "@/lib/useApiData";
+import { useDestinations, useAttractions, useDestinationsLoading, prefetchDestination } from "@/lib/useApiData";
 import type { Destination } from "@/lib/staticData";
 import { Search, MapPin, Star, ChevronRight, LayoutGrid, List, Navigation2 } from "lucide-react";
 import { getLangText } from "@/lib/i18n";
@@ -153,6 +153,8 @@ export default function SitesPage() {
                 data-testid={`dest-card-${dest.slug}`}
                 className="tour-card rounded-2xl border border-border bg-card overflow-hidden cursor-pointer group"
                 onClick={() => navigate(`/sites/${dest.slug}`)}
+                onMouseEnter={() => prefetchDestination(dest.slug)}
+                onTouchStart={() => prefetchDestination(dest.slug)}
               >
                 {/* 16:9 hero image — industry standard aspect ratio */}
                 <div className="relative overflow-hidden bg-muted" style={{ aspectRatio: "16/9" }}>
@@ -232,6 +234,8 @@ export default function SitesPage() {
                 key={dest.slug}
                 data-testid={`dest-list-${dest.slug}`}
                 className="tour-card rounded-xl border border-border bg-card overflow-hidden group"
+                onMouseEnter={() => prefetchDestination(dest.slug)}
+                onTouchStart={() => prefetchDestination(dest.slug)}
               >
                 <div className="flex items-stretch">
                   {/* Thumbnail — fixed 96×96 square, standard list-row size */}

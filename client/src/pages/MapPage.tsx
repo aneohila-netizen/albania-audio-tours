@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useApp } from "@/App";
 import type { TourSite } from "@shared/schema";
-import { useDestinations, useAttractions, useDestinationsLoading } from "@/lib/useApiData";
+import { useDestinations, useAttractions, useDestinationsLoading, prefetchDestination } from "@/lib/useApiData";
 import type { Destination, Attraction } from "@/lib/staticData";
 import VisitModal from "@/components/VisitModal";
 import { apiRequest, RAILWAY_URL } from "@/lib/queryClient";
@@ -926,8 +926,10 @@ export default function MapPage() {
   const handleViewDetails = () => {
     if (!selectedPin) return;
     if (selectedPin.type === "destination") {
+      prefetchDestination(selectedPin.data.slug);
       navigate(`/sites/${selectedPin.data.slug}`);
     } else {
+      prefetchDestination(selectedPin.dest.slug);
       navigate(`/sites/${selectedPin.dest.slug}/${selectedPin.data.slug}`);
     }
   };
@@ -1788,6 +1790,8 @@ export default function MapPage() {
                     setDestSearch("");
                     navigate(`/sites/${dest.slug}`);
                   }}
+                  onMouseEnter={() => prefetchDestination(dest.slug)}
+                  onTouchStart={() => prefetchDestination(dest.slug)}
                   className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted/60 transition-colors text-left group"
                 >
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: "#C0392B" }} />
