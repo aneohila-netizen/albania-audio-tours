@@ -918,11 +918,18 @@ export default function MapPage() {
         </div>
       )}
 
-      {/* GPS error toast */}
+      {/* GPS error toast — with recovery guidance for permission-denied */}
       {gpsError && (
-        <div className="absolute top-3 left-3 z-[1001] bg-destructive text-destructive-foreground text-xs rounded-lg px-3 py-2 shadow-md flex items-center gap-2">
-          <span>{gpsError}</span>
-          <button onClick={() => setGpsError(null)} aria-label="Dismiss" className="ml-1 font-bold">✕</button>
+        <div className="absolute top-3 left-3 z-[1001] max-w-xs bg-destructive text-destructive-foreground text-xs rounded-xl px-3 py-2.5 shadow-lg">
+          <div className="flex items-start gap-2">
+            <span className="flex-1 leading-relaxed">{gpsError}</span>
+            <button onClick={() => setGpsError(null)} aria-label="Dismiss" className="font-bold shrink-0 mt-0.5 opacity-80 hover:opacity-100">✕</button>
+          </div>
+          {gpsError.toLowerCase().includes("permission") && (
+            <p className="mt-1.5 opacity-90 leading-relaxed">
+              To fix: open your browser settings, find <strong>Site Permissions → Location</strong>, and allow this site. Then tap <strong>Share Location</strong> again.
+            </p>
+          )}
         </div>
       )}
 

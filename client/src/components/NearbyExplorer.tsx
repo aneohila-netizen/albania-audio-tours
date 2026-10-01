@@ -17,8 +17,9 @@ import {
   BedDouble, Utensils, Sparkles, ShieldAlert, Phone,
   Star, MapPin, ArrowUpDown, ChevronDown, ChevronUp,
   Loader2, AlertCircle, ExternalLink, Navigation2,
-  RefreshCw,
+  RefreshCw, ArrowLeft, Headphones,
 } from "lucide-react";
+import { Link } from "wouter";
 import { RAILWAY_URL } from "@/lib/queryClient";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -186,10 +187,12 @@ interface Props {
   destLat: number;
   destLng: number;
   destName: string;
+  destSlug?: string;      // for back-to-destination link
+  initialOpen?: boolean;  // auto-expand when ?nearby=1 is in the URL
 }
 
-export default function NearbyExplorer({ destLat, destLng, destName }: Props) {
-  const [open, setOpen] = useState(false);
+export default function NearbyExplorer({ destLat, destLng, destName, destSlug, initialOpen = false }: Props) {
+  const [open, setOpen] = useState(initialOpen);
   const [activeCategory, setActiveCategory] = useState<CategoryKey>("hotels");
   const [sort, setSort] = useState<SortKey>("nearest");
   const [showSort, setShowSort] = useState(false);
@@ -282,6 +285,22 @@ export default function NearbyExplorer({ destLat, destLng, destName }: Props) {
       {/* ── Expanded panel ── */}
       {open && (
         <div className="border-t border-border">
+
+          {/* ── Back-to-destination banner — only shown when arrived via ?nearby=1 ── */}
+          {initialOpen && destSlug && (
+            <div className="flex items-center justify-between gap-2 px-3 py-2.5 bg-primary/5 border-b border-primary/20">
+              <Link href={`/sites/${destSlug}`}>
+                <a className="flex items-center gap-2 text-xs font-semibold text-primary hover:underline">
+                  <ArrowLeft size={13} /> Back to {destName}
+                </a>
+              </Link>
+              <Link href={`/sites/${destSlug}`}>
+                <a className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors">
+                  <Headphones size={12} /> View Audio Tours
+                </a>
+              </Link>
+            </div>
+          )}
 
           {/* Google API not configured — admin notice */}
           {!configured && (

@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useApp } from "@/App";
 import { useDestinations, useAttractions, useDestinationsLoading } from "@/lib/useApiData";
 import type { Destination } from "@/lib/staticData";
-import { Search, MapPin, Star, ChevronRight, LayoutGrid, List } from "lucide-react";
+import { Search, MapPin, Star, ChevronRight, LayoutGrid, List, Navigation2 } from "lucide-react";
 import { getLangText } from "@/lib/i18n";
 import BackToTop from "@/components/BackToTop";
 
@@ -291,12 +291,23 @@ export default function SitesPage() {
                           <span>📍 {attrCount} places</span>
                         )}
                       </div>
-                      <span
-                        className="flex items-center gap-1 text-xs font-semibold text-primary whitespace-nowrap cursor-pointer"
-                        onClick={() => navigate(`/sites/${dest.slug}`)}
-                      >
-                        Explore <ChevronRight size={13} />
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className="flex items-center gap-1 text-xs font-semibold text-primary whitespace-nowrap cursor-pointer"
+                          onClick={() => navigate(`/sites/${dest.slug}`)}
+                        >
+                          Explore <ChevronRight size={13} />
+                        </span>
+                        <button
+                          type="button"
+                          title="Explore Nearby — hotels, restaurants & more"
+                          onClick={e => { e.stopPropagation(); navigate(`/sites/${dest.slug}?nearby=1`); }}
+                          className="flex items-center justify-center w-6 h-6 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+                          aria-label="Explore Nearby"
+                        >
+                          <Navigation2 size={12} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

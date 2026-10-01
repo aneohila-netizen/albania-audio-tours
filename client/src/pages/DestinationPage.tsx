@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useApp } from "@/App";
 import { useQuery } from "@tanstack/react-query";
@@ -46,11 +46,24 @@ export default function DestinationPage() {
   const { lang, visitedSiteIds } = useApp();
   const { sub } = useSubscription();
   const [globalLocked, setGlobalLocked] = useState<boolean | null>(null);
+  const nearbyRef = useRef<HTMLDivElement>(null);
 
-  // Mirror the same paywall state used by the audio tour PaywallGate
+  // Detect ?nearby=1 in the hash query string (hash routing: /#/sites/berat?nearby=1)
+  const nearbyParam = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("nearby") === "1"
+    : false;
+
+  // Re-fetch paywall state on every mount — 60s TTL in PaywallGate handles dedup
   useEffect(() => {
     getGlobalPaywallActive().then(setGlobalLocked);
   }, []);
+
+  // Auto-scroll to Explore Nearby section when ?nearby=1
+  useEffect(() => {
+    if (nearbyParam && nearbyRef.current) {
+      setTimeout(() => nearbyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
+    }
+  }, [nearbyParam]);
 
   // Fetch destination directly from Railway (bypasses Perplexity proxy)
   const { data: dest, isLoading: destLoading } = useQuery<TourSite>({
@@ -113,11 +126,18 @@ export default function DestinationPage() {
         interval={5000}
         
       >
-        {/* Overlay: title only — tagline removed to keep hero image clean */}
-        <div className="absolute bottom-0 left-0 right-0 p-5 pointer-events-none">
-          <h1 className="text-3xl font-bold text-white leading-tight drop-shadow-lg" style={{ fontFamily: "var(--font-display)" }}>
+        {/* Overlay: title + Explore Nearby button */}
+        <div className="absolute bottom-0 left-0 right-0 p-5 flex items-end justify-between gap-3">
+          <h1 className="text-3xl font-bold text-white leading-tight drop-shadow-lg pointer-events-none" style={{ fontFamily: "var(--font-display)" }}>
             {name}
           </h1>
+          <button
+            type="button"
+            onClick={() => nearbyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/20 backdrop-blur-sm border border-white/30 text-white text-xs font-semibold hover:bg-white/30 transition-colors shrink-0 pointer-events-auto"
+          >
+            <Navigation2 size={13} /> Explore Nearby
+          </button>
         </div>
         <div className="absolute top-3 right-3 flex flex-col gap-1.5 items-end pointer-events-none">
           {totalAttrPoints > 0 && (
@@ -150,8 +170,17 @@ export default function DestinationPage() {
         </div>
       )}
 
-      {/* Visitor rating average */}
-      <StarRatingDisplay siteSlug={dest.slug} />
+      {/* Visitor rating + Explore Nearby shortcut in the same row */}
+      <div className="flex items-center justify-between gap-3">
+        <StarRatingDisplay siteSlug={dest.slug} />
+        <button
+          type="button"
+          onClick={() => nearbyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-primary/30 bg-primary/5 text-primary text-xs font-semibold hover:bg-primary/10 transition-colors shrink-0"
+        >
+          <Navigation2 size={13} /> Explore Nearby
+        </button>
+      </div>
 
       {/* Audio Guide (premium) — gated behind subscription */}
       <PaywallGate
@@ -188,9 +217,16 @@ export default function DestinationPage() {
 
       {/* ── Explore Nearby — gated by the same admin paywall switch as the audio tour ── */}
       {/* effectiveLocked mirrors PaywallGate: locked when globalLocked=true AND not subscribed */}
+      <div ref={nearbyRef} className="scroll-mt-4">
       {(sub.checking || globalLocked === null) ? null : (!(globalLocked) || sub.active) ? (
         /* Paywall OFF or subscriber — show live feature */
-        <NearbyExplorer destLat={dest.lat} destLng={dest.lng} destName={name} />
+        <NearbyExplorer
+          destLat={dest.lat}
+          destLng={dest.lng}
+          destName={name}
+          destSlug={dest.slug}
+          initialOpen={nearbyParam}
+        />
       ) : (
         /* Non-subscriber — teaser card with locked overlay */
         <div className="relative rounded-2xl border border-border overflow-hidden">
@@ -244,6 +280,7 @@ export default function DestinationPage() {
           </div>
         </div>
       )}
+      </div>
 
       {/* Book with a guide */}
       <BookWithGuide shopifyUrl={(dest as any).shopifyUrl || ""} siteName={name} />

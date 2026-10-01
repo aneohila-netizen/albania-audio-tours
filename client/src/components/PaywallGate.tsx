@@ -23,50 +23,55 @@ interface PaywallGateProps {
   children: React.ReactNode;
 }
 
-// Fetch the global paywall state once per session and cache it
+// Fetch the global paywall state — cached with a 60-second TTL so admin
+// changes take effect within one minute without requiring a full page refresh.
 let _globalPaywallCache: boolean | null = null;
+let _globalPaywallCacheAt: number = 0;
+const PAYWALL_CACHE_TTL_MS = 60_000; // 60 seconds
 let _globalPaywallFetching: Promise<boolean> | null = null;
 
-async function getGlobalPaywallActive(): Promise<boolean> {
-  if (_globalPaywallCache !== null) return _globalPaywallCache;
-  if (_globalPaywallFetching) return _globalPaywallFetching;
-
-  _globalPaywallFetching = (async () => {
-    try {
-      const [pwRes, fuRes] = await Promise.all([
-        fetch(`${RAILWAY_URL}/api/settings/paywall_active`),
-        fetch(`${RAILWAY_URL}/api/settings/free_until`),
-      ]);
-      const pw = await pwRes.json();
-      const fu = await fuRes.json();
-
-      // Check free_until: if set and in the future, content is still free
-      if (fu.value) {
-        const freeUntilDate = new Date(fu.value);
-        if (!isNaN(freeUntilDate.getTime()) && freeUntilDate > new Date()) {
-          _globalPaywallCache = false;
-          return false;
-        }
-        // free_until is in the past → treat as locked (paywall effective)
-        _globalPaywallCache = true;
-        return true;
+async function fetchPaywallState(): Promise<boolean> {
+  try {
+    const [pwRes, fuRes] = await Promise.all([
+      fetch(`${RAILWAY_URL}/api/settings/paywall_active`),
+      fetch(`${RAILWAY_URL}/api/settings/free_until`),
+    ]);
+    const pw = await pwRes.json();
+    const fu = await fuRes.json();
+    if (fu.value) {
+      const freeUntilDate = new Date(fu.value);
+      if (!isNaN(freeUntilDate.getTime()) && freeUntilDate > new Date()) {
+        return false;
       }
-
-      _globalPaywallCache = pw.value === "true";
-      return _globalPaywallCache;
-    } catch {
-      // Fail open: if we can't reach the server, don't block content
-      _globalPaywallCache = false;
-      return false;
+      return true;
     }
-  })();
+    return pw.value === "true";
+  } catch {
+    return false; // fail open
+  }
+}
 
+export async function getGlobalPaywallActive(): Promise<boolean> {
+  const now = Date.now();
+  // Return cached value if still fresh
+  if (_globalPaywallCache !== null && now - _globalPaywallCacheAt < PAYWALL_CACHE_TTL_MS) {
+    return _globalPaywallCache;
+  }
+  // Deduplicate concurrent calls
+  if (_globalPaywallFetching) return _globalPaywallFetching;
+  _globalPaywallFetching = fetchPaywallState().then(result => {
+    _globalPaywallCache = result;
+    _globalPaywallCacheAt = Date.now();
+    _globalPaywallFetching = null;
+    return result;
+  });
   return _globalPaywallFetching;
 }
 
 // Invalidate the global cache when admin changes settings
 export function invalidatePaywallCache() {
   _globalPaywallCache = null;
+  _globalPaywallCacheAt = 0;
   _globalPaywallFetching = null;
 }
 
