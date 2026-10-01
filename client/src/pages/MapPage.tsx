@@ -7,7 +7,7 @@ import type { Destination, Attraction } from "@/lib/staticData";
 import VisitModal from "@/components/VisitModal";
 import { apiRequest, RAILWAY_URL } from "@/lib/queryClient";
 import { getSessionId } from "@/lib/session";
-import { MapPin, X, Layers, Locate, LocateFixed, Headphones, ChevronRight, ArrowRight, Search } from "lucide-react";
+import { MapPin, X, Layers, Locate, LocateFixed, Headphones, ChevronRight, ArrowRight, Search, Navigation } from "lucide-react";
 // Leaflet marker cluster — groups overlapping pins into numbered bubbles
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
@@ -201,6 +201,8 @@ export default function MapPage() {
   // ── Nearest tour (API-driven, includes all future tours) ─────────
   // { slug: destinationSlug, name: tour name, distM: distance in metres }
   const [nearestTour, setNearestTour] = useState<{ slug: string; name: string; distM: number } | null>(null);
+  const [showNearestBanner, setShowNearestBanner] = useState(false);
+  const nearestBannerShownRef = useRef(false); // show only once per session
   // All published itineraries fetched once on mount — auto-updates when tours are added
   const [allItineraries, setAllItineraries] = useState<Array<{ siteSlug: string; name: string }>>([]);
   const blueDotRef = useRef<any>(null); // Leaflet circle marker for user location
@@ -668,6 +670,13 @@ export default function MapPage() {
         }
         if (bestSlug) {
           setNearestTour({ slug: bestSlug, name: bestName, distM: bestDist });
+          // Show nearest-destination banner once per session on first GPS fix
+          if (!nearestBannerShownRef.current) {
+            nearestBannerShownRef.current = true;
+            setShowNearestBanner(true);
+            // Auto-dismiss after 12 seconds if user doesn't act
+            setTimeout(() => setShowNearestBanner(false), 12000);
+          }
         }
       }
 
@@ -738,9 +747,18 @@ export default function MapPage() {
     //           Google Maps fallback so the user is never left stuck.
     navigator.geolocation.getCurrentPosition(
       () => {
-        // Permission granted — hand off to the watchPosition useEffect
+        // Permission granted — clear any stale error, hand off to watchPosition
+        setGpsError(null);
         userPannedRef.current = false;
         setAutoCenter(true);
+        // Kick the map to correct size in case it rendered at 0px height
+        // (happens when the user comes from an external link / fresh tab)
+        setTimeout(() => {
+          if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
+        }, 300);
+        setTimeout(() => {
+          if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
+        }, 800);
       },
       (err) => {
         if (err.code === 1) {
@@ -1003,6 +1021,39 @@ export default function MapPage() {
               </button>
             </>
           )}
+        </div>
+      )}
+
+      {/* Nearest destination banner — appears once on first GPS fix */}
+      {showNearestBanner && nearestTour && (
+        <div className="absolute bottom-6 left-3 right-3 z-[1003] animate-in slide-in-from-bottom-4">
+          <div className="bg-primary text-primary-foreground rounded-2xl shadow-2xl p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+              <Navigation size={18} className="text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold opacity-80">Nearest destination</p>
+              <p className="text-sm font-bold truncate">{nearestTour.name.split("—")[0].trim()}</p>
+              {nearestTour.distM < 999999 && (
+                <p className="text-xs opacity-75">{nearestTour.distM < 1000 ? `${Math.round(nearestTour.distM)} m away` : `${(nearestTour.distM / 1000).toFixed(1)} km away`}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => { setShowNearestBanner(false); navigate(`/sites/${nearestTour.slug}`); }}
+                className="px-3 py-2 rounded-xl bg-white text-primary text-xs font-bold hover:bg-white/90 transition-colors"
+              >
+                Open
+              </button>
+              <button
+                onClick={() => setShowNearestBanner(false)}
+                className="p-1.5 rounded-full hover:bg-white/20 transition-colors"
+                aria-label="Dismiss"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

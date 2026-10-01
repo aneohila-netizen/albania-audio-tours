@@ -386,6 +386,10 @@ function isResolvableMapsUrl(url: URL): boolean {
 // instead of silently pointing back at Railway.
 const RAILWAY_BASE = process.env.PUBLIC_BASE_URL || "https://albania-audio-tours-production.up.railway.app";
 
+// FRONTEND_URL: user-facing domain for email links. Always albaniaaudiotours.com.
+// Override with FRONTEND_URL env var if the domain changes.
+const FRONTEND_URL = process.env.FRONTEND_URL || "https://albaniaaudiotours.com";
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "AlbaTour2026!";
 const ADMIN_TOKEN = "albatour-admin-secret-token"; // simple shared token
@@ -2654,10 +2658,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const RESEND_FROM_ADDR = process.env.RESEND_FROM || 'noreply@albanianeagletours.com';
       let emailSent = false;
       if (RESEND_API_KEY) {
-        const activateUrl = `https://albania-audio-tours-production.up.railway.app/#/activate?order_id=${orderId}&email=${encodeURIComponent(email.toLowerCase())}`;
+        const activateUrl = `${FRONTEND_URL}/#/activate?order_id=${orderId}&email=${encodeURIComponent(email.toLowerCase())}`;
         const expiryStr = expiresAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
         const startStr  = startsAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-        const qrUrl = `https://albania-audio-tours-production.up.railway.app/api/qr?data=${encodeURIComponent(activateUrl)}`;
+        const qrUrl = `${RAILWAY_BASE}/api/qr?data=${encodeURIComponent(activateUrl)}`;
         const deviceNote = deviceLimit > 1
           ? `Share this code with up to <strong>${deviceLimit - 1}</strong> travel companion${deviceLimit > 2 ? 's' : ''} — each opens the app and enters the same code.`
           : 'This code activates on 1 device.';
@@ -2775,10 +2779,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const RESEND_FROM_ADDR = process.env.RESEND_FROM || 'noreply@albanianeagletours.com';
       let emailSent = false;
       if (RESEND_API_KEY) {
-        const activateUrl = `https://albania-audio-tours-production.up.railway.app/#/activate?order_id=${orderId}&email=${encodeURIComponent(email.toLowerCase())}`;
+        const activateUrl = `${FRONTEND_URL}/#/activate?order_id=${orderId}&email=${encodeURIComponent(email.toLowerCase())}`;
         const startStr  = startsAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
         const expiryStr = expiresAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-        const qrUrl = `https://albania-audio-tours-production.up.railway.app/api/qr?data=${encodeURIComponent(activateUrl)}`;
+        const qrUrl = `${RAILWAY_BASE}/api/qr?data=${encodeURIComponent(activateUrl)}`;
         const isPending = startsAt > new Date();
         const deviceNote = deviceLimit > 1
           ? `Share this code with up to <strong>${deviceLimit - 1}</strong> travel companion${deviceLimit > 2 ? 's' : ''} — each opens the app and enters the same code.`
