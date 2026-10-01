@@ -706,12 +706,34 @@ export default function MapPage() {
     };
 
     const onGpsError = (err: GeolocationPositionError) => {
-      setGpsError(err.code === 1 ? "Location permission denied." : "Unable to get your location.");
-      setAutoCenter(false);
+      // Use the same structured error codes as toggleAutoCenter for consistent UI
+      if (err.code === 1) {
+        setGpsError("permission_denied");
+      } else if (err.code === 2) {
+        // POSITION_UNAVAILABLE with high accuracy — retry once with low accuracy
+        // before showing an error. This is the common mobile fallback path.
+        if (watchIdRef.current !== null) {
+          navigator.geolocation.clearWatch(watchIdRef.current);
+          watchIdRef.current = null;
+        }
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          updateDot,
+          (err2) => {
+            setGpsError(err2.code === 1 ? "permission_denied" : "position_unavailable");
+            setAutoCenter(false);
+          },
+          { enableHighAccuracy: false, maximumAge: 10000, timeout: 15000 }
+        );
+        return; // don't setAutoCenter(false) yet — low-acc retry is still running
+      } else {
+        setGpsError("timeout");
+        setAutoCenter(false);
+      }
     };
 
+    // Start with high accuracy; onGpsError retries with low accuracy on failure
     watchIdRef.current = navigator.geolocation.watchPosition(updateDot, onGpsError, {
-      enableHighAccuracy: true, maximumAge: 5000, timeout: 10000,
+      enableHighAccuracy: true, maximumAge: 5000, timeout: 12000,
     });
 
     return () => {
