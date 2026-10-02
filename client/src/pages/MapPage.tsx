@@ -17,6 +17,7 @@ import { getLangText } from "@/lib/i18n";
 import MobileDrawer from "@/components/MobileDrawer";
 import AnimatedQuickGuide from "@/components/AnimatedQuickGuide";
 import AppLoadingScreen from "@/components/AppLoadingScreen";
+import NearestFlowOverlay from "@/components/NearestFlowOverlay";
 import { getStreetTiles, loadCartoBasemapKey } from "@/lib/cartoBasemap";
 
 type LeafletLib = any;
@@ -140,6 +141,7 @@ export default function MapPage() {
   // 10-second idle popup — shown once per session, dismissed permanently on close
   const [showExplorePopup, setShowExplorePopup] = useState(false);
   const [popupDismissed, setPopupDismissed] = useState(false);
+  const [nearestFlow, setNearestFlow] = useState(false); // "Show Me What's Nearby" overlay
   const [showBridgeLoading, setShowBridgeLoading] = useState(false); // "Loading..." between guide and Explore popup
 
   // ── Loading screen ─────────────────────────────────────────────────────────
@@ -974,6 +976,24 @@ export default function MapPage() {
     <div ref={mapWrapperRef} className="relative flex-1 min-h-0"
       style={{ height: mapHeight > 0 ? `${mapHeight}px` : 'calc(100svh - 114px)' }}>
 
+      {/* ── "Show Me What's Nearby" flow: locate → nearest destination → Explore Nearby ── */}
+      {nearestFlow && (
+        <NearestFlowOverlay
+          destinations={DESTINATIONS}
+          destName={(slug) => {
+            const d = DESTINATIONS.find(x => x.slug === slug);
+            return d ? destName(d) : slug;
+          }}
+          onNavigate={(path) => { setNearestFlow(false); navigate(path); }}
+          onCancel={() => setNearestFlow(false)}
+          onChooseDestination={() => {
+            setNearestFlow(false);
+            setLayerMode("destinations");
+            setShowDestPanel(true);
+          }}
+        />
+      )}
+
       {/* ── Loading screen — first-visit only, dismissed when destinations ready ── */}
       {showLoadingScreen && (
         <AppLoadingScreen onDone={() => setShowLoadingScreen(false)} />
@@ -1218,7 +1238,7 @@ export default function MapPage() {
                 onClick={() => {
                   setShowExplorePopup(false);
                   setPopupDismissed(true);
-                  setAutoCenter(true); // triggers the existing GPS flow
+                  setNearestFlow(true); // locate → nearest destination → Explore Nearby (NearestFlowOverlay)
                 }}
                 className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2"
                 style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
@@ -1229,7 +1249,7 @@ export default function MapPage() {
 
               {/* Privacy note */}
               <p className="text-[10px] text-muted-foreground/70 text-center mt-2.5 leading-relaxed">
-                Your location is used only to find nearby tours and is never stored or shared.
+                Your location is used only to find nearby places. It stays on your device for this visit.
               </p>
             </div>
           </div>

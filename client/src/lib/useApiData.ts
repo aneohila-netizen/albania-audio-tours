@@ -122,18 +122,19 @@ import type { TourSite as TourSiteType } from "@shared/schema";
  * Silent: never throws, never blocks the UI thread.
  * Safe to call repeatedly — TanStack deduplicates in-flight requests.
  */
-export function prefetchDestination(slug: string): void {
-  if (!slug) return;
-  // Destination detail (full row with all language fields)
-  queryClient.prefetchQuery({
-    queryKey: ["railway", "sites", slug],
-    queryFn: () => railwayFetch<TourSiteType>(`/api/sites/${slug}`),
-    staleTime: 5 * 60_000,
-  }).catch(() => {});
-  // Attractions for this destination
-  queryClient.prefetchQuery({
-    queryKey: ["railway", "attractions", slug],
-    queryFn: () => railwayFetch<ApiAttraction[]>(`/api/attractions/${slug}`),
-    staleTime: 60_000,
-  }).catch(() => {});
+export function prefetchDestination(slug: string): Promise<void> {
+  if (!slug) return Promise.resolve();
+  // Destination detail (full row with all language fields) + attractions, in parallel.
+  return Promise.allSettled([
+    queryClient.prefetchQuery({
+      queryKey: ["railway", "sites", slug],
+      queryFn: () => railwayFetch<TourSiteType>(`/api/sites/${slug}`),
+      staleTime: 5 * 60_000,
+    }),
+    queryClient.prefetchQuery({
+      queryKey: ["railway", "attractions", slug],
+      queryFn: () => railwayFetch<ApiAttraction[]>(`/api/attractions/${slug}`),
+      staleTime: 60_000,
+    }),
+  ]).then(() => undefined);
 }
