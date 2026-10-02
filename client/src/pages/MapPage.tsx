@@ -244,7 +244,7 @@ export default function MapPage() {
   useEffect(() => {
     if (!nearestTour || !DESTINATIONS.length) return;
     const dest = DESTINATIONS.find(d => d.slug === nearestTour.slug);
-    if (!dest) return;
+    if (!dest || dest.id == null) return; // no database id → no audio URL to preload
     // Use /api/audio/serve endpoint — same as handlePlayFromPin and AudioPlayer.
     // audioUrl* fields are stripped from API responses so we build the URL directly.
     const audioUrl = `${RAILWAY_URL}/api/audio/serve/site/${dest.id}/${lang}`;
@@ -959,7 +959,7 @@ export default function MapPage() {
 
     setSelectedPin(null); // close popup before loadTrack so player renders cleanly
     loadTrack({
-      siteId: data.id,
+      siteId: data.id as number, // set for API-loaded destinations and attractions
       siteSlug: data.slug,
       siteName,
       lang,

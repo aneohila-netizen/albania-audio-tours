@@ -18,6 +18,7 @@ function siteToDestination(s: TourSite): Destination {
     text ? text.split(/[.!?]/)[0].trim() : "";
 
   return {
+    id: s.id,
     slug: s.slug,
     nameEn: s.nameEn || "",
     nameAl: s.nameAl || s.nameEn || "",

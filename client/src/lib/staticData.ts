@@ -24,6 +24,7 @@ export interface Attraction {
 }
 
 export interface Destination {
+  id?: number; // database id (set for API-loaded destinations; needed for /api/audio/serve/site/:id/:lang)
   slug: string;
   nameEn: string;
   nameAl: string;
