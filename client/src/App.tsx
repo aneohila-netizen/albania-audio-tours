@@ -21,6 +21,7 @@ import RatingSheet from "@/components/RatingSheet";
 import type { AudioTrack } from "@/components/StickyAudioPlayer";
 import NavBar from "@/components/NavBar";
 import LaunchBanner from "@/components/LaunchBanner";
+import { RouteLoadingFallback } from "@/components/PageLoading";
 
 // Map page loads eagerly — it’s the homepage
 import MapPage from "@/pages/MapPage";
@@ -258,11 +259,7 @@ function AppRoutes() {
   return (
     <Router hook={useHashLocation}>
       <AudioPlayerProvider onComplete={handleAudioComplete} onNavigate={handleNavigate}>
-        <Suspense fallback={
-          <div className="flex items-center justify-center min-h-screen bg-background">
-            <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-          </div>
-        }>
+        <Suspense fallback={<RouteLoadingFallback />}>
         <Switch>
           {/* Admin */}
           <Route path="/admin" component={AdminPanel} />

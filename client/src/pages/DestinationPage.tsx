@@ -13,6 +13,7 @@ import ItineraryCard from "@/components/ItineraryCard";
 import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb, Navigation, LayoutGrid, List, Navigation2, Lock } from "lucide-react";
 import GallerySlideshow from "@/components/GallerySlideshow";
 import { Skeleton } from "@/components/ui/skeleton";
+import PageLoading from "@/components/PageLoading";
 import { getLangText } from "@/lib/i18n";
 import BackToTop from "@/components/BackToTop";
 import NearbyExplorer from "@/components/NearbyExplorer";
@@ -102,6 +103,7 @@ export default function DestinationPage() {
   if (destLoading || attrsLoading) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+        <PageLoading label="Loading destination" inline delayMs={0} />
         <Skeleton className="h-6 w-32" />
         <Skeleton className="h-64 w-full rounded-2xl" />
         <Skeleton className="h-32 w-full" />

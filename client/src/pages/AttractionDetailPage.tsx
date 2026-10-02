@@ -16,6 +16,7 @@ import { Clock, Star, Lightbulb, Navigation, ChevronRight, MapPin } from "lucide
 import { apiRequest } from "@/lib/queryClient";
 import { getSessionId } from "@/lib/session";
 import { Skeleton } from "@/components/ui/skeleton";
+import PageLoading from "@/components/PageLoading";
 import { getLangText } from "@/lib/i18n";
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -73,6 +74,7 @@ export default function AttractionDetailPage() {
   if (isLoading) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+        <PageLoading label="Loading attraction" inline delayMs={0} />
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-64 w-full rounded-2xl" />
         <Skeleton className="h-8 w-64" />
