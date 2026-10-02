@@ -57,3 +57,45 @@ export function formatKm(distM: number): string {
 
 /** Destinations farther than this from the device trigger the "far away" confirmation. */
 export const FAR_THRESHOLD_M = 100_000;
+
+// ─── "Open Explore Nearby on arrival" intent ──────────────────────────────────
+// wouter's hash navigate() moves "?query" outside the "#" and leaves it in the
+// URL for every later navigation, so a query flag would stick. Instead the flow
+// leaves a one-shot flag for the target destination; the destination page reads
+// it once on arrival and clears it. The URL form (?nearby=1, either in the hash
+// or before it) is still honoured for direct links and cleaned after use.
+const INTENT_KEY = "alb_open_nearby";
+
+export function setNearbyIntent(slug: string): void {
+  try { sessionStorage.setItem(INTENT_KEY, slug); } catch {}
+}
+
+export function peekNearbyIntent(slug?: string): boolean {
+  if (!slug || typeof window === "undefined") return false;
+  try { if (sessionStorage.getItem(INTENT_KEY) === slug) return true; } catch {}
+  try {
+    const fromSearch = new URLSearchParams(window.location.search).get("nearby") === "1";
+    const fromHash = new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("nearby") === "1";
+    return fromSearch || fromHash;
+  } catch { return false; }
+}
+
+/** Remove the flag and any ?nearby=1 from the address bar (keeps the #route). */
+export function clearNearbyIntent(): void {
+  try { sessionStorage.removeItem(INTENT_KEY); } catch {}
+  try {
+    const url = new URL(window.location.href);
+    let changed = false;
+    if (url.searchParams.get("nearby") === "1") { url.searchParams.delete("nearby"); changed = true; }
+    const [h, q] = url.hash.split("?");
+    if (q) {
+      const sp = new URLSearchParams(q);
+      if (sp.get("nearby") === "1") {
+        sp.delete("nearby");
+        url.hash = sp.toString() ? `${h}?${sp.toString()}` : h;
+        changed = true;
+      }
+    }
+    if (changed) history.replaceState(history.state, "", url.href);
+  } catch {}
+}

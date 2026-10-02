@@ -14,6 +14,7 @@ import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb, Navigation, La
 import GallerySlideshow from "@/components/GallerySlideshow";
 import { Skeleton } from "@/components/ui/skeleton";
 import PageLoading from "@/components/PageLoading";
+import { peekNearbyIntent, clearNearbyIntent } from "@/lib/nearestDestination";
 import { getLangText } from "@/lib/i18n";
 import BackToTop from "@/components/BackToTop";
 import NearbyExplorer from "@/components/NearbyExplorer";
@@ -49,22 +50,24 @@ export default function DestinationPage() {
   const [globalLocked, setGlobalLocked] = useState<boolean | null>(null);
   const nearbyRef = useRef<HTMLDivElement>(null);
 
-  // Detect ?nearby=1 in the hash query string (hash routing: /#/sites/berat?nearby=1)
-  const nearbyParam = typeof window !== "undefined"
-    ? new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("nearby") === "1"
-    : false;
+  // "Open Explore Nearby on arrival": set by the Show Me What's Nearby flow (one-shot flag)
+  // or by a ?nearby=1 link. Captured once per destination, then cleared so it never sticks.
+  const intentRef = useRef<{ slug?: string; open: boolean }>({ open: false });
+  if (intentRef.current.slug !== params?.dest) {
+    intentRef.current = { slug: params?.dest, open: peekNearbyIntent(params?.dest) };
+  }
+  const nearbyParam = intentRef.current.open;
+  const nearbyScrolledRef = useRef(false);
+
+  useEffect(() => {
+    nearbyScrolledRef.current = false;
+    if (nearbyParam) clearNearbyIntent();
+  }, [params?.dest]);
 
   // Re-fetch paywall state on every mount — 60s TTL in PaywallGate handles dedup
   useEffect(() => {
     getGlobalPaywallActive().then(setGlobalLocked);
   }, []);
-
-  // Auto-scroll to Explore Nearby section when ?nearby=1
-  useEffect(() => {
-    if (nearbyParam && nearbyRef.current) {
-      setTimeout(() => nearbyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
-    }
-  }, [nearbyParam]);
 
   // ── Audio prefetch (Change 4) ───────────────────────────────────────────────────
   // Fetch destination directly from Railway (bypasses Perplexity proxy)
@@ -99,6 +102,16 @@ export default function DestinationPage() {
     document.head.appendChild(link);
     return () => { try { document.head.removeChild(link); } catch {} };
   }, [dest?.id, globalLocked, sub.active]);
+
+  // Scroll to the Explore Nearby block once the page content exists (works for cached
+  // and uncached loads — the block's wrapper only exists after the data has arrived).
+  useEffect(() => {
+    if (!nearbyParam || nearbyScrolledRef.current) return;
+    if (destLoading || attrsLoading || !dest || !nearbyRef.current) return;
+    nearbyScrolledRef.current = true;
+    const t = setTimeout(() => nearbyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
+    return () => clearTimeout(t);
+  }, [nearbyParam, destLoading, attrsLoading, dest?.id]);
 
   if (destLoading || attrsLoading) {
     return (
@@ -243,6 +256,7 @@ export default function DestinationPage() {
       {(sub.checking || globalLocked === null) ? null : (!(globalLocked) || sub.active) ? (
         /* Paywall OFF or subscriber — show live feature */
         <NearbyExplorer
+          key={dest.slug}
           destLat={dest.lat}
           destLng={dest.lng}
           destName={name}

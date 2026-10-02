@@ -5,7 +5,7 @@
  *  2. Find the nearest destination among ALL destinations that have coordinates
  *  3. If the device is farther than FAR_THRESHOLD_M from every destination, ask first
  *  4. Show "loading maps, hotels, restaurants, things to do…", warm the destination
- *     data, then open /sites/<slug>?nearby=1 (Explore Nearby expanded + scrolled)
+ *     data, then open /sites/<slug> with Explore Nearby expanded + scrolled (one-shot intent)
  *
  * Every stage has a Cancel link. A denied/unavailable location offers retry,
  * "choose a destination instead", and a Google Maps fallback.
@@ -18,6 +18,7 @@ import {
   findNearestDestination,
   formatKm,
   saveUserPosition,
+  setNearbyIntent,
   type LatLng,
 } from "@/lib/nearestDestination";
 
@@ -122,7 +123,8 @@ export default function NearestFlowOverlay({
       sleep(MAX_PREFETCH_MS),
     ]);
     if (cancelled.current) return;
-    onNavigate(`/sites/${slug}?nearby=1`);
+    setNearbyIntent(slug); // destination page opens Explore Nearby once, then clears this
+    onNavigate(`/sites/${slug}`);
   }
 
   const stepIndex = stage === "locating" ? 0 : stage === "finding" || stage === "far" ? 1 : 2;
