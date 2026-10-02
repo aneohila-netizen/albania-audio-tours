@@ -109,8 +109,18 @@ export default function DestinationPage() {
     if (!nearbyParam || nearbyScrolledRef.current) return;
     if (destLoading || attrsLoading || !dest || !nearbyRef.current) return;
     nearbyScrolledRef.current = true;
-    const t = setTimeout(() => nearbyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
-    return () => clearTimeout(t);
+    // Maps and images above the block finish loading after the first scroll and push it
+    // down, so scroll again as the layout settles — unless the user has taken over.
+    let userTookOver = false;
+    const stop = () => { userTookOver = true; };
+    const evts = ["wheel", "touchstart", "keydown", "mousedown"];
+    evts.forEach(e => window.addEventListener(e, stop, { passive: true, once: true }));
+    const go = () => { if (!userTookOver) nearbyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); };
+    const timers = [400, 1600, 3200].map(ms => setTimeout(go, ms));
+    return () => {
+      timers.forEach(clearTimeout);
+      evts.forEach(e => window.removeEventListener(e, stop));
+    };
   }, [nearbyParam, destLoading, attrsLoading, dest?.id]);
 
   if (destLoading || attrsLoading) {

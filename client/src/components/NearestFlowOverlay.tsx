@@ -13,6 +13,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, MapPin, X } from "lucide-react";
 import { prefetchDestination } from "@/lib/useApiData";
+import { getNearby } from "@/lib/nearbyCache";
+import { getGlobalPaywallActive } from "@/components/PaywallGate";
 import {
   FAR_THRESHOLD_M,
   findNearestDestination,
@@ -118,8 +120,16 @@ export default function NearestFlowOverlay({
     if (started.current) return;
     started.current = true;
     setStage("loading");
+    const d = destinations.find(x => x.slug === slug);
+    // Warm the default Explore Nearby tab (hotels) only when the feature is free for
+    // everyone; with the paywall on we skip it so non-subscribers never trigger Places calls.
+    const warmNearby = async () => {
+      try {
+        if (d && (await getGlobalPaywallActive()) === false) await getNearby(d.lat, d.lng, "lodging");
+      } catch {}
+    };
     await Promise.race([
-      Promise.all([prefetchDestination(slug), sleep(MIN_STEP_MS * 1.5)]),
+      Promise.all([prefetchDestination(slug), warmNearby(), sleep(MIN_STEP_MS * 1.5)]),
       sleep(MAX_PREFETCH_MS),
     ]);
     if (cancelled.current) return;

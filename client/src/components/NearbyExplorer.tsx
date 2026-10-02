@@ -12,7 +12,7 @@
  * Filter: distance haversine-calculated client-side from destination coords.
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   BedDouble, Utensils, Sparkles, ShieldAlert, Phone,
   Star, MapPin, ArrowUpDown, ChevronDown, ChevronUp,
@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { RAILWAY_URL } from "@/lib/queryClient";
+import { getNearby } from "@/lib/nearbyCache";
+import { getSavedUserPosition, saveUserPosition, FAR_THRESHOLD_M, type LatLng } from "@/lib/nearestDestination";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -212,33 +214,22 @@ export default function NearbyExplorer({ destLat, destLng, destName, destSlug, i
     return () => document.removeEventListener("mousedown", handler);
   }, [showSort]);
 
-  const fetchCategory = useCallback(async (cat: CategoryKey) => {
+  const fetchCategory = useCallback(async (cat: CategoryKey, force = false) => {
     if (cat === "emergency") return; // static data, no fetch
     const catConfig = CATEGORIES.find(c => c.key === cat);
     if (!catConfig) return;
     setLoading(true);
     setError(null);
     try {
-      const r = await fetch(`${RAILWAY_URL}/api/nearby`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lat: destLat, lng: destLng, type: catConfig.type }),
-      });
-      const data: NearbyResponse = await r.json();
+      const data: NearbyResponse = await getNearby<NearbyResponse>(destLat, destLng, catConfig.type, force);
       setConfigured(data.configured ?? true);
       if (data.error && data.configured) {
         setError(data.error);
         setResults([]);
         return;
       }
-      // Compute distance from destination for each result
-      const withDist = (data.results || []).map(p => ({
-        ...p,
-        distanceM: (p.lat !== null && p.lng !== null)
-          ? haversineM(destLat, destLng, p.lat, p.lng)
-          : undefined,
-      }));
-      setResults(withDist);
+      // Raw results; distances are derived below from the chosen reference point
+      setResults(data.results || []);
     } catch {
       setError("Connection error. Please try again.");
       setResults([]);
@@ -253,8 +244,71 @@ export default function NearbyExplorer({ destLat, destLng, destName, destSlug, i
     fetchCategory(activeCategory);
   }, [open, activeCategory, fetchCategory]);
 
+  // ── Distance reference ──────────────────────────────────────────────────────
+  // Results are always for the DESTINATION. Distances are measured from the device
+  // when its location is shared (and it is within 100 km of the destination);
+  // otherwise from the destination centre.
+  const [userPos, setUserPos] = useState<LatLng | null>(() => getSavedUserPosition());
+  const [locPrompt, setLocPrompt] = useState(false); // show "Use my location" chip
+  const [locBusy, setLocBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open || userPos) return;
+    if (!("geolocation" in navigator)) return;
+    let alive = true;
+    const perms = (navigator as any).permissions;
+    if (!perms?.query) return;
+    perms.query({ name: "geolocation" }).then((st: PermissionStatus) => {
+      if (!alive) return;
+      if (st.state === "granted") {
+        navigator.geolocation.getCurrentPosition(
+          p => {
+            if (!alive) return;
+            const here = { lat: p.coords.latitude, lng: p.coords.longitude };
+            saveUserPosition(here);
+            setUserPos(here);
+          },
+          () => {},
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 120000 },
+        );
+      } else if (st.state === "prompt") {
+        setLocPrompt(true);
+      } // "denied" → keep destination as the reference
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [open, userPos]);
+
+  function requestLocation() {
+    setLocBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      p => {
+        const here = { lat: p.coords.latitude, lng: p.coords.longitude };
+        saveUserPosition(here);
+        setUserPos(here);
+        setLocPrompt(false);
+        setLocBusy(false);
+      },
+      () => { setLocPrompt(false); setLocBusy(false); },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 120000 },
+    );
+  }
+
+  const useDevice = !!userPos && haversineM(userPos.lat, userPos.lng, destLat, destLng) <= FAR_THRESHOLD_M;
+  const refLat = useDevice ? userPos!.lat : destLat;
+  const refLng = useDevice ? userPos!.lng : destLng;
+
+  const displayResults = useMemo(
+    () => results.map(p => ({
+      ...p,
+      distanceM: (p.lat !== null && p.lng !== null) ? haversineM(refLat, refLng, p.lat, p.lng) : undefined,
+    })),
+    [results, refLat, refLng],
+  );
+
   const catConfig = CATEGORIES.find(c => c.key === activeCategory)!;
-  const sorted = sortResults(results, sort);
+  const sorted = sortResults(displayResults, sort);
+  const [firstLoadDone, setFirstLoadDone] = useState(false);
+  useEffect(() => { if (open && !loading && (results.length > 0 || error)) setFirstLoadDone(true); }, [open, loading, results.length, error]);
   const activeSortLabel = SORT_OPTIONS.find(s => s.key === sort)?.label ?? "Sort";
 
   return (
@@ -299,6 +353,31 @@ export default function NearbyExplorer({ destLat, destLng, destName, destSlug, i
                   <Headphones size={12} /> View Audio Tours
                 </a>
               </Link>
+            </div>
+          )}
+
+          {/* Not your area? — only when arrived via Show Me What's Nearby / ?nearby=1 */}
+          {initialOpen && destSlug && (
+            <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border">
+              Not your area?{" "}
+              <Link href="/sites">
+                <a className="font-semibold text-primary hover:underline">Change destination</a>
+              </Link>
+            </div>
+          )}
+
+          {/* Location not shared yet — optional, one tap, no surprise prompt */}
+          {locPrompt && !userPos && (
+            <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-muted/30">
+              <p className="text-xs text-muted-foreground">Show distances from where you are?</p>
+              <button
+                type="button"
+                onClick={requestLocation}
+                disabled={locBusy}
+                className="shrink-0 text-xs font-semibold px-2.5 py-1 rounded-lg bg-primary text-primary-foreground disabled:opacity-60"
+              >
+                {locBusy ? "Locating…" : "Use my location"}
+              </button>
             </div>
           )}
 
@@ -403,6 +482,9 @@ export default function NearbyExplorer({ destLat, destLng, destName, destSlug, i
                 <div className="flex items-center justify-between mb-2" ref={sortRef}>
                   <p className="text-xs text-muted-foreground">
                     {results.length} place{results.length !== 1 ? "s" : ""} near {destName}
+                    <span className="block text-[10px] text-muted-foreground/70 mt-0.5">
+                      {useDevice ? "Distances from your location" : `Distances from ${destName} centre`}
+                    </span>
                   </p>
                   <div className="relative">
                     <button
@@ -438,7 +520,12 @@ export default function NearbyExplorer({ destLat, destLng, destName, destSlug, i
               {loading && (
                 <div className="flex flex-col items-center justify-center py-10 gap-2">
                   <Loader2 size={22} className="animate-spin text-muted-foreground" />
-                  <p className="text-xs text-muted-foreground">Finding nearby {catConfig.label.toLowerCase()}…</p>
+                  <p className="text-xs font-medium text-foreground/80">
+                    {firstLoadDone ? `Finding nearby ${catConfig.label.toLowerCase()}…` : "Loading hotels, restaurants, things to do and maps…"}
+                  </p>
+                  {!firstLoadDone && (
+                    <p className="text-[11px] text-muted-foreground">Starting with {catConfig.label.toLowerCase()} near {destName}</p>
+                  )}
                 </div>
               )}
 
@@ -450,7 +537,7 @@ export default function NearbyExplorer({ destLat, destLng, destName, destSlug, i
                   </div>
                   <button
                     type="button"
-                    onClick={() => fetchCategory(activeCategory)}
+                    onClick={() => fetchCategory(activeCategory, true)}
                     className="flex items-center gap-1.5 text-xs text-primary hover:underline"
                   >
                     <RefreshCw size={11} /> Try again
