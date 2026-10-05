@@ -46,8 +46,9 @@ import { parseGoogleMapsCoords, isShortenedMapsLink } from "@/lib/googleMapsLink
 import { getStreetTiles, loadCartoBasemapKey, SATELLITE_TILES } from "@/lib/cartoBasemap";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
-const ADMIN_PASSWORD = "AlbaTour2026!";
-const TOKEN_VALUE = "albatour-admin-secret-token";
+// No password or token is stored in the browser code. The password is checked on
+// the server, and a short-lived session token is issued only after the emailed
+// verification code is confirmed (see server/adminAuth.ts).
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const CATEGORY_COLORS: Record<string, string> = {
@@ -123,6 +124,15 @@ type View =
 // ─── Admin fetch helper ────────────────────────────────────────────────────────
 const RAILWAY_API = "https://albania-audio-tours-production.up.railway.app";
 
+// If the server rejects the session (expired / revoked), sign out and show login.
+function handleExpiredSession(res: Response, url: string) {
+  if (res.status === 401 && url.includes("/api/admin/") && getAdminToken()) {
+    clearAdminToken();
+    window.location.reload();
+  }
+  return res;
+}
+
 function adminFetch(url: string, options?: RequestInit) {
   const token = getAdminToken() || "";
   // Always use absolute Railway URL so calls work from any hosting
@@ -135,7 +145,7 @@ function adminFetch(url: string, options?: RequestInit) {
       "x-admin-token": token,
       ...(options?.headers || {}),
     },
-  });
+  }).then(res => handleExpiredSession(res, fullUrl));
 }
 
 // For multipart/file uploads (no Content-Type header — browser sets boundary)
@@ -147,7 +157,7 @@ function adminUpload(url: string, formData: FormData) {
     credentials: "include",
     headers: { "x-admin-token": token },
     body: formData,
-  });
+  }).then(res => handleExpiredSession(res, fullUrl));
 }
 
 // ─── BACKEND STATUS BANNER ───────────────────────────────────────────────────
@@ -182,8 +192,9 @@ function BackendStatusBanner() {
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
 // ─── Two-step admin login ────────────────────────────────────────────────────
-// Step 1: password check (client-side)
+// Step 1: password — verified server-side
 // Step 2: 6-digit OTP emailed to book@albanianeagletours.com — verified server-side
+// Only after both steps does the server return a session token.
 const ADMIN_OTP_EMAIL = "book@albanianeagletours.com";
 
 // ─── Forgot Password — 3-step automated reset ──────────────────────────
@@ -429,10 +440,7 @@ function LoginView({ onLogin }: { onLogin: () => void }) {
   async function handlePasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (password !== ADMIN_PASSWORD) {
-      setError("Incorrect password. Please try again.");
-      return;
-    }
+    if (!password) { setError("Enter your password."); return; }
     setLoading(true);
     try {
       const res = await fetch(`${RAILWAY_API}/api/admin/send-otp`, {
@@ -440,7 +448,13 @@ function LoginView({ onLogin }: { onLogin: () => void }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (res.status === 401) { setError("Incorrect password. Please try again."); return; }
+      if (res.status === 429) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Too many attempts. Please wait and try again.");
+        return;
+      }
+      if (!res.ok) throw new Error("send failed");
       setStep("otp");
       setOtpSentAt(Date.now());
       setResendCooldown(60);
@@ -464,8 +478,9 @@ function LoginView({ onLogin }: { onLogin: () => void }) {
         body: JSON.stringify({ otp }),
       });
       const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || "Invalid code");
-      setAdminToken(TOKEN_VALUE);
+      if (!res.ok || !data.ok || !data.token) throw new Error(data.error || "Invalid code");
+      setAdminToken(data.token);
+      setPassword(""); // do not keep the password in memory after login
       onLogin();
     } catch (err: any) {
       setError(err.message || "Invalid or expired code. Please try again.");
@@ -3584,6 +3599,15 @@ export default function AdminPanel() {
     getAdminToken() ? { screen: "sites" } : { screen: "login" }
   );
 
+  // Confirm a stored session is still valid (expired after 12h or revoked).
+  useEffect(() => {
+    const t = getAdminToken();
+    if (!t) return;
+    fetch(`${RAILWAY_API}/api/admin/session`, { headers: { "x-admin-token": t } })
+      .then(r => { if (r.status === 401) { clearAdminToken(); setView({ screen: "login" }); } })
+      .catch(() => {});
+  }, []);
+
   if (view.screen === "login") {
     return <LoginView onLogin={() => setView({ screen: "sites" })} />;
   }
@@ -3593,7 +3617,12 @@ export default function AdminPanel() {
       <SitesView
         onEdit={id => setView({ screen: "editor", siteId: id })}
         onNew={() => setView({ screen: "editor", siteId: null })}
-        onLogout={() => { clearAdminToken(); setView({ screen: "login" }); }}
+        onLogout={() => {
+          const t = getAdminToken();
+          if (t) fetch(`${RAILWAY_API}/api/admin/logout`, { method: "POST", headers: { "x-admin-token": t } }).catch(() => {});
+          clearAdminToken();
+          setView({ screen: "login" });
+        }}
         onManageAttractions={(slug, name) => setView({ screen: "attractions", destinationSlug: slug, destinationName: name })}
       />
     );

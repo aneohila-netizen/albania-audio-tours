@@ -29,7 +29,7 @@ export default function ResetPasswordPage() {
   // Password strength
   const strength = (() => {
     if (password.length === 0)  return null;
-    if (password.length < 8)    return { level: 0, label: "Too short",  color: "bg-red-500" };
+    if (password.length < 12)    return { level: 0, label: "Too short",  color: "bg-red-500" };
     const hasUpper  = /[A-Z]/.test(password);
     const hasLower  = /[a-z]/.test(password);
     const hasNumber = /\d/.test(password);
@@ -45,8 +45,8 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     setError("");
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+    if (password.length < 12) {
+      setError("Password must be at least 12 characters.");
       return;
     }
     if (password !== confirm) {
@@ -205,7 +205,7 @@ export default function ResetPasswordPage() {
                   type={showPass ? "text" : "password"}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="Min. 8 characters"
+                  placeholder="Min. 12 characters"
                   className="w-full pr-10 pl-3 py-2.5 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/40"
                   autoFocus
                   required
@@ -287,7 +287,7 @@ export default function ResetPasswordPage() {
 
             <button
               type="submit"
-              disabled={!password || !confirm || password !== confirm || password.length < 8}
+              disabled={!password || !confirm || password !== confirm || password.length < 12}
               className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 transition-opacity"
             >
               Set New Password

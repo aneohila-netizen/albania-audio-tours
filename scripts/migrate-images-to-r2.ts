@@ -20,7 +20,8 @@ import * as http from "http";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const RAILWAY_BASE  = process.env.RAILWAY_BASE  || "https://albania-audio-tours-production.up.railway.app";
-const ADMIN_TOKEN   = process.env.ADMIN_TOKEN   || "albatour-admin-secret-token";
+const ADMIN_TOKEN   = process.env.ADMIN_TOKEN   || "";
+if (!ADMIN_TOKEN) { console.error("Set ADMIN_TOKEN (the ADMIN_API_TOKEN value) in the environment."); process.exit(1); }
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || "537459e65b55c4e1aaa1996ef06bb3fc";
 const R2_ACCESS_KEY = process.env.R2_ACCESS_KEY_ID || "7018d59eae4f73e6557ac79097c36949";
 const R2_SECRET_KEY = process.env.R2_SECRET_KEY || "bfd9406f1dca82d5843e033a47bf6c5234bbc5a26513dda2a94cc4b2f918f662";
