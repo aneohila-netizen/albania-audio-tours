@@ -25,6 +25,10 @@ const FFMPEG_BIN = resolveFfmpeg();
 import multer from "multer";
 import sharp from "sharp";
 import { storage } from "./storage";
+import {
+  requireAdmin, checkAdminPassword, generateOtp, createSession, revokeSession,
+  revokeAllSessions, safeEqual, rateLimit, resetRateLimit, clientIp,
+} from "./adminAuth";
 import { uploadToR2, deleteFromR2, isR2Configured } from "./r2";
 import { insertUserProgressSchema, insertTourSiteSchema, insertAttractionSchema, categories, insertCategorySchema } from "@shared/schema";
 
@@ -391,16 +395,8 @@ const RAILWAY_BASE = process.env.PUBLIC_BASE_URL || "https://albania-audio-tours
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://albaniaaudiotours.com";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "AlbaTour2026!";
-const ADMIN_TOKEN = "albatour-admin-secret-token"; // simple shared token
-
-function requireAdmin(req: any, res: any, next: any) {
-  const auth = req.headers["x-admin-token"] || req.query.token;
-  if (auth !== ADMIN_TOKEN) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-  next();
-}
+// requireAdmin, password check, OTP and session handling live in ./adminAuth.ts.
+// No password or token is stored in source code — see that file for the env vars.
 
 // 2-step protection: all DELETE routes require this header in addition to admin token.
 // The admin UI must show a confirmation dialog and set x-confirm-delete: yes.
@@ -825,13 +821,25 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // ── Admin: Auth ─────────────────────────────────────────────────────────────
-  app.post("/api/admin/login", (req, res) => {
-    const { password } = req.body;
-    if (password === ADMIN_PASSWORD) {
-      res.json({ token: ADMIN_TOKEN });
-    } else {
-      res.status(401).json({ error: "Invalid password" });
-    }
+  // The old password-only /api/admin/login endpoint was removed: it returned an
+  // admin token without the email verification step. Login is now
+  // /api/admin/send-otp (password) → /api/admin/verify-otp (email code) only.
+  app.post("/api/admin/login", (_req, res) => {
+    res.status(410).json({ error: "Use the two-step login (send-otp → verify-otp)." });
+  });
+
+  // Session check — lets the admin panel confirm a stored session is still valid.
+  app.get("/api/admin/session", requireAdmin, (_req, res) => {
+    res.json({ ok: true });
+  });
+
+  // Logout — revokes the current session token.
+  app.post("/api/admin/logout", async (req, res) => {
+    try {
+      const token = String(req.headers["x-admin-token"] || "");
+      await revokeSession(token);
+    } catch { /* ignore */ }
+    res.json({ ok: true });
   });
 
   // ── Admin: Attractions CRUD ────────────────────────────────────────────────
@@ -1900,7 +1908,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // OTP is generated server-side, emailed to the admin, verified server-side.
   // Never exposed in any client-side code or UI.
 
-  const otpStore = new Map<string, { code: string; expires: number }>();
+  const otpStore = new Map<string, { code: string; expires: number; attempts: number }>();
+  const OTP_MAX_ATTEMPTS = 5;
   // OTP_EMAIL: recipient for OTP codes. Defaults to ADMIN_OTP_EMAIL env var.
   // While Resend domain is unverified, set ADMIN_OTP_EMAIL=aneo.hila@gmail.com in Railway.
   // Once albanianeagletours.com is verified in Resend, set it to book@albanianeagletours.com.
@@ -1912,14 +1921,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // POST /api/admin/send-otp — verify password, send OTP email
   app.post("/api/admin/send-otp", async (req, res) => {
     try {
+      const ip = clientIp(req);
+      // Max 5 password attempts per IP per 15 minutes; max 5 code emails per hour.
+      if (!rateLimit(`pw:${ip}`, 5, 15 * 60 * 1000)) {
+        return res.status(429).json({ error: "Too many attempts. Please wait 15 minutes and try again." });
+      }
       const { password } = req.body as { password: string };
-      if (password !== process.env.ADMIN_PASSWORD && password !== "AlbaTour2026!") {
+      if (!checkAdminPassword(password)) {
         return res.status(401).json({ error: "Incorrect password" });
       }
+      resetRateLimit(`pw:${ip}`);
+      if (!rateLimit("otp-send", 5, 60 * 60 * 1000)) {
+        return res.status(429).json({ error: "Too many verification emails requested. Please wait and try again later." });
+      }
 
-      // Generate 6-digit OTP
-      const code = String(Math.floor(100000 + Math.random() * 900000));
-      otpStore.set("admin", { code, expires: Date.now() + OTP_TTL_MS });
+      // Generate 6-digit OTP (cryptographically secure)
+      const code = generateOtp();
+      otpStore.set("admin", { code, expires: Date.now() + OTP_TTL_MS, attempts: 0 });
 
       // Send via Resend API — pure HTTPS, no SMTP, works on Railway
       const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
@@ -1961,12 +1979,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.json({ ok: true, sentTo: ADMIN_EMAIL });
     } catch (e: any) {
       console.error("[OTP] send error:", e.message);
-      res.status(500).json({ error: "Failed to send verification email: " + e.message });
+      res.status(500).json({ error: "Failed to send verification email. Please try again." });
     }
   });
 
   // POST /api/admin/verify-otp — check OTP, return success
-  app.post("/api/admin/verify-otp", (req, res) => {
+  app.post("/api/admin/verify-otp", async (req, res) => {
     try {
       const { otp } = req.body as { otp: string };
       const stored = otpStore.get("admin");
@@ -1975,13 +1993,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         otpStore.delete("admin");
         return res.status(400).json({ error: "Code has expired. Please sign in again." });
       }
-      if (otp !== stored.code) {
+      if (typeof otp !== "string" || !safeEqual(otp.trim(), stored.code)) {
+        stored.attempts += 1;
+        if (stored.attempts >= OTP_MAX_ATTEMPTS) {
+          otpStore.delete("admin");
+          return res.status(401).json({ error: "Too many incorrect codes. Please sign in again." });
+        }
         return res.status(401).json({ error: "Incorrect code. Please check your email and try again." });
       }
       otpStore.delete("admin"); // single-use
-      res.json({ ok: true });
+      const token = await createSession();
+      res.json({ ok: true, token });
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      console.error("[OTP] verify error:", e.message);
+      res.status(500).json({ error: "Verification failed. Please try again." });
     }
   });
 
@@ -1994,12 +2019,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Body: { emailChoice: "primary"|"secondary", phone: string }
   app.post("/api/admin/forgot-password", async (req, res) => {
     try {
+      if (!rateLimit(`forgot:${clientIp(req)}`, 5, 60 * 60 * 1000)) {
+        return res.status(429).json({ error: "Too many attempts. Please try again later." });
+      }
       const { emailChoice, phone } = req.body as { emailChoice: string; phone: string };
 
-      // Verify phone — digits only, deliberate vague error to prevent enumeration
-      const RECOVERY_PHONE = (process.env.ADMIN_RECOVERY_PHONE || "0682060901").replace(/\D/g, "");
+      // Verify phone — digits only, deliberate vague error to prevent enumeration.
+      // ADMIN_RECOVERY_PHONE must be set in the environment (no default in code).
+      const RECOVERY_PHONE = (process.env.ADMIN_RECOVERY_PHONE || "").replace(/\D/g, "");
+      if (!RECOVERY_PHONE) {
+        console.error("[RESET] ADMIN_RECOVERY_PHONE is not set — password reset is disabled.");
+        return res.status(401).json({ error: "Verification failed. Please check your details and try again." });
+      }
       const submittedPhone = (phone || "").replace(/\D/g, "");
-      if (!submittedPhone || submittedPhone !== RECOVERY_PHONE) {
+      if (!submittedPhone || !safeEqual(submittedPhone, RECOVERY_PHONE)) {
         return res.status(401).json({ error: "Verification failed. Please check your details and try again." });
       }
 
@@ -2069,7 +2102,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const { token, newPassword } = req.body as { token: string; newPassword: string };
 
       if (!token || !newPassword) return res.status(400).json({ error: "Missing token or password." });
-      if (newPassword.length < 8)  return res.status(400).json({ error: "Password must be at least 8 characters." });
+      if (newPassword.length < 12) return res.status(400).json({ error: "Password must be at least 12 characters." });
 
       const stored = resetStore.get(token);
       if (!stored) return res.status(400).json({ error: "Invalid or already-used reset link. Please request a new one." });
@@ -2108,6 +2141,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (gqlData.errors?.length) throw new Error(`Railway API: ${JSON.stringify(gqlData.errors[0]?.message || gqlData.errors)}`);
 
       console.log("[RESET] ADMIN_PASSWORD updated on Railway — redeploy triggered automatically");
+      await revokeAllSessions().catch(() => {}); // sign out every existing admin session
 
       // Send confirmation to BOTH addresses
       const RESEND_API_KEY  = process.env.RESEND_API_KEY       || "";
@@ -2145,7 +2179,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.json({ ok: true, message: "Password updated. Railway will redeploy in 2–3 minutes. You can then log in with your new password." });
     } catch (e: any) {
       console.error("[RESET] reset-password error:", e.message);
-      res.status(500).json({ error: e.message || "Failed to reset password. Please try again." });
+      res.status(500).json({ error: "Failed to reset password. Please try again." });
     }
   });
 

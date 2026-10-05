@@ -16,9 +16,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RAILWAY_URL } from "@/lib/queryClient";
+import { getAdminToken } from "@/lib/adminAuth";
 import { getStreetTiles, loadCartoBasemapKey, SATELLITE_TILES } from "@/lib/cartoBasemap";
 
-const ADMIN_TOKEN = "albatour-admin-secret-token";
+// Admin session token comes from the server after the two-step login.
+const adminToken = () => getAdminToken() || "";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export interface Waypoint {
@@ -334,12 +336,12 @@ export default function ItineraryManager({ siteSlug, entityType = "site", center
   const [imageError, setImageError] = useState<string | null>(null);
   const coverFileRef = useRef<HTMLInputElement>(null);
 
-  const headers = { "Content-Type": "application/json", "x-admin-token": ADMIN_TOKEN };
+  const headers = { "Content-Type": "application/json", "x-admin-token": adminToken() };
 
   const fetchItineraries = async () => {
     try {
       setLoading(true);
-      const r = await fetch(`${RAILWAY_URL}/api/admin/itineraries/${siteSlug}`, { headers: { "x-admin-token": ADMIN_TOKEN } });
+      const r = await fetch(`${RAILWAY_URL}/api/admin/itineraries/${siteSlug}`, { headers: { "x-admin-token": adminToken() } });
       if (r.ok) setItineraries(await r.json());
     } catch {} finally { setLoading(false); }
   };
@@ -369,7 +371,7 @@ export default function ItineraryManager({ siteSlug, entityType = "site", center
     try {
       const r = await fetch(`${RAILWAY_URL}/api/admin/itineraries/${editing}/image`, {
         method: "POST",
-        headers: { "x-admin-token": ADMIN_TOKEN },
+        headers: { "x-admin-token": adminToken() },
         body: fd,
       });
       const d = await r.json();
@@ -388,7 +390,7 @@ export default function ItineraryManager({ siteSlug, entityType = "site", center
     try {
       const r = await fetch(`${RAILWAY_URL}/api/admin/itineraries/${editing}/image`, {
         method: "DELETE",
-        headers: { "x-admin-token": ADMIN_TOKEN, "x-confirm-delete": "yes" },
+        headers: { "x-admin-token": adminToken(), "x-confirm-delete": "yes" },
       });
       if (!r.ok) {
         const d = await r.json();
