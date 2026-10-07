@@ -281,6 +281,9 @@ function AppRoutes() {
               </div>
               {/* pb-[4.5rem] on mobile = clears the fixed bottom nav (48px + safe area) */}
               <main className="flex-none pb-0 md:pb-0"> {/* map page controls its own height */}
+                {/* Page-level boundary: while a page's code loads, only this area shows the
+                    "Loading…" message — the menu and footer stay on screen and clickable. */}
+                <Suspense fallback={<RouteLoadingFallback contained />}>
                 <Switch>
                   <Route path="/" component={MapPage} />
                   <Route path="/sites" component={SitesPage} />
@@ -298,6 +301,7 @@ function AppRoutes() {
               <Route path="/reset-password" component={ResetPasswordPage} />
               <Route path="/p/:slug" component={CmsPageRenderer} />
                 </Switch>
+                </Suspense>
               </main>
               {/* R3a: Desktop footer always visible (even on map page).
                    Mobile: hidden on map page (MobileDrawer handles it);

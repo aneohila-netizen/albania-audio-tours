@@ -89,8 +89,19 @@ export default function PageLoading({
   );
 }
 
-/** Suspense fallback for lazy route chunks — label follows the destination route. */
-export function RouteLoadingFallback() {
+/**
+ * Suspense fallback for lazy route chunks — label follows the destination route.
+ * `contained` renders inside the page area (menu and footer stay visible and clickable);
+ * the default is full screen (used outside the page layout, e.g. the admin panel).
+ */
+export function RouteLoadingFallback({ contained = false }: { contained?: boolean }) {
   const [path] = useLocation();
+  if (contained) {
+    return (
+      <div className="flex items-center justify-center" style={{ minHeight: "60vh" }}>
+        <PageLoading label={routeLabel(path)} inline />
+      </div>
+    );
+  }
   return <PageLoading label={routeLabel(path)} />;
 }
