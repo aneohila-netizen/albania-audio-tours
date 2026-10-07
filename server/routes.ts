@@ -508,6 +508,52 @@ function isR2Url(url: string): boolean {
   return url?.startsWith(R2_PUBLIC_BASE);
 }
 
+// ── Lite list rows ──────────────────────────────────────────────────────────
+// GET /api/sites?view=lite&lang=xx and /api/attractions?view=lite&lang=xx. The full list
+// rows carry every description + fun fact in all 11 languages (attractions: 7 MB raw, 2.7 MB
+// gzip) although the map / list / search only need names, coordinates and a short snippet.
+// Lite keeps everything the list screens read, but:
+//   - desc*  → a ~300 char snippet, only for English and the requested language ("" otherwise)
+//   - funFact* → full text, only for English and the requested language (null otherwise)
+//   - audioUrl* removed (the list screens never read them), images → first image only
+// Full text is still available from the detail endpoints.
+const LITE_SNIPPET_MAX = 300;
+
+function liteSnippet(text: unknown): string {
+  if (typeof text !== "string" || text.length <= LITE_SNIPPET_MAX) return (text as string) || "";
+  const head = text.slice(0, LITE_SNIPPET_MAX);
+  // prefer ending on a sentence boundary, else on a word boundary
+  const sentenceEnd = Math.max(head.lastIndexOf(". "), head.lastIndexOf("! "), head.lastIndexOf("? "));
+  if (sentenceEnd >= 80) return head.slice(0, sentenceEnd + 1);
+  const space = head.lastIndexOf(" ");
+  return (space > 80 ? head.slice(0, space) : head).trimEnd();
+}
+
+function toLiteRow(obj: any, lang: string): any {
+  const L = lang.charAt(0).toUpperCase() + lang.slice(1);
+  const keep = new Set(["En", L]);
+  const out: any = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const m = /^(desc|funFact)(En|Al|Gr|It|Es|De|Fr|Ar|Ru|Pt|Cn)$/.exec(k);
+    if (m) {
+      const [, kind, suffix] = m;
+      if (kind === "desc") out[k] = keep.has(suffix) ? liteSnippet(v) : "";
+      else out[k] = keep.has(suffix) ? v : null;
+      continue;
+    }
+    if (/^audioUrl(En|Al|Gr|It|Es|De|Fr|Ar|Ru|Pt|Cn)$/.test(k)) continue;
+    if (k === "images") { out[k] = Array.isArray(v) ? v.slice(0, 1) : []; continue; }
+    out[k] = v;
+  }
+  out.lite = true;
+  return out;
+}
+
+function liteLang(q: unknown): string {
+  const l = typeof q === "string" ? q.toLowerCase() : "en";
+  return (SUPPORTED_LANGS as readonly string[]).includes(l) ? l : "en";
+}
+
 function stripImageData(obj: any, type: 'attraction'|'site'): any {
   if (!obj) return obj;
   const out = { ...obj };
@@ -628,9 +674,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   runStartupImageCleanup();
 
   // ── Public API ──────────────────────────────────────────────────────────────
-  app.get("/api/sites", async (_req, res) => {
+  app.get("/api/sites", async (req, res) => {
     const sites = await storage.getAllSites();
-    res.json(sites.map(s => stripImageData(stripAudioData(s, 'site'), 'site')));
+    const rows = sites.map(s => stripImageData(stripAudioData(s, 'site'), 'site'));
+    if (req.query.view === "lite") {
+      const lang = liteLang(req.query.lang);
+      return res.json(rows.map(r => toLiteRow(r, lang)));
+    }
+    res.json(rows);
   });
 
   app.get("/api/sites/:slug", async (req, res) => {
@@ -799,9 +850,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // ── Public: Attractions ────────────────────────────────────────────────────
-  app.get("/api/attractions", async (_req, res) => {
+  app.get("/api/attractions", async (req, res) => {
     const attrs = await storage.getAllAttractions();
-    res.json(attrs.map(a => stripImageData(stripAudioData(a, 'attraction'), 'attraction')));
+    const rows = attrs.map(a => stripImageData(stripAudioData(a, 'attraction'), 'attraction'));
+    if (req.query.view === "lite") {
+      const lang = liteLang(req.query.lang);
+      return res.json(rows.map(r => toLiteRow(r, lang)));
+    }
+    res.json(rows);
   });
 
   app.get("/api/attractions/:destinationSlug", async (req, res) => {
