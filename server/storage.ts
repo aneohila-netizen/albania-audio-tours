@@ -22,12 +22,17 @@ const AUDIO_LANG_COLS: Array<[string, string]> = [
   ["Fr", "audio_url_fr"], ["Ar", "audio_url_ar"], ["Ru", "audio_url_ru"],
   ["Pt", "audio_url_pt"], ["Cn", "audio_url_cn"],
 ];
-// Comma-joined "length(col) AS len_col" clauses — computed server-side by
+// Comma-joined "octet_length(col) AS len_col" clauses — computed server-side by
 // Postgres so only a small integer crosses the wire per language, instead of
 // the full multi-MB base64 audio payload. This is what prevents bulk list
 // endpoints (getAllAttractions/getAttractionsByDestination/getAllSites) from
 // pulling hundreds of MB into Node's memory and causing heap-OOM crashes.
-const AUDIO_LEN_SELECT = AUDIO_LANG_COLS.map(([, col]) => `length(${col}) AS len_${col}`).join(", ");
+// octet_length(), NOT length(): for TEXT columns Postgres answers octet_length() from the
+// stored value's header without reading the (multi-MB, TOASTed) base64 payload, while
+// length() must fetch and decompress the whole value to count characters. With 11 audio
+// columns per row that made every list request read hundreds of MB. The audio values are
+// ASCII data URIs, so both functions return identical numbers.
+const AUDIO_LEN_SELECT = AUDIO_LANG_COLS.map(([, col]) => `octet_length(${col}) AS len_${col}`).join(", ");
 
 // Explicit non-audio column lists for the two tables that carry per-language
 // audio_url_* blobs. Kept explicit (rather than "SELECT * EXCLUDE(...)", which
