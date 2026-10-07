@@ -141,6 +141,7 @@ export default function MapPage() {
   // 10-second idle popup — shown once per session, dismissed permanently on close
   const [showExplorePopup, setShowExplorePopup] = useState(false);
   const [popupDismissed, setPopupDismissed] = useState(false);
+  const [mapReadyTick, setMapReadyTick] = useState(0); // bumps when the Leaflet map finishes initialising
   const [nearestFlow, setNearestFlow] = useState(false); // "Show Me What's Nearby" overlay
   const [showBridgeLoading, setShowBridgeLoading] = useState(false); // "Loading..." between guide and Explore popup
 
@@ -502,6 +503,7 @@ export default function MapPage() {
       LeafletRef.current = L;
       mapInstanceRef.current = map;
       mapReadyRef.current = true;
+      setMapReadyTick(n => n + 1); // re-run the marker effect with the CURRENT lists/language
 
       // Build markers immediately after map is ready
       buildMarkers();
@@ -591,7 +593,7 @@ export default function MapPage() {
   // ── Rebuild markers when layer, either category filter, visited status, or data changes ─
   useEffect(() => {
     if (mapReadyRef.current) buildMarkers();
-  }, [layerMode, categoryFilter, attrCategoryFilter, visitedSiteIds, DESTINATIONS, ATTRACTIONS]);
+  }, [layerMode, categoryFilter, attrCategoryFilter, visitedSiteIds, DESTINATIONS, ATTRACTIONS, lang, mapReadyTick]);
 
   // ── GPS blue dot ────────────────────────────────────────────
   useEffect(() => {

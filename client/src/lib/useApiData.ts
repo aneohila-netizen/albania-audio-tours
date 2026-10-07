@@ -6,6 +6,7 @@
  * Any destination or attraction created in the admin panel
  * automatically appears everywhere: map, grid, list, detail pages.
  */
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { TourSite, Attraction as ApiAttraction } from "@shared/schema";
 import type { Destination, Attraction } from "./staticData";
@@ -72,6 +73,9 @@ export const attractionsLiteKey = (lang: string) => ["railway", "attractions", "
 export const fetchSitesLite = (lang: string) => railwayFetch<TourSite[]>(`/api/sites?view=lite&lang=${lang}`);
 export const fetchAttractionsLite = (lang: string) => railwayFetch<ApiAttraction[]>(`/api/attractions?view=lite&lang=${lang}`);
 
+const EMPTY_DESTINATIONS: Destination[] = [];
+const EMPTY_ATTRACTIONS: Attraction[] = [];
+
 /** Returns all destinations — API is authoritative, staticData is loading fallback */
 export function useDestinations(lang: string = "en"): Destination[] {
   const { data: apiSites } = useQuery<TourSite[]>({
@@ -82,10 +86,12 @@ export function useDestinations(lang: string = "en"): Destination[] {
     placeholderData: (prev) => prev, // language switch: keep showing the previous list while the new one loads
   });
 
-  if (apiSites && apiSites.length > 0) {
-    return apiSites.map(siteToDestination);
-  }
-  return [];
+  // Memoised on the query data: a fresh array every render made every effect that depends on the
+  // list (map markers, audio preload, ...) re-run on every unrelated state change.
+  return useMemo(
+    () => (apiSites && apiSites.length > 0 ? apiSites.map(siteToDestination) : EMPTY_DESTINATIONS),
+    [apiSites],
+  );
 }
 
 /** Returns true while the sites query is in-flight (no cached data yet) */
@@ -119,13 +125,12 @@ export function useAttractions(destinationSlug?: string, lang: string = "en"): A
     placeholderData: (prev) => prev,
   });
 
-  // API loaded → use it entirely (includes any admin-created attractions)
-  if (apiAttrs && apiAttrs.length > 0) {
-    return apiAttrs.map(apiAttrToAttraction);
-  }
-
-  // Still loading or failed → return empty (no Unsplash placeholders)
-  return [];
+  // API loaded → use it entirely (includes any admin-created attractions); still loading or
+  // failed → empty (no Unsplash placeholders). Memoised for stable identity (see useDestinations).
+  return useMemo(
+    () => (apiAttrs && apiAttrs.length > 0 ? apiAttrs.map(apiAttrToAttraction) : EMPTY_ATTRACTIONS),
+    [apiAttrs],
+  );
 }
 
 // ─── Prefetch helpers ─────────────────────────────────────────────────────────
