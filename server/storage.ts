@@ -77,6 +77,9 @@ export interface IStorage {
   // Sites (destinations / regions)
   getAllSites(): Promise<TourSite[]>;
   getSiteBySlug(slug: string): Promise<TourSite | undefined>;
+  // Public detail reads: same shape as the list rows (audio URLs from octet_length(), no audio
+  // payload fetched). getSiteBySlug keeps SELECT * for callers that need the raw audio columns.
+  getSiteBySlugLight(slug: string): Promise<TourSite | undefined>;
   getSiteById(id: number): Promise<TourSite | undefined>;
   // Fetches only the single requested language's audio column, instead of
   // the full row (which carries 11 languages of base64 audio). Used by the
@@ -89,6 +92,7 @@ export interface IStorage {
   getAllAttractions(): Promise<Attraction[]>;
   getAttractionsByDestination(destinationSlug: string): Promise<Attraction[]>;
   getAttractionBySlug(destinationSlug: string, slug: string): Promise<Attraction | undefined>;
+  getAttractionBySlugLight(destinationSlug: string, slug: string): Promise<Attraction | undefined>;
   getAttractionById(id: number): Promise<Attraction | undefined>;
   createAttraction(data: InsertAttraction): Promise<Attraction>;
   updateAttraction(id: number, data: Partial<InsertAttraction>): Promise<Attraction | undefined>;
@@ -744,6 +748,12 @@ class PgStorage implements IStorage {
     return rows[0] ? this.rowToSite(rows[0]) : undefined;
   }
 
+  async getSiteBySlugLight(slug: string): Promise<TourSite | undefined> {
+    await this.ready;
+    const { rows } = await this.pool.query(`SELECT ${SITE_LIGHT_SELECT} FROM tour_sites WHERE slug=$1`, [slug]);
+    return rows[0] ? this.rowToSiteLight(rows[0]) : undefined;
+  }
+
   async getSiteById(id: number): Promise<TourSite | undefined> {
     await this.ready;
     const { rows } = await this.pool.query("SELECT * FROM tour_sites WHERE id=$1", [id]);
@@ -838,6 +848,12 @@ class PgStorage implements IStorage {
     await this.ready;
     const { rows } = await this.pool.query("SELECT * FROM attractions WHERE destination_slug=$1 AND slug=$2", [destinationSlug, slug]);
     return rows[0] ? this.rowToAttraction(rows[0]) : undefined;
+  }
+
+  async getAttractionBySlugLight(destinationSlug: string, slug: string): Promise<Attraction | undefined> {
+    await this.ready;
+    const { rows } = await this.pool.query(`SELECT ${ATTRACTION_LIGHT_SELECT} FROM attractions WHERE destination_slug=$1 AND slug=$2`, [destinationSlug, slug]);
+    return rows[0] ? this.rowToAttractionLight(rows[0]) : undefined;
   }
 
   async getAttractionById(id: number): Promise<Attraction | undefined> {
@@ -1402,6 +1418,7 @@ export class MemStorage implements IStorage {
 
   async getAllSites() { return [...this.sites]; }
   async getSiteBySlug(slug: string) { return this.sites.find(s => s.slug === slug); }
+  async getSiteBySlugLight(slug: string) { return this.sites.find(s => s.slug === slug); }
   async getSiteById(id: number) { return this.sites.find(s => s.id === id); }
 
   async getAudioBase64(type: "site" | "attraction", id: number, lang: string): Promise<string | null> {
@@ -1434,6 +1451,7 @@ export class MemStorage implements IStorage {
   async getAllAttractions() { return [...this.attrs]; }
   async getAttractionsByDestination(destinationSlug: string) { return this.attrs.filter(a => a.destinationSlug === destinationSlug); }
   async getAttractionBySlug(destinationSlug: string, slug: string) { return this.attrs.find(a => a.destinationSlug === destinationSlug && a.slug === slug); }
+  async getAttractionBySlugLight(destinationSlug: string, slug: string) { return this.attrs.find(a => a.destinationSlug === destinationSlug && a.slug === slug); }
   async getAttractionById(id: number) { return this.attrs.find(a => a.id === id); }
 
   async createAttraction(data: InsertAttraction): Promise<Attraction> {

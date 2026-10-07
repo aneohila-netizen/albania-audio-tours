@@ -634,7 +634,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.get("/api/sites/:slug", async (req, res) => {
-    const site = await storage.getSiteBySlug(req.params.slug);
+    const site = await storage.getSiteBySlugLight(req.params.slug);
     if (!site) return res.status(404).json({ error: "Not found" });
     res.json(stripImageData(stripAudioData(site, 'site'), 'site'));
   });
@@ -810,7 +810,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.get("/api/attractions/:destinationSlug/:slug", async (req, res) => {
-    const attr = await storage.getAttractionBySlug(req.params.destinationSlug, req.params.slug);
+    const attr = await storage.getAttractionBySlugLight(req.params.destinationSlug, req.params.slug);
     if (!attr) return res.status(404).json({ error: "Not found" });
     res.json(stripImageData(stripAudioData(attr, 'attraction'), 'attraction'));
   });
