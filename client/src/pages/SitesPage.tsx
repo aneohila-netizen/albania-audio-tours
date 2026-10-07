@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { railwayFetch } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { useApp } from "@/App";
 import { useDestinations, useAttractions, useDestinationsLoading, prefetchDestination } from "@/lib/useApiData";
@@ -31,6 +33,21 @@ const CATEGORY_EMOJI: Record<string, string> = {
 
 function catLabel(cat: string) {
   return cat.charAt(0).toUpperCase() + cat.slice(1).replace("-", " ");
+}
+
+/**
+ * Expanded ("Read more") description. The lists only carry a short snippet, so the full text is
+ * loaded from the destination detail endpoint (already warmed on hover/touch by
+ * prefetchDestination, same query key). Shows the snippet until the full text arrives.
+ */
+function ExpandedDescription({ slug, lang, fallback }: { slug: string; lang: string; fallback: string }) {
+  const { data } = useQuery<any>({
+    queryKey: ["railway", "sites", slug],
+    queryFn: () => railwayFetch<any>(`/api/sites/${slug}`),
+    staleTime: 5 * 60_000,
+  });
+  const cap = lang.charAt(0).toUpperCase() + lang.slice(1);
+  return <>{(data && (data[`desc${cap}`] || data.descEn)) || fallback}</>;
 }
 
 export default function SitesPage() {
@@ -320,7 +337,7 @@ export default function SitesPage() {
                 {descText && (
                   <div className="px-3 pb-3 pt-0">
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      {previewText}
+                      {isExpanded ? <ExpandedDescription slug={dest.slug} lang={lang} fallback={previewText} /> : previewText}
                       {needsTruncation && (
                         <button
                           className="ml-1 text-primary font-semibold hover:underline focus:outline-none"

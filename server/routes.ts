@@ -517,27 +517,31 @@ function isR2Url(url: string): boolean {
 //   - funFact* → full text, only for English and the requested language (null otherwise)
 //   - audioUrl* removed (the list screens never read them), images → first image only
 // Full text is still available from the detail endpoints.
-const LITE_SNIPPET_MAX = 300;
+// Snippet lengths: destinations feed the Tour Sites list card (160 char preview + "Read more",
+// which loads the full text) and the tagline (first sentence); attractions only feed the map
+// popup (200 chars).
+const LITE_SNIPPET_MAX = { site: 400, attraction: 240 } as const;
 
-function liteSnippet(text: unknown): string {
-  if (typeof text !== "string" || text.length <= LITE_SNIPPET_MAX) return (text as string) || "";
-  const head = text.slice(0, LITE_SNIPPET_MAX);
-  // prefer ending on a sentence boundary, else on a word boundary
+function liteSnippet(text: unknown, max: number): string {
+  if (typeof text !== "string" || text.length <= max) return (text as string) || "";
+  const head = text.slice(0, max);
+  // prefer ending on a sentence boundary (if that keeps most of the snippet), else on a word boundary
   const sentenceEnd = Math.max(head.lastIndexOf(". "), head.lastIndexOf("! "), head.lastIndexOf("? "));
-  if (sentenceEnd >= 80) return head.slice(0, sentenceEnd + 1);
+  if (sentenceEnd >= max * 0.6) return head.slice(0, sentenceEnd + 1);
   const space = head.lastIndexOf(" ");
-  return (space > 80 ? head.slice(0, space) : head).trimEnd();
+  return (space > max * 0.5 ? head.slice(0, space) : head).trimEnd();
 }
 
-function toLiteRow(obj: any, lang: string): any {
+function toLiteRow(obj: any, lang: string, type: "site" | "attraction"): any {
   const L = lang.charAt(0).toUpperCase() + lang.slice(1);
   const keep = new Set(["En", L]);
+  const max = LITE_SNIPPET_MAX[type];
   const out: any = {};
   for (const [k, v] of Object.entries(obj)) {
     const m = /^(desc|funFact)(En|Al|Gr|It|Es|De|Fr|Ar|Ru|Pt|Cn)$/.exec(k);
     if (m) {
       const [, kind, suffix] = m;
-      if (kind === "desc") out[k] = keep.has(suffix) ? liteSnippet(v) : "";
+      if (kind === "desc") out[k] = keep.has(suffix) ? liteSnippet(v, max) : "";
       else out[k] = keep.has(suffix) ? v : null;
       continue;
     }
@@ -679,7 +683,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const rows = sites.map(s => stripImageData(stripAudioData(s, 'site'), 'site'));
     if (req.query.view === "lite") {
       const lang = liteLang(req.query.lang);
-      return res.json(rows.map(r => toLiteRow(r, lang)));
+      return res.json(rows.map(r => toLiteRow(r, lang, "site")));
     }
     res.json(rows);
   });
@@ -855,7 +859,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const rows = attrs.map(a => stripImageData(stripAudioData(a, 'attraction'), 'attraction'));
     if (req.query.view === "lite") {
       const lang = liteLang(req.query.lang);
-      return res.json(rows.map(r => toLiteRow(r, lang)));
+      return res.json(rows.map(r => toLiteRow(r, lang, "attraction")));
     }
     res.json(rows);
   });
