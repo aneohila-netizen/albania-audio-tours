@@ -234,8 +234,8 @@ export default function MapPage() {
   const { t, lang, visitedSiteIds, markVisited } = useApp();
   const { loadTrack } = useAudioPlayer();
 
-  const DESTINATIONS = useDestinations();
-  const ATTRACTIONS = useAttractions();
+  const DESTINATIONS = useDestinations(lang);
+  const ATTRACTIONS = useAttractions(undefined, lang);
 
   // Change 5: preload nearest destination audio in background after GPS lock
   // When nearestTour is set, silently download its audio URL into browser cache.
@@ -942,7 +942,9 @@ export default function MapPage() {
     const nameField = `name${lang.charAt(0).toUpperCase() + lang.slice(1)}`;
     const siteName = (data as any)[nameField] || (data as any).nameEn || "";
     const descField = `desc${lang.charAt(0).toUpperCase() + lang.slice(1)}`;
-    const text = (data as any)[descField] || (data as any).descEn || "";
+    // The list data only carries a short description snippet; the full text is fetched below
+    // when it is actually needed (generated-speech fallback).
+    let text = (data as any)[descField] || (data as any).descEn || "";
     const entityType = selectedPin.type === "destination" ? "site" : "attraction";
     const serveUrl = `${RAILWAY_URL}/api/audio/serve/${entityType}/${data.id}/${lang}`;
 
@@ -956,6 +958,21 @@ export default function MapPage() {
       const probe = await fetch(serveUrl, { method: "HEAD" });
       if (probe.ok) storedUrl = serveUrl;
     } catch { /* network error — fall through to TTS */ }
+
+    // No stored audio → the player speaks the description with TTS, so it needs the FULL text,
+    // not the list snippet. Fetch it from the detail endpoint (falls back to the snippet on error).
+    if (!storedUrl) {
+      try {
+        const detailPath = selectedPin.type === "destination"
+          ? `/api/sites/${data.slug}`
+          : `/api/attractions/${selectedPin.dest.slug}/${data.slug}`;
+        const r = await fetch(`${RAILWAY_URL}${detailPath}`);
+        if (r.ok) {
+          const full = await r.json();
+          text = full[descField] || full.descEn || text;
+        }
+      } catch { /* keep the snippet */ }
+    }
 
     setSelectedPin(null); // close popup before loadTrack so player renders cleanly
     loadTrack({

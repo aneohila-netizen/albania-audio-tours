@@ -62,13 +62,24 @@ function apiAttrToAttraction(a: ApiAttraction): Attraction {
   };
 }
 
+/**
+ * Lite list endpoints (?view=lite&lang=xx): names, coordinates, categories, images and a
+ * short description snippet for English + the current language — ~150 KB instead of ~3 MB.
+ * Full descriptions come from the per-destination / per-attraction detail endpoints.
+ */
+export const sitesLiteKey = (lang: string) => ["railway", "sites", "lite", lang] as const;
+export const attractionsLiteKey = (lang: string) => ["railway", "attractions", "lite", lang] as const;
+export const fetchSitesLite = (lang: string) => railwayFetch<TourSite[]>(`/api/sites?view=lite&lang=${lang}`);
+export const fetchAttractionsLite = (lang: string) => railwayFetch<ApiAttraction[]>(`/api/attractions?view=lite&lang=${lang}`);
+
 /** Returns all destinations — API is authoritative, staticData is loading fallback */
-export function useDestinations(): Destination[] {
+export function useDestinations(lang: string = "en"): Destination[] {
   const { data: apiSites } = useQuery<TourSite[]>({
-    queryKey: ["railway", "sites"],
-    queryFn: () => railwayFetch<TourSite[]>("/api/sites"),
+    queryKey: sitesLiteKey(lang),
+    queryFn: () => fetchSitesLite(lang),
     staleTime: 5 * 60_000,  // 5 min — aligned with QueryClient default
     gcTime:   30 * 60_000,  // keep in cache 30 min after last use
+    placeholderData: (prev) => prev, // language switch: keep showing the previous list while the new one loads
   });
 
   if (apiSites && apiSites.length > 0) {
@@ -79,27 +90,33 @@ export function useDestinations(): Destination[] {
 
 /** Returns true while the sites query is in-flight (no cached data yet) */
 export function useDestinationsLoading(): boolean {
+  // The app always starts in English, so the English lite list is the one that gates first paint.
   const { isFetching, data } = useQuery<TourSite[]>({
-    queryKey: ["railway", "sites"],
-    queryFn: () => railwayFetch<TourSite[]>("/api/sites"),
+    queryKey: sitesLiteKey("en"),
+    queryFn: () => fetchSitesLite("en"),
     staleTime: 5 * 60_000,
     gcTime:   30 * 60_000,
   });
   return isFetching && (!data || data.length === 0);
 }
 
-/** Returns attractions — API is authoritative, staticData is loading fallback */
-export function useAttractions(destinationSlug?: string): Attraction[] {
+/**
+ * Returns attractions — API is authoritative, staticData is loading fallback.
+ * With a destinationSlug: that destination's attractions (full rows, used by detail screens).
+ * Without: the lite list of every attraction (map markers, search, counts).
+ */
+export function useAttractions(destinationSlug?: string, lang: string = "en"): Attraction[] {
   const { data: apiAttrs } = useQuery<ApiAttraction[]>({
     queryKey: destinationSlug
       ? ["railway", "attractions", destinationSlug]
-      : ["railway", "attractions"],
+      : attractionsLiteKey(lang),
     queryFn: () =>
       destinationSlug
         ? railwayFetch<ApiAttraction[]>(`/api/attractions/${destinationSlug}`)
-        : railwayFetch<ApiAttraction[]>("/api/attractions"),
-    staleTime: 60_000,
+        : fetchAttractionsLite(lang),
+    staleTime: destinationSlug ? 60_000 : 5 * 60_000,
     enabled: true,
+    placeholderData: (prev) => prev,
   });
 
   // API loaded → use it entirely (includes any admin-created attractions)

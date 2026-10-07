@@ -2,12 +2,19 @@ import { Switch, Route, Router, useLocation } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient, RAILWAY_URL } from "@/lib/queryClient";
+import { sitesLiteKey, attractionsLiteKey, fetchSitesLite, fetchAttractionsLite } from "@/lib/useApiData";
 
-// Prefetch destinations at module load time — fires before any component mounts.
-// When SitesPage renders, data is already in cache → instant display, no flash.
+// Prefetch the lite destination + attraction lists at module load time — fires before any
+// component mounts, so the map and Tour Sites render from cache. The app always starts in
+// English; a language switch fetches that language's lite list (~150 KB) on demand.
 queryClient.prefetchQuery({
-  queryKey: ["railway", "sites"],
-  queryFn: () => fetch(`${RAILWAY_URL}/api/sites`, { credentials: "include" }).then(r => r.json()),
+  queryKey: sitesLiteKey("en"),
+  queryFn: () => fetchSitesLite("en"),
+  staleTime: 5 * 60_000,
+});
+queryClient.prefetchQuery({
+  queryKey: attractionsLiteKey("en"),
+  queryFn: () => fetchAttractionsLite("en"),
   staleTime: 5 * 60_000,
 });
 import { useState, useRef, createContext, useContext, useEffect, lazy, Suspense } from "react";

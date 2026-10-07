@@ -40,8 +40,8 @@ export default function NavBar() {
   const [searchQuery, setSearchQuery] = useState("");
   const searchRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const DESTINATIONS_DATA = useDestinations();
-  const ATTRACTIONS_DATA = useAttractions();
+  const DESTINATIONS_DATA = useDestinations(lang);
+  const ATTRACTIONS_DATA = useAttractions(undefined, lang);
 
   // Focus input when search opens
   useEffect(() => {

@@ -45,8 +45,8 @@ export default function SitesPage() {
   const tagline = (d: Destination) => getLangText(d, "tagline", lang);
   const desc = (d: Destination) => getLangText(d, "desc", lang);
 
-  const DESTINATIONS = useDestinations();
-  const ATTRACTIONS = useAttractions();
+  const DESTINATIONS = useDestinations(lang);
+  const ATTRACTIONS = useAttractions(undefined, lang);
   const isLoadingDestinations = useDestinationsLoading();
 
   // Build category list from actual data — expand comma-separated multi-categories.
