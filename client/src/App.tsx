@@ -187,7 +187,7 @@ function DynamicFooter() {
   const [cmsLinks, setCmsLinks] = useState<CmsFooterPage[]>([]);
 
   useEffect(() => {
-    fetch(`${RAILWAY_URL}/api/cms/pages`)
+    fetch(`${RAILWAY_URL}/api/cms/pages?view=footer`)
       .then(r => r.json())
       .then((pages: any[]) => {
         // Only pages with showInFooter=true, exclude slugs already in fixed links

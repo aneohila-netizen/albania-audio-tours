@@ -1650,6 +1650,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const type = req.query.type as string | undefined;
       const pages = await storage.getPublishedCmsPages(type);
+      // ?view=footer — tiny list for the site footer (was the full 279-page list with every
+      // body/cover image, ~1.3 MB, on every page load)
+      if (req.query.view === "footer") {
+        return res.json(
+          pages.filter((p: any) => p.showInFooter).map((p: any) => ({ id: p.id, slug: p.slug, title: p.title, showInFooter: true })),
+        );
+      }
       res.json(pages);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
