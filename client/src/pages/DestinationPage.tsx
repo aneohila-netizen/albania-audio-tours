@@ -107,7 +107,7 @@ export default function DestinationPage() {
   // and uncached loads — the block's wrapper only exists after the data has arrived).
   useEffect(() => {
     if (!nearbyParam || nearbyScrolledRef.current) return;
-    if (destLoading || attrsLoading || !dest || !nearbyRef.current) return;
+    if (destLoading || !dest || !nearbyRef.current) return;
     nearbyScrolledRef.current = true;
     // Maps and images above the block finish loading after the first scroll and push it
     // down, so scroll again as the layout settles — unless the user has taken over.
@@ -121,9 +121,11 @@ export default function DestinationPage() {
       timers.forEach(clearTimeout);
       evts.forEach(e => window.removeEventListener(e, stop));
     };
-  }, [nearbyParam, destLoading, attrsLoading, dest?.id]);
+  }, [nearbyParam, destLoading, dest?.id]);
 
-  if (destLoading || attrsLoading) {
+  // Only the destination itself gates the page. The attractions list (the slower request) streams
+  // in below the header/description instead of holding the whole page behind skeletons.
+  if (destLoading) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
         <PageLoading label="Loading destination" inline delayMs={0} />
@@ -567,7 +569,15 @@ export default function DestinationPage() {
         );
       })()}
 
-      {attractions.length === 0 && (
+      {attrsLoading && (
+        <div className="space-y-3" aria-busy="true">
+          <PageLoading label="Loading attractions" inline delayMs={0} />
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <Skeleton className="h-20 w-full rounded-xl" />
+        </div>
+      )}
+
+      {!attrsLoading && attractions.length === 0 && (
         <div className="rounded-xl border border-border bg-muted/30 p-6 text-center text-muted-foreground">
           <Lightbulb size={28} className="mx-auto mb-3 opacity-40" />
           <p className="text-sm">Attractions coming soon.</p>
