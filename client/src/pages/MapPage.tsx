@@ -157,10 +157,14 @@ export default function MapPage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardStep, setOnboardStep] = useState(0);
 
+  // The Aeti guide no longer opens by itself. Aeti now gives her orientation tips on the loading
+  // screen, and when that closes the red "Explore Nearby" widget opens directly. The full guide
+  // stays available behind the "?" help button (setShowOnboarding(true)).
+  const introPopupDone = useRef(false);
   useEffect(() => {
-    if (alreadySeen || showLoadingScreen) return;
-    const timer = setTimeout(() => setShowOnboarding(true), 600);
-    return () => clearTimeout(timer);
+    if (showLoadingScreen || introPopupDone.current) return;
+    introPopupDone.current = true;
+    if (!popupDismissed && !autoCenter) setShowExplorePopup(true);
   }, [showLoadingScreen]);
 
   // Quietly warm the mascot images in the background so the Animated Quick Guide
@@ -1025,6 +1029,20 @@ export default function MapPage() {
 
       {/* Map */}
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} data-testid="map-container" />
+
+      {/* "?" help — reopens Aeti's full guide on demand */}
+      {!selectedPin && !showOnboarding && (
+        <button
+          type="button"
+          aria-label="Help — show the guide"
+          title="Help"
+          onClick={() => { setShowExplorePopup(false); setShowOnboarding(true); }}
+          className="absolute left-3 z-[999] w-9 h-9 rounded-full flex items-center justify-center text-base font-bold shadow-md border border-border bg-card text-foreground hover:bg-muted transition-colors"
+          style={{ bottom: heroDismissed ? "44px" : "92px" }}
+        >
+          ?
+        </button>
+      )}
 
       {/* Start Exploring pill — primary CTA, bottom-left, dismissible */}
       {!heroDismissed && !selectedPin && (
