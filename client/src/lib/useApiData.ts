@@ -161,3 +161,15 @@ export function prefetchDestination(slug: string): Promise<void> {
     }),
   ]).then(() => undefined);
 }
+
+/** Warms only the destination detail (small) — used for "likely next" idle prefetching. */
+export function prefetchSite(slug: string): Promise<void> {
+  if (!slug) return Promise.resolve();
+  return queryClient
+    .prefetchQuery({
+      queryKey: ["railway", "sites", slug],
+      queryFn: () => railwayFetch<TourSiteType>(`/api/sites/${slug}`),
+      staleTime: 5 * 60_000,
+    })
+    .then(() => undefined, () => undefined);
+}

@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { Check } from "lucide-react";
 import { useDestinationsLoading } from "@/lib/useApiData";
 
 const MESSAGES = [
@@ -124,14 +125,18 @@ export default function AppLoadingScreen({ onDone }: { onDone: () => void }) {
 
       {/* Dynamic loading information */}
       <div className="flex items-center gap-2 text-sm font-medium text-foreground/70 min-h-[24px]">
-        <svg
-          className="animate-spin shrink-0"
-          width="16" height="16" viewBox="0 0 24 24" fill="none"
-          stroke="hsl(var(--primary))" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-        </svg>
+        {dataReady ? (
+          <Check size={16} className="shrink-0" style={{ color: "hsl(var(--primary))" }} aria-hidden="true" />
+        ) : (
+          <svg
+            className="animate-spin shrink-0"
+            width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="hsl(var(--primary))" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+        )}
         <span>
           {dataReady ? "Ready" : MESSAGES[msgIdx]}
           {!dataReady && <span className="aat-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span>}

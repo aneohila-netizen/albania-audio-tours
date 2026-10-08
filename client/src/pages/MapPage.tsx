@@ -18,6 +18,7 @@ import MobileDrawer from "@/components/MobileDrawer";
 import AnimatedQuickGuide from "@/components/AnimatedQuickGuide";
 import AppLoadingScreen from "@/components/AppLoadingScreen";
 import NearestFlowOverlay from "@/components/NearestFlowOverlay";
+import { startIdlePrefetch } from "@/lib/idlePrefetch";
 import { getStreetTiles, loadCartoBasemapKey } from "@/lib/cartoBasemap";
 
 type LeafletLib = any;
@@ -241,6 +242,21 @@ export default function MapPage() {
 
   const DESTINATIONS = useDestinations(lang);
   const ATTRACTIONS = useAttractions(undefined, lang);
+
+  const cancelPrefetchRef = useRef<() => void>(() => {});
+  // Idle prefetch of the likely next pages — starts once, after the landing page is usable.
+  const prefetchStarted = useRef(false);
+  useEffect(() => {
+    if (showLoadingScreen || prefetchStarted.current) return;
+    if (DESTINATIONS.length === 0 || ATTRACTIONS.length === 0) return;
+    prefetchStarted.current = true;
+    const timer = setTimeout(() => {
+      cancelPrefetchRef.current = startIdlePrefetch({ destinations: DESTINATIONS, attractions: ATTRACTIONS });
+    }, 2500); // let the first interactions (widget, map) settle first
+    return () => clearTimeout(timer);
+  }, [showLoadingScreen, DESTINATIONS, ATTRACTIONS]);
+  useEffect(() => () => cancelPrefetchRef.current(), []); // stop when leaving the landing page
+
 
   // Change 5: preload nearest destination audio in background after GPS lock
   // When nearestTour is set, silently download its audio URL into browser cache.
