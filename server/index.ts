@@ -24,6 +24,7 @@ import cors from "cors";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { registerSeoRoutes } from "./seo";
+import { registerAgentRoutes } from "./agent";
 import { createServer } from "http";
 
 const app = express();
@@ -120,6 +121,8 @@ app.get("/map-config.json", (_req, res) => {
   // SEO routes (/p/:slug, /sitemap.xml, /robots.txt) — registered BEFORE
   // the API routes and the catch-all static handler so real URLs are served
   // as server-rendered HTML that Google can index without executing JS.
+  // AI-agent readiness (markdown for agents, llms.txt, MCP, discovery docs) — read-only, public data only
+  registerAgentRoutes(app);
   registerSeoRoutes(app);
 
   await registerRoutes(httpServer, app);

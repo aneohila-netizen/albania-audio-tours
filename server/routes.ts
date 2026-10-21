@@ -1712,6 +1712,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const pages = await storage.getPublishedCmsPages(type);
       // ?view=footer — tiny list for the site footer (was the full 279-page list with every
       // body/cover image, ~1.3 MB, on every page load)
+      // ?view=list — titles, excerpts and URLs only (for agents and lightweight lists)
+      if (req.query.view === "list") {
+        return res.json(
+          pages.map((p: any) => ({
+            id: p.id, slug: p.slug, title: p.title, excerpt: p.excerpt, pageType: p.pageType,
+            publishedAt: p.publishedAt, author: p.author, url: `https://albaniaaudiotours.com/p/${p.slug}`,
+          })),
+        );
+      }
       if (req.query.view === "footer") {
         return res.json(
           pages.filter((p: any) => p.showInFooter).map((p: any) => ({ id: p.id, slug: p.slug, title: p.title, showInFooter: true })),
@@ -1727,7 +1736,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/cms/pages/:slug", async (req, res) => {
     try {
       const page = await storage.getCmsPageBySlug(req.params.slug);
-      if (!page) return res.status(404).json({ error: "Page not found" });
+      // Drafts are private: only published pages are served on the public endpoint
+      // (admins preview drafts through /api/admin/cms/pages).
+      if (!page || !page.isPublished) return res.status(404).json({ error: "Page not found" });
       res.json(page);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
