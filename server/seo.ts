@@ -611,12 +611,37 @@ ${pageUrls}
   app.get("/robots.txt", (_req, res) => {
     res.setHeader("Content-Type", "text/plain");
     res.send(
-`User-agent: *
+`# Albania Audio Tours — crawlers and AI agents are welcome on all public content.
+# Content Signals (https://contentsignals.org/): search indexing, AI answers and AI training allowed.
+User-agent: *
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
 Allow: /
 Allow: /p/
+Allow: /llms.txt
+Allow: /llms-full.txt
+Allow: /.well-known/
+Allow: /openapi.json
 Disallow: /api/
 Disallow: /admin
 
+# AI search and assistant crawlers (explicitly allowed)
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: Bingbot
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+Allow: /
+Disallow: /api/
+Disallow: /admin
+
+Agentmap: ${SITE_URL}/.well-known/ai-catalog.json
 Sitemap: ${SITE_URL}/sitemap.xml`
     );
   });
