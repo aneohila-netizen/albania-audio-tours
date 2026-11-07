@@ -767,6 +767,81 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.redirect(val);
   });
 
+  // ── Offline packs ─────────────────────────────────────────────────────────────
+  // GET /api/offline/pack/:slug?lang=xx
+  // Describes everything a visitor needs to use one destination without a signal: the audio files
+  // (with sizes), the pictures, and the API reads the pages make. Built from the light getters, so
+  // no audio payload is read; sizes come from the ?v= length already carried by the audio URLs.
+  app.get("/api/offline/pack/:slug", async (req, res) => {
+    try {
+      const slug = String(req.params.slug || "");
+      const lang = String(req.query.lang || "en").toLowerCase();
+      if (!SUPPORTED_LANGS.includes(lang as SupportedLang)) return res.status(400).json({ error: "Unsupported lang" });
+      const site: any = await storage.getSiteBySlugLight(slug);
+      if (!site) return res.status(404).json({ error: "Destination not found" });
+      const attrs: any[] = await storage.getAttractionsByDestination(slug);
+      const L = lang.charAt(0).toUpperCase() + lang.slice(1);
+      const audio: any[] = [];
+      const addAudio = (type: "site" | "attraction", row: any, label: string) => {
+        const url: string | null = row?.[`audioUrl${L}`] || null;
+        if (!url) return;
+        const v = Number((String(url).match(/[?&]v=(\d+)/) || [])[1] || 0);
+        // v is the length of the base64 data URI; decoded audio is about 3/4 of that.
+        audio.push({ type, id: row.id, lang, url, v, bytes: Math.round(v * 0.75), label });
+      };
+      addAudio("site", site, site.nameEn || slug);
+      for (const a of attrs) addAudio("attraction", a, a.nameEn || a.slug);
+      const parseImgs = (raw: unknown): string[] => {
+        try { const j = typeof raw === "string" ? JSON.parse(raw) : raw; return Array.isArray(j) ? j.filter((u) => typeof u === "string") : []; } catch { return []; }
+      };
+      const images = Array.from(new Set([
+        site.imageUrl, ...parseImgs(site.images).slice(0, 6),
+        ...attrs.map((a) => a.imageUrl),
+      ].filter((u): u is string => typeof u === "string" && /^https?:\/\//.test(u))));
+      const api = [
+        `/api/sites?view=lite&lang=en`, `/api/attractions?view=lite&lang=en`,
+        ...(lang !== "en" ? [`/api/sites?view=lite&lang=${lang}`, `/api/attractions?view=lite&lang=${lang}`] : []),
+        `/api/sites/${slug}`, `/api/attractions/${slug}`,
+        ...attrs.map((a) => `/api/attractions/${slug}/${a.slug}`),
+        `/api/itineraries/${encodeURIComponent(slug)}`, `/api/ratings/${encodeURIComponent(slug)}`,
+        `/api/settings/itinerary_hero_image`, `/api/settings/paywall_active`, `/api/settings/free_until`,
+        `/api/cms/pages?view=footer`,
+      ];
+      res.set("Cache-Control", "no-store");
+      res.json({
+        slug, lang, siteId: site.id, name: site.nameEn || slug,
+        stops: attrs.length + 1, audioCount: audio.length,
+        audioBytes: audio.reduce((n, a) => n + a.bytes, 0),
+        audio, images, api,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message || "Could not build offline pack" });
+    }
+  });
+
+  // GET /api/offline/img?u=<image url>
+  // The picture bucket sends no CORS headers, so the browser cannot store its images in the offline
+  // cache directly. This relays only that bucket's images (exact host pattern, https, size-capped).
+  app.get("/api/offline/img", async (req, res) => {
+    try {
+      const raw = String(req.query.u || "");
+      let u: URL;
+      try { u = new URL(raw); } catch { return res.status(400).send("Invalid url"); }
+      if (u.protocol !== "https:" || !/^pub-[a-z0-9]+\.r2\.dev$/.test(u.hostname)) return res.status(400).send("Host not allowed");
+      const up = await fetch(u.toString(), { redirect: "error", signal: AbortSignal.timeout(10000) });
+      if (!up.ok) return res.status(up.status === 404 ? 404 : 502).send("Upstream error");
+      const type = up.headers.get("content-type") || "";
+      if (!/^image\//.test(type)) return res.status(415).send("Not an image");
+      const buf = Buffer.from(await up.arrayBuffer());
+      if (buf.length > 8 * 1024 * 1024) return res.status(413).send("Too large");
+      res.set("Content-Type", type);
+      res.set("Cache-Control", "public, max-age=86400");
+      res.send(buf);
+    } catch {
+      res.status(502).send("Relay failed");
+    }
+  });
+
   // ── Serve image from DB base64 (permanent — survives all redeploys) ──────────
   // GET /api/images/db/site/:id  or  /api/images/db/attraction/:id
   app.get("/api/images/db/:type/:id", async (req, res) => {
