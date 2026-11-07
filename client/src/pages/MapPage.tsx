@@ -18,6 +18,7 @@ import MobileDrawer from "@/components/MobileDrawer";
 import AnimatedQuickGuide from "@/components/AnimatedQuickGuide";
 import AppLoadingScreen from "@/components/AppLoadingScreen";
 import NearestFlowOverlay from "@/components/NearestFlowOverlay";
+import MapSideCards from "@/components/MapSideCards";
 import { startIdlePrefetch } from "@/lib/idlePrefetch";
 import { getStreetTiles, loadCartoBasemapKey } from "@/lib/cartoBasemap";
 
@@ -1059,6 +1060,13 @@ export default function MapPage() {
           ?
         </button>
       )}
+
+      {/* Desktop only: offline download, plans and journey cards in the empty areas beside Albania */}
+      <MapSideCards
+        destinations={DESTINATIONS}
+        destName={(slug) => { const d = DESTINATIONS.find(x => x.slug === slug); return d ? destName(d) : slug; }}
+        suppressed={showLoadingScreen || showExplorePopup || !!selectedPin || showOnboarding || nearestFlow || showDestPanel}
+      />
 
       {/* Start Exploring pill — primary CTA, bottom-left, dismissible */}
       {!heroDismissed && !selectedPin && (

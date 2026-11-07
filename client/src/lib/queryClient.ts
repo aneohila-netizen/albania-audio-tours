@@ -65,6 +65,9 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000, // 5 minutes — refreshes audio URLs when re-uploaded
       retry: false,
+      // Run the request even when the phone reports "offline": the service worker may hold a saved
+      // copy (downloaded destinations). Without this, queries sit paused until the signal returns.
+      networkMode: "offlineFirst",
     },
     mutations: {
       retry: false,

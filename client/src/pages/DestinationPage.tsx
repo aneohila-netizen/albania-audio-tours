@@ -10,6 +10,7 @@ import PaywallGate from "@/components/PaywallGate";
 import BookWithGuide from "@/components/BookWithGuide";
 import StarRatingDisplay from "@/components/StarRatingDisplay";
 import ItineraryCard from "@/components/ItineraryCard";
+import OfflinePackCard from "@/components/OfflinePackCard";
 import { ArrowLeft, MapPin, Star, Clock, ChevronRight, Lightbulb, Navigation, LayoutGrid, List, Navigation2, Lock } from "lucide-react";
 import GallerySlideshow from "@/components/GallerySlideshow";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -238,6 +239,9 @@ export default function DestinationPage() {
         <AudioPlayer site={dest} />
         <ItineraryCard siteSlug={dest.slug} centerLat={dest.lat} centerLng={dest.lng} />
       </PaywallGate>
+
+      {/* Offline download — free while the platform is free, subscribers only once the paywall is on */}
+      <OfflinePackCard slug={dest.slug} name={name} itemLocked={(dest as any).isLocked || false} />
 
       {/* Description — FREE forever as promised */}
       <div>
