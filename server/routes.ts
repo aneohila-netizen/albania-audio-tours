@@ -2129,7 +2129,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         throw new Error(`Resend API error ${resendResp.status}: ${errBody}`);
       }
 
-      res.json({ ok: true, sentTo: ADMIN_EMAIL });
+      res.json({ ok: true });
     } catch (e: any) {
       console.error("[OTP] send error:", e.message);
       res.status(500).json({ error: "Failed to send verification email. Please try again." });
@@ -2169,42 +2169,42 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   const resetStore = new Map<string, { email: string; expires: number }>();
 
   // POST /api/admin/forgot-password
-  // Body: { emailChoice: "primary"|"secondary", phone: string }
+  // Body: { phone: string }
+  // Privacy rule: the response never says where the link went, and it is identical whether or not the
+  // phone matched, so this endpoint cannot be used to learn the admin addresses or to test phone numbers.
+  // The link goes to every administrator address held in the environment.
   app.post("/api/admin/forgot-password", async (req, res) => {
     try {
       if (!rateLimit(`forgot:${clientIp(req)}`, 5, 60 * 60 * 1000)) {
         return res.status(429).json({ error: "Too many attempts. Please try again later." });
       }
-      const { emailChoice, phone } = req.body as { emailChoice: string; phone: string };
+      const { phone } = req.body as { phone: string };
 
-      // Verify phone — digits only, deliberate vague error to prevent enumeration.
       // ADMIN_RECOVERY_PHONE must be set in the environment (no default in code).
       const RECOVERY_PHONE = (process.env.ADMIN_RECOVERY_PHONE || "").replace(/\D/g, "");
       if (!RECOVERY_PHONE) {
         console.error("[RESET] ADMIN_RECOVERY_PHONE is not set — password reset is disabled.");
-        return res.status(401).json({ error: "Verification failed. Please check your details and try again." });
+        return res.json({ ok: true });
       }
-      const submittedPhone = (phone || "").replace(/\D/g, "");
+      const submittedPhone = (typeof phone === "string" ? phone : "").replace(/\D/g, "");
       if (!submittedPhone || !safeEqual(submittedPhone, RECOVERY_PHONE)) {
-        return res.status(401).json({ error: "Verification failed. Please check your details and try again." });
+        console.warn("[RESET] reset requested with a non-matching phone number");
+        return res.json({ ok: true }); // same answer as success: no phone-number oracle
       }
 
-      // Resolve recipient
       const PRIMARY_EMAIL   = process.env.ADMIN_OTP_EMAIL       || "book@albanianeagletours.com";
       const SECONDARY_EMAIL = process.env.ADMIN_SECONDARY_EMAIL || "aneo.hila@gmail.com";
-      const recipientEmail  = emailChoice === "secondary" ? SECONDARY_EMAIL : PRIMARY_EMAIL;
+      const recipients = Array.from(new Set([PRIMARY_EMAIL, SECONDARY_EMAIL].filter(Boolean)));
 
-      // Generate single-use 64-char hex token
+      // Generate single-use 64-char hex token (valid from either email, usable once)
       const { randomBytes } = await import("crypto");
       const token   = randomBytes(32).toString("hex");
       const expires = Date.now() + 60 * 60 * 1000; // 1 hour
-      resetStore.set(token, { email: recipientEmail, expires });
+      resetStore.set(token, { email: PRIMARY_EMAIL, expires });
 
-      // Build reset URL
       const BASE_URL = process.env.APP_URL || "https://albaniaaudiotours.com";
       const resetUrl = `${BASE_URL}/#/reset-password?token=${token}`;
 
-      // Send via Resend
       const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
       if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY not configured");
       const RESEND_FROM = process.env.RESEND_FROM || "noreply@albanianeagletours.com";
@@ -2212,7 +2212,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const emailHtml = `
         <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;">
           <h2 style="color:#c0392b;margin:0 0 8px">AlbaTour Admin — Password Reset</h2>
-          <p style="color:#555;margin:0 0 20px">A password reset was requested for the AlbaTour admin panel. If this was you, click below.</p>
+          <p style="color:#555;margin:0 0 20px">A password reset was requested for the AlbaTour admin panel. Both administrators received this message. If this was you, click below.</p>
           <div style="text-align:center;margin:28px 0;">
             <a href="${resetUrl}" style="background:#c0392b;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;display:inline-block;">Reset My Password</a>
           </div>
@@ -2223,27 +2223,33 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         </div>
       `;
 
-      const resendResp = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from:    `AlbaTour Security <${RESEND_FROM}>`,
-          to:      [recipientEmail],
-          subject: "AlbaTour Admin — Password Reset Request",
-          html:    emailHtml,
-          text:    `Password reset link (expires 1 hour):\n${resetUrl}\n\nIf you did not request this, ignore this email.`,
-        }),
-      });
-      if (!resendResp.ok) {
-        const errText = await resendResp.text();
-        throw new Error(`Resend error ${resendResp.status}: ${errText}`);
-      }
+      const results = await Promise.all(recipients.map(async (to) => {
+        try {
+          const r = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              from:    `AlbaTour Security <${RESEND_FROM}>`,
+              to:      [to],
+              subject: "AlbaTour Admin — Password Reset Request",
+              html:    emailHtml,
+              text:    `Password reset link (expires 1 hour):\n${resetUrl}\n\nIf you did not request this, ignore this email.`,
+            }),
+          });
+          if (!r.ok) console.error(`[RESET] Resend error ${r.status} for one recipient`);
+          return r.ok;
+        } catch (err: any) {
+          console.error("[RESET] send failed:", err.message);
+          return false;
+        }
+      }));
+      if (!results.some(Boolean)) throw new Error("No reset email could be sent");
 
-      console.log(`[RESET] Reset link sent to ${recipientEmail}`);
-      res.json({ ok: true, sentTo: recipientEmail });
+      console.log(`[RESET] Reset link sent to ${results.filter(Boolean).length} of ${recipients.length} administrator addresses`);
+      res.json({ ok: true });
     } catch (e: any) {
       console.error("[RESET] forgot-password error:", e.message);
-      res.status(500).json({ error: "Failed to send reset email. Please try again." });
+      res.status(500).json({ error: "Could not process the request. Please try again later." });
     }
   });
 

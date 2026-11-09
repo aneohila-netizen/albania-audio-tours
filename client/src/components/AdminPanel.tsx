@@ -193,22 +193,19 @@ function BackendStatusBanner() {
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
 // ─── Two-step admin login ────────────────────────────────────────────────────
 // Step 1: password — verified server-side
-// Step 2: 6-digit OTP emailed to book@albanianeagletours.com — verified server-side
+// Step 2: 6-digit OTP emailed to the administrator address held on the server — verified server-side
 // Only after both steps does the server return a session token.
-const ADMIN_OTP_EMAIL = "book@albanianeagletours.com";
 
-// ─── Forgot Password — 3-step automated reset ──────────────────────────
-// Step 1: choose email (primary / secondary)
-// Step 2: enter phone number for verification
-// Step 3: success — reset link sent
+// ─── Forgot Password ───────────────────────────────────────────────────
+// Never shows or hints at which email addresses exist. The visitor verifies the recovery phone
+// number; the server sends the reset link to the administrator addresses it holds and always
+// answers the same way, so nothing about the account can be learned from this dialog.
 
 function ForgotPasswordModal({ onClose }: { onClose: () => void }) {
-  const [step, setStep]           = useState<"choose" | "phone" | "sent">("choose");
-  const [emailChoice, setChoice]  = useState<"primary" | "secondary">("primary");
-  const [phone, setPhone]         = useState("");
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState("");
-  const [sentTo, setSentTo]       = useState("");
+  const [step, setStep]       = useState<"phone" | "sent">("phone");
+  const [phone, setPhone]     = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -218,11 +215,12 @@ function ForgotPasswordModal({ onClose }: { onClose: () => void }) {
       const res = await fetch(`${RAILWAY_API}/api/admin/forgot-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emailChoice, phone }),
+        body: JSON.stringify({ phone }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Request failed");
-      setSentTo(data.sentTo || "");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Request failed");
+      }
       setStep("sent");
     } catch (err: any) {
       setError(err.message || "Something went wrong. Please try again.");
@@ -245,12 +243,11 @@ function ForgotPasswordModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-start justify-between">
           <div>
             <h2 className="font-bold text-base text-foreground">
-              {step === "sent" ? "Check your email" : "Reset Password"}
+              {step === "sent" ? "Request received" : "Reset Password"}
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {step === "choose" && "Choose where to send your reset link"}
-              {step === "phone"  && "Verify your identity with your phone number"}
-              {step === "sent"   && "A reset link has been sent"}
+              {step === "phone" && "Verify your identity with your phone number"}
+              {step === "sent"  && "Your request has been processed"}
             </p>
           </div>
           <button
@@ -262,70 +259,7 @@ function ForgotPasswordModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        {/* Step indicator dots */}
-        {step !== "sent" && (
-          <div className="flex items-center gap-1.5 justify-center">
-            {(["choose", "phone"] as const).map((s, i) => (
-              <div
-                key={s}
-                className={`h-1.5 rounded-full transition-all ${
-                  step === s ? "w-5 bg-primary" : "w-1.5 bg-muted"
-                }`}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* ── Step 1: Choose email ── */}
-        {step === "choose" && (
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              A time-limited reset link will be sent to your chosen email. You will also need to verify your phone number on the next step.
-            </p>
-            <div className="space-y-2">
-              {[
-                { value: "primary",   label: "Primary email",   desc: "b***@albanianeagletours.com" },
-                { value: "secondary", label: "Secondary email",  desc: "a***@gmail.com" },
-              ].map(opt => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setChoice(opt.value as "primary" | "secondary")}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors text-left ${
-                    emailChoice === opt.value
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:bg-muted/40"
-                  }`}
-                >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                    emailChoice === opt.value ? "bg-primary/15" : "bg-muted"
-                  }`}>
-                    <Mail size={14} className={emailChoice === opt.value ? "text-primary" : "text-muted-foreground"} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-foreground">{opt.label}</p>
-                    <p className="text-[11px] text-muted-foreground truncate">{opt.desc}</p>
-                  </div>
-                  {emailChoice === opt.value && (
-                    <div className="ml-auto w-4 h-4 rounded-full bg-primary flex items-center justify-center shrink-0">
-                      <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                        <path d="M1.5 4l1.8 1.8L6.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setStep("phone")}
-              className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
-            >
-              Continue →
-            </button>
-          </div>
-        )}
-
-        {/* ── Step 2: Phone verification ── */}
+        {/* ── Phone verification ── */}
         {step === "phone" && (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground space-y-0.5">
@@ -357,52 +291,33 @@ function ForgotPasswordModal({ onClose }: { onClose: () => void }) {
                 {error}
               </p>
             )}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => { setStep("choose"); setError(""); }}
-                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors"
-              >
-                ← Back
-              </button>
-              <button
-                type="submit"
-                disabled={loading || !phone}
-                className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <><Loader2 size={14} className="animate-spin" /> Sending…</>
-                ) : (
-                  "Send Reset Link"
-                )}
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={loading || !phone}
+              className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <><Loader2 size={14} className="animate-spin" /> Sending…</>
+              ) : (
+                "Request Reset"
+              )}
+            </button>
           </form>
         )}
 
-        {/* ── Step 3: Success ── */}
+        {/* ── Done ── */}
         {step === "sent" && (
           <div className="space-y-4 text-center">
             <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto">
               <Mail size={24} className="text-green-600 dark:text-green-400" />
             </div>
             <div className="space-y-1.5">
-              <p className="text-sm font-semibold text-foreground">Reset link sent</p>
-              {sentTo && (
-                <p className="text-xs text-muted-foreground">
-                  Check <span className="font-mono text-primary">{sentTo}</span>
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground">
+                If the details were correct, the administrators have been notified and a reset link has been sent to them.
+              </p>
               <p className="text-xs text-muted-foreground">
                 The link expires in <strong>1 hour</strong> and can only be used once.
               </p>
-            </div>
-            <div className="p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground text-left space-y-1">
-              <p className="font-semibold text-foreground">What happens next</p>
-              <p>1. Click the link in your email</p>
-              <p>2. Set a new password</p>
-              <p>3. Railway redeploys automatically (2–3 min)</p>
-              <p>4. Confirmation sent to both email addresses</p>
             </div>
             <button
               onClick={onClose}
@@ -584,8 +499,7 @@ function LoginView({ onLogin }: { onLogin: () => void }) {
               <form onSubmit={handleOtpSubmit} className="space-y-4">
                 <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs text-muted-foreground space-y-0.5">
                   <p className="font-semibold text-foreground text-sm">Check your email</p>
-                  <p>A 6-digit verification code was sent to</p>
-                  <p className="font-mono text-primary">{ADMIN_OTP_EMAIL}</p>
+                  <p>A 6-digit verification code was sent to the administrator email on file.</p>
                   <p className="text-[11px] mt-1">Code expires in 10 minutes. Check your spam folder if needed.</p>
                 </div>
                 <div>
